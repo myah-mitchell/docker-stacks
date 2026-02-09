@@ -1,0 +1,10 @@
+http:
+  middlewares:
+    chain-authentik:
+      chain:
+        middlewares:
+          - middlewares-bouncer
+          - middlewares-rate-limit
+          - middlewares-secure-headers
+          - middlewares-compress
+          - middlewares-authentik

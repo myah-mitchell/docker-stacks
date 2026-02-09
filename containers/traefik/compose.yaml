@@ -1,0 +1,245 @@
+###############################################################################
+# Start of default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+  
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+###############################################################################
+# Start of stack config
+###############################################################################
+
+services:
+  .traefik:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: traefik:${TRAEFIK_VERSION:-latest}
+    hostname: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
+    container_name: ${PROJECT_NAME}
+    command:
+      ################################################################
+      # Global configuration
+      ################################################################
+      - --global.checknewversion=true
+      - --global.sendanonymoususage=false
+
+      ################################################################
+      # Logs
+      ################################################################
+      - --log.level=INFO
+      - --log.format=json
+      - --accesslog.format=json
+      - --accesslog.addinternals=false
+      - --accesslog.filepath=/etc/traefik/log/access.log
+      #- --accesslog.bufferingsize=10
+      - --accesslog.fields.defaultmode=keep
+      - --accesslog.fields.headers.defaultmode=keep
+      - --accesslog.fields.headers.names.Cookie=redact
+      - --accesslog.fields.headers.names.Set-Cookie=redact
+      - --accesslog.fields.headers.names.Authorization=drop
+
+      ################################################################
+      # Metrics
+      ################################################################
+      - --metrics.prometheus.addrouterslabels=true
+      - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
+      - --metrics.prometheus.headerlabels.useragent=User-Agent
+
+      ################################################################
+      # API and Dashboard
+      ################################################################
+      - --api.dashboard=true
+
+      ################################################################
+      # Entrypoints
+      ################################################################
+      # HTTP -> HTTPS Redirect
+      - --entrypoints.http.address=:80
+      - --entrypoints.http.http.redirections.entrypoint.to=https
+      - --entrypoints.http.http.redirections.entrypoint.scheme=https
+        # Trusted IPs (Cloudflare + Local)
+      - --entrypoints.http.forwardedheaders.trustedips=
+          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+          # Middlewares
+      - --entrypoints.http.http.middlewares=
+          middlewares-bouncer@file,
+          middlewares-rate-limit@file,
+          middlewares-secure-headers@file
+
+      # HTTPS
+      - --entrypoints.https.address=:443
+      - --entrypoints.https.asdefault=true
+      - --entrypoints.https.http.tls.options=tls-opts@file
+      #- --entrypoints.https.http.tls.certresolver=letsencrypt
+      #- --entrypoints.https.http.tls.domains[0].main=${DOMAIN_NAME}
+      #- --entrypoints.https.http.tls.domains[0].sans=*.${DOMAIN_NAME},*.${SUB_DOMAIN_NAME}${DOMAIN_NAME},*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+        # Trusted IPs (Cloudflare + Local)
+      - --entrypoints.https.forwardedheaders.trustedips=
+          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+          # Middlewares
+      - --entrypoints.https.http.middlewares=
+          middlewares-bouncer@file,
+          middlewares-rate-limit@file,
+          middlewares-secure-headers@file,
+          middlewares-compress@file
+
+      # Dashboard
+      - --entrypoints.dashboard.address=:8443
+      #- --entrypoints.dashboard.http.tls.options=tls-opts@file
+      - --entrypoints.dashboard.http.tls.certresolver=letsencrypt
+      - --entrypoints.dashboard.http.tls.domains[0].main=${DOMAIN_NAME}
+      - --entrypoints.dashboard.http.tls.domains[0].sans=*.${DOMAIN_NAME},*.${SUB_DOMAIN_NAME}${DOMAIN_NAME},*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+          # Trusted IPs (Local)
+      - --entrypoints.https.forwardedheaders.trustedips=
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+
+      ################################################################
+      # Healthcheck / Ping
+      ################################################################
+      - --ping=true
+
+      ################################################################
+      # Transports
+      ################################################################
+      - --serversTransport.insecureSkipVerify=true
+
+      ################################################################
+      # Providers
+      ################################################################
+      # Configuration reload frequency
+      - --providers.providersthrottleduration=2s
+ 
+      # Folder with dynamic configuration
+      - --providers.file.directory=/etc/traefik/rules
+      - --providers.file.watch=true
+      
+      # Docker provider for connecting all apps that are inside of the docker network
+      - --providers.docker.watch=true
+      - --providers.docker.network=proxy
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.endpoint=tcp://traefik-socket-proxy:2375
+
+      # Docker Redis provider for storing proxy labels from traefik-kop hosts
+      #- --providers.redis.endpoints=redis:6379
+
+      ################################################################
+      # Plugins
+      ################################################################
+      - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      #- --experimental.plugins.bouncer.version=v1.4.6
+      - --experimental.plugins.bouncer.version=v1.5.0
+
+      ################################################################
+      # Certificates Resolvers (ACME)
+      ################################################################
+      - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/certs/acme.json
+      # Uncomment the following line to use LetsEncrypt Staging
+      #- --certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=10
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+
+      ################################################################
+      # Extra Commands from Env Vars
+      ################################################################
+      - ${TRAEFIK_EXTRA_COMMAND:-""}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8443:8443"
+    environment:
+      <<: [*environment_tz, *environment_user]
+      CF_API_EMAIL: ${CF_API_EMAIL}
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
+      LE_EMAIL: letsencrypt@${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      CROWDSEC_LAPI_KEY: ${CROWDSEC_LAPI_KEY}
+      CROWDSEC_LAPI_HOST: ${CROWDSEC_LAPI_HOST}
+    volumes:
+      - "./traefik-config:/etc/traefik/rules/"
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-logs:/etc/traefik/log/"
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-plugins:/plugins-storage/"
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/cert-data:/etc/traefik/certs/"
+    labels: ## Traefik Labels
+      - "traefik.enable=true"
+
+      ## Traefik Dashboard
+      - "traefik.http.routers.traefik.rule=
+        Host(`${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+      - "traefik.http.routers.traefik.entrypoints=dashboard"  # Defined in traefik.yaml
+      - "traefik.http.routers.traefik.service=api@internal"
+
+      ## Default TLS Cert
+      - "traefik.tls.stores.default.defaultGeneratedCert.resolver=letsencrypt"
+      - "traefik.tls.stores.default.defaultGeneratedCert.domain.main=$DOMAIN_NAME"
+      - "traefik.tls.stores.default.defaultGeneratedCert.domain.sans=*.$DOMAIN_NAME,*.$SUB_DOMAIN_NAME$DOMAIN_NAME,*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      - proxy
+      - frontend
+      - backend
+      - socket_proxy
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      <<: *default_healthcheck

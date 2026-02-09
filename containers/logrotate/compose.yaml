@@ -1,0 +1,92 @@
+###############################################################################
+# Start of default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+  
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+###############################################################################
+# Start of stack config
+###############################################################################
+
+services:
+  .logrotate:
+    <<: [*limits, *restart, *security, *logging]
+    image: vegardit/traefik-logrotate:${LOGROTATE_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-logrotate.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: ${PROJECT_NAME}-logrotate
+    environment:
+      <<: [*environment_tz, *environment_user]
+      LOGROTATE_LOGS: "/logs/*.log"
+      LOGROTATE_TRIGGER_INTERVAL: weekly  # rotate daily, must be one of: daily, weekly, monthly, yearly
+      LOGROTATE_TRIGGER_SIZE: 50M       # rotate if log file size reaches 50MB
+      LOGROTATE_MAX_BACKUPS: 3           # keep 14 backup copies per rotated log file
+      LOGROTATE_FILE_USER: 1000          # owning user of the rotated file
+      LOGROTATE_FILE_GROUP: 1000         # owning group of the rotated file
+      CRON_SCHEDULE: "*/5 * * * *"
+      CRON_LOG_LEVEL: 4  # see https://unix.stackexchange.com/a/414010/378036
+      DOCKER_HOST: tcp://${PROJECT_NAME}-socket-proxy-rw:2375
+    volumes:
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-logs:/logs/"
+    networks:
+      - backend
+      - socket_proxy
+    healthcheck:
+      test: ["CMD", "logrotate", "--version"]
+      <<: *default_healthcheck

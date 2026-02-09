@@ -1,0 +1,38 @@
+################################################################
+# https://blog.lrvt.de/configuring-crowdsec-with-traefik/#configuring-traefik
+#
+# Dynamic configuration
+################################################################
+http:
+  middlewares:
+
+    middlewares-bouncer:
+      plugin:
+        bouncer:
+          enabled: true
+          defaultDecisionSeconds: 60
+          crowdsecMode: live
+          crowdsecAppsecEnabled: false # <--- here you can enable appsec waf
+          crowdsecAppsecHost: #crowdsec:7422
+          crowdsecAppsecFailureBlock: true
+          crowdsecAppsecUnreachableBlock: true
+          crowdsecLapiKey: {{env "CROWDSEC_LAPI_KEY"}}
+          crowdsecLapiHost: {{env "CROWDSEC_LAPI_HOST"}}
+          crowdsecLapiScheme: http
+          crowdsecLapiTLSInsecureVerify: false
+#         forwardedHeadersTrustedIPs:
+#           # private class ranges
+#           - 10.0.0.0/8
+#           - 172.16.0.0/12
+#           - 192.168.0.0/16
+#         clientTrustedIPs:
+#           # private class ranges
+#           - 10.0.0.0/8
+#           - 172.16.0.0/12
+#           - 192.168.0.0/16
+
+    #https://github.com/BetterCorp/cloudflarewarp/issues/30#issuecomment-1907922601
+    middlewares-realip:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-For: ">CF-Connecting-IP"

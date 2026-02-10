@@ -68,9 +68,9 @@ x-environment: &default_environment
 services:
   .traefik:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: traefik:${TRAEFIK_VERSION:-latest}
-    hostname: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
-    container_name: ${PROJECT_NAME}
+    image: ${TRAEFIK_IMAGE:-traefik}:${TRAEFIK_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
+    container_name: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}
     command:
       ################################################################
       # Global configuration
@@ -213,10 +213,10 @@ services:
       CROWDSEC_LAPI_KEY: ${CROWDSEC_LAPI_KEY}
       CROWDSEC_LAPI_HOST: ${CROWDSEC_LAPI_HOST}
     volumes:
-      - "./traefik-config:/etc/traefik/rules/"
-      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-logs:/etc/traefik/log/"
-      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-plugins:/plugins-storage/"
-      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/cert-data:/etc/traefik/certs/"
+      - "./rules:/etc/traefik/rules/"
+      - "${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/etc/traefik/log/"
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik/plugins:/plugins-storage/"
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik/certs:/etc/traefik/certs/"
     labels: ## Traefik Labels
       - "traefik.enable=true"
 

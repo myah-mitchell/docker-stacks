@@ -68,9 +68,9 @@ x-environment: &default_environment
 services:
   .logrotate:
     <<: [*limits, *restart, *security, *logging]
-    image: vegardit/traefik-logrotate:${LOGROTATE_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-logrotate.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
-    container_name: ${PROJECT_NAME}-logrotate
+    image: ${LOGROTATE_IMAGE:-vegardit/traefik-logrotate}:${LOGROTATE_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${LOGROTATE_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: ${PROJECT_NAME}-${LOGROTATE_HOSTNAME}
     environment:
       <<: [*environment_tz, *environment_user]
       LOGROTATE_LOGS: "/logs/*.log"
@@ -83,7 +83,7 @@ services:
       CRON_LOG_LEVEL: 4  # see https://unix.stackexchange.com/a/414010/378036
       DOCKER_HOST: tcp://${PROJECT_NAME}-socket-proxy-rw:2375
     volumes:
-      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-logs:/logs/"
+      - "${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/logs/"
     networks:
       - backend
       - socket_proxy

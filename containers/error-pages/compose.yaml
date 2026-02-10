@@ -68,9 +68,9 @@ x-environment: &default_environment
 services:
   .error-pages:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: tarampampam/error-pages:${ERROR_PAGES_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-error-pages.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
-    container_name: ${PROJECT_NAME}-error-pages
+    image: ${ERROR_PAGES_IMAGE:-tarampampam/error-pages}:${ERROR_PAGES_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${ERROR_PAGES_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: ${PROJECT_NAME}-${ERROR_PAGES_HOSTNAME}
     environment:
       <<: [*environment_tz, *environment_user]
       TEMPLATE_NAME: lost-in-space

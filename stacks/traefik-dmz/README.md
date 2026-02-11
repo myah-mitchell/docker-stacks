@@ -1,6 +1,6 @@
-# Traefik-kop Central Stack (Server) Overview
+# Bastion Host Stack (DMZ) Overview
 
-This will start up a Traefik stack with Traefik-kop and a password protected Redis server that all Traefik-kop services can write too. This server will need to allow inbound 6379 (Redis) and then port 80/443 (HTTP/HTTPS). This compose file should only be deployed to one server. 
+This will start up a Traefik stack that is configured to have Redis replicate data from the server stack. Then using a Traefik provider add routers and services from Redis to the proxy config. This stack is intended to be used on the edge of your network in a heavily restricted DMZ network. Only Port 443 (HTTPS) to your internal Traefik servers, and port 6379 (Redis) to the server running `traefik-server` need to be opened out of the DMZ. This compose file can be deployed to one or more servers in the DMZ. This is your HTTP/HTTPS Bastion host.
 
 # Create and Setup Requried Folders
 ## Create Stack Folders

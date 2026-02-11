@@ -68,23 +68,6 @@ x-environment: &default_environment
 
 services:
 
-  .redis-public:
-    <<: [*limits, *restart, *security, *logging]
-    image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-${REDIS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
-    container_name: "${PROJECT_NAME}-${REDIS_HOSTNAME}"
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    ports:
-      - "6379:6379"
-    environment:
-      <<: *default_environment
-    networks:
-      - frontend
-      - backend
-    healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-      <<: *default_healthcheck
-
   .redis:
     <<: [*limits, *restart, *security, *logging]
     image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-latest}
@@ -98,3 +81,15 @@ services:
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       <<: *default_healthcheck
+
+  .redis-public:
+    extends: .redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    networks:
+      - frontend
+
+  .redis-replica:
+    extends: .redis
+    command: redis-server --appendonly yes --replicaof ${REDIS_SERVER} 6379 --masterauth ${REDIS_PASSWORD}

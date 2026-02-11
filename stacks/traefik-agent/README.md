@@ -1,6 +1,6 @@
-# Traefik-kop Central Stack (Server) Overview
+# Traefik-kop Stack (Agent) Overview
 
-This will start up a Traefik stack with Traefik-kop and a password protected Redis server that all Traefik-kop services can write too. This server will need to allow inbound 6379 (Redis) and then port 80/443 (HTTP/HTTPS). This compose file should only be deployed to one server. 
+This will start up a Traefik stack with Traefik-kop. This server will only need port 80/443 (HTTP/HTTPS) inbound open. This server will need port 6379 (Redis) outbound open to talk to the `traefik-server` stack. This compose file can be ran on as many servers as you would like. Each server just needs to be able to acces the Redis server (6379 outbound) and be accessed by the DMZ servers (443 inbound).
 
 # Create and Setup Requried Folders
 ## Create Stack Folders

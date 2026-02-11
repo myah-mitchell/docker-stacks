@@ -30,8 +30,6 @@ services:
     extends:
       file: ../../containers/traefik/compose.yaml
       service: .traefik
-    hostname: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
-    container_name: ${PROJECT_NAME}
     depends_on:
       socket-proxy:
         condition: service_healthy

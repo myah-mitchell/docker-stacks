@@ -175,7 +175,7 @@ services:
       - --providers.docker.watch=true
       - --providers.docker.network=proxy
       - --providers.docker.exposedbydefault=false
-      - --providers.docker.endpoint=tcp://traefik-socket-proxy:2375
+      - --providers.docker.endpoint=tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
 
       # Docker Redis provider for storing proxy labels from traefik-kop hosts
       #- --providers.redis.endpoints=redis:6379

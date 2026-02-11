@@ -4,7 +4,9 @@
 
 For each server you will start one of the follwoing stacks, only one should be ran per server as the have overlaping services.
 
-**Traefik Stack (Basic)** The `traefik-basic\compose.yaml` will start up a basic Traefik stack without Traefik-kop support. This is a working Traefik stack with a socket-proxy and custom error pages.
+**Traefik Stack (Basic)** The `traefik-basic\compose.yaml` will start up a basic Traefik stack without Traefik-kop support or any monitoring/log collection. This is a working Traefik stack with a socket-proxy, custom error pages, and access log rotation.
+
+**Traefik Stack (Monitored)** The `traefik-monitored\compose.yaml` will start up a basic Traefik stack with monitoring and log collection but without Traefik-kop support. This is a working Traefik stack with a socket-proxy, custom error pages, access log rotation, vlagent, vmagent, and vector.
 
 **Traefik-kop Central Stack (Server)** The `traefik-server\compose.yaml` will start up a Traefik stack with Traefik-kop and a password protected Redis server that all Traefik-kop services can write too. This server will need to allow inbound 6379 (Redis) and then port 80/443 (HTTP/HTTPS). This compose file should only be deployed to one server. 
 

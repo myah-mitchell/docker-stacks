@@ -1,6 +1,6 @@
 # Traefik Stack (Basic) Overview
 
-This will start up a basic Traefik stack without Traefik-kop support. This is a working Traefik stack with a socket-proxy, custom error pages, and access log rotation.
+This will start up a basic Traefik stack without Traefik-kop support or any monitoring/log collection. This is a working Traefik stack with a socket-proxy, custom error pages, and access log rotation.
 
 # Create and Setup Requried Folders
 ## Create Stack Folders

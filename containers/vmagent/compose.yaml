@@ -86,6 +86,7 @@ services:
     environment:
       <<: [*environment_tz, *environment_user]
       SERVER_ADDRESS: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+      PROJECT_NAME: ${PROJECT_NAME}
     volumes:
       - ./config/prometheus-traefik.yml:/etc/prometheus/prometheus.yml:ro
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/vmagent-data:/vmagent

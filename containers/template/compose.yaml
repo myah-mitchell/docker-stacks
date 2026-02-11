@@ -82,7 +82,7 @@ services:
     volumes:
       - "./imageName-config:/config"
       - ${DOCKER_LOGS}/${PROJECT_NAME}/imageName:/logs"
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/imageName/data:/data"
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/imageName-data:/data"
     labels: ## Traefik
       - "traefik.enable: true"
       - "traefik.docker.network: ${PROXY_NETWORK}"

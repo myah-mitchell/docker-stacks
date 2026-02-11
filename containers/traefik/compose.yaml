@@ -216,8 +216,8 @@ services:
     volumes:
       - "./rules:/etc/traefik/rules/"
       - "${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/etc/traefik/log/"
-      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik/plugins:/plugins-storage/"
-      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik/certs:/etc/traefik/certs/"
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-plugins:/plugins-storage/"
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/traefik-certs:/etc/traefik/certs/"
     labels: ## Traefik Labels
       - "traefik.enable=true"
 

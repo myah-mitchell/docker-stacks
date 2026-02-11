@@ -1,5 +1,5 @@
 ###############################################################################
-# Start of default configs
+#region Default configs
 ###############################################################################
 
   #####################################
@@ -60,9 +60,10 @@ x-environment-user: &environment_user
   ## All environment defaults in one
 x-environment: &default_environment
   <<: [*environment_tz, *environment_user]
-
+  
+#endregion
 ###############################################################################
-# Start of stack config
+#region Stack config
 ###############################################################################
 
 services:
@@ -87,9 +88,9 @@ services:
       - "traefik.docker.network: ${PROXY_NETWORK}"
         ## HTTP Routers
       - "traefik.http.routers.$PROJECT_NAME-rtr.rule:
-        Host(`${SERVICE_NAME}.${DOMAIN_NAME}`) ||
-        Host(`${SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_HOSTNAME}.${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
       - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: bouncer,realip"
         ## Middlewares

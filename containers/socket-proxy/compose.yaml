@@ -1,5 +1,5 @@
 ###############################################################################
-# Start of default configs
+#region Default configs
 ###############################################################################
 
   #####################################
@@ -61,8 +61,9 @@ x-environment-user: &environment_user
 x-environment: &default_environment
   <<: [*environment_tz, *environment_user]
 
+#endregion
 ###############################################################################
-# Start of stack config
+#region Stack config
 ###############################################################################
 
 services:
@@ -116,8 +117,8 @@ services:
   .socket-proxy-rw:
     <<: [*limits, *restart, *security, *logging]
     image: lscr.io/linuxserver/socket-proxy:${SOCKET_PROXY_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-socket-proxy-rw.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
-    container_name: "${PROJECT_NAME}-socket-proxy-rw"
+    hostname: ${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}-rw.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}-rw"
     environment:
       <<: [*environment_tz, *environment_user]
       ALLOW_START: 0 #optional

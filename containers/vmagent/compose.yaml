@@ -68,39 +68,30 @@ x-environment: &default_environment
 
 services:
 
-  .imageName:
+  .vmagent-traefik:
     <<: [*limits, *restart, *security, *logging]
-    image: ${IMAGENAME_IMAGE:-imageName}:${IMAGENAME_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
-    container_name: "${PROJECT_NAME}-${IMAGENAME_HOSTNAME}"
+    image: ${VMAGENT_IMAGE:-victoriametrics/vmagent}:${VMAGENT_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${VMAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${VMAGENT_HOSTNAME}"
     command:
-      - "COMMAND"
-    ports:
-      - "PORT:PORT"
+      - "--loggerFormat=json"
+      - "--promscrape.config=/etc/prometheus/prometheus.yml"
+      - "--remoteWrite.tmpDataPath=/vmagent"
+      - '--remoteWrite.maxDiskUsagePerURL=${VMAGENT_DISK_USAGE:-200MB}'
+      - "--remoteWrite.basicAuth.username=${VMAUTH_USER}"
+      - "--remoteWrite.basicAuth.password=${VMAUTH_PASS}"
+      - "--remoteWrite.url=https://${VMAUTH_HOST}/api/v1/write"
+    #ports:
+    #  - 8429:8429
     environment:
       <<: [*environment_tz, *environment_user]
+      SERVER_ADDRESS: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     volumes:
-      - "./imageName-config:/config"
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/imageName:/logs"
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/imageName-data:/data"
-    labels: ## Traefik
-      - "traefik.enable: true"
-      - "traefik.docker.network: ${PROXY_NETWORK}"
-        ## HTTP Routers
-      - "traefik.http.routers.$PROJECT_NAME-rtr.rule:
-        Host(`${IMAGENAME_HOSTNAME}.${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: bouncer,realip"
-        ## Middlewares
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: chain-no-auth@file"
-        ## HTTP Services
-      - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=9120"
+      - ./config/prometheus-traefik.yml:/etc/prometheus/prometheus.yml:ro
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/vmagent-data:/vmagent
     networks:
-      - proxy
       - frontend
       - backend
     healthcheck:
-      test: ["CMD", "", ""]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8429/health"]
       <<: *default_healthcheck

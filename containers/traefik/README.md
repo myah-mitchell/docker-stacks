@@ -3,8 +3,8 @@
 
 ```yaml
 services:
-  Traefik:
+  traefik:
     extends:
       file: ../../containers/Traefik/compose.yaml
-      service: .Traefik
+      service: .traefik
 ```

@@ -68,39 +68,33 @@ x-environment: &default_environment
 
 services:
 
-  .imageName:
+  .redis-public:
     <<: [*limits, *restart, *security, *logging]
-    image: ${IMAGENAME_IMAGE:-imageName}:${IMAGENAME_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
-    container_name: "${PROJECT_NAME}-${IMAGENAME_HOSTNAME}"
-    command:
-      - "COMMAND"
+    image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${REDIS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${REDIS_HOSTNAME}"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     ports:
-      - "PORT:PORT"
+      - "6379:6379"
     environment:
-      <<: [*environment_tz, *environment_user]
-    volumes:
-      - "./imageName-config:/config"
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/imageName:/logs"
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/imageName-data:/data"
-    labels: ## Traefik
-      - "traefik.enable: true"
-      - "traefik.docker.network: ${PROXY_NETWORK}"
-        ## HTTP Routers
-      - "traefik.http.routers.$PROJECT_NAME-rtr.rule:
-        Host(`${IMAGENAME_HOSTNAME}.${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: bouncer,realip"
-        ## Middlewares
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: chain-no-auth@file"
-        ## HTTP Services
-      - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=9120"
+      <<: *default_environment
     networks:
-      - proxy
       - frontend
       - backend
     healthcheck:
-      test: ["CMD", "", ""]
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      <<: *default_healthcheck
+
+  .redis:
+    <<: [*limits, *restart, *security, *logging]
+    image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${REDIS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${REDIS_HOSTNAME}"
+    command: redis-server --appendonly yes
+    environment:
+      <<: *default_environment
+    networks:
+      - backend
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       <<: *default_healthcheck

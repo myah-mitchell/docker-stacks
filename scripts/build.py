@@ -27,13 +27,15 @@ Usage:
 """
 
 import re
+import secrets
+import string
 import sys
 from pathlib import Path
 from copy import deepcopy
 
 
 # ============================================================================
-# Data Structures
+# region Data Structures
 # ============================================================================
 
 class Section:
@@ -66,9 +68,9 @@ class Section:
             f"children={len(self.children)})"
         )
 
-
+# endregion
 # ============================================================================
-# Heading Detection
+# region Heading Detection
 # ============================================================================
 
 def detect_komodo_heading(line):
@@ -96,9 +98,9 @@ def detect_markdown_heading(line):
         return len(m.group(1)), m.group(2).strip()
     return None
 
-
+# endregion
 # ============================================================================
-# Parsing: Content -> Section Tree
+# region Parsing: Content -> Section Tree
 # ============================================================================
 
 def parse_sections(content, heading_detector):
@@ -151,9 +153,9 @@ def parse_sections(content, heading_detector):
 
     return preamble, top_level
 
-
+# endregion
 # ============================================================================
-# Merging: Combine Section Trees
+# region Merging: Combine Section Trees
 # ============================================================================
 
 def merge_sections(base_sections, new_sections):
@@ -161,8 +163,12 @@ def merge_sections(base_sections, new_sections):
 
     For each section in new_sections:
       - If a section with the same heading_text exists in base: append
-        content lines and recursively merge children.
+        only unique content lines and recursively merge children.
       - If no match: append as a new section.
+
+    Blank lines are always allowed through to preserve formatting
+    between groups of lines from different containers. Non-blank lines
+    are deduplicated so that identical entries are not repeated.
 
     Returns a new list; inputs are not modified.
     """
@@ -176,17 +182,43 @@ def merge_sections(base_sections, new_sections):
         )
 
         if match:
-            match.content_lines.extend(new_sec.content_lines)
+            existing = set(l for l in match.content_lines if l.strip())
+            for line in new_sec.content_lines:
+                if not line.strip() or line not in existing:
+                    match.content_lines.append(line)
+                    if line.strip():
+                        existing.add(line)
             match.children = merge_sections(match.children, new_sec.children)
         else:
             result.append(deepcopy(new_sec))
 
     return result
 
+# endregion
+# ============================================================================
+# region Serialization: Section Tree -> String
+# ============================================================================
 
-# ============================================================================
-# Serialization: Section Tree -> String
-# ============================================================================
+def prune_empty_sections(sections):
+    """Recursively remove sections that have no content and no children.
+
+    A section is considered empty if all its content_lines are blank
+    and it has no children (after its own children have been pruned).
+
+    Args:
+        sections: List of Section objects.
+
+    Returns:
+        Filtered list with empty sections removed.
+    """
+    pruned = []
+    for section in sections:
+        section.children = prune_empty_sections(section.children)
+        has_content = any(line.strip() for line in section.content_lines)
+        if has_content or section.children:
+            pruned.append(section)
+    return pruned
+
 
 def serialize_sections(preamble, sections):
     """Convert a preamble and section tree back into a string.
@@ -238,9 +270,9 @@ def serialize_sections(preamble, sections):
 
     return '\n'.join(lines) + '\n'
 
-
+# endregion
 # ============================================================================
-# Compose Parsing: Discover Container References
+# region Compose Parsing: Discover Container References
 # ============================================================================
 
 def extract_container_refs(compose_path):
@@ -273,9 +305,9 @@ def extract_container_refs(compose_path):
 
     return containers
 
-
+# endregion
 # ============================================================================
-# komodo.env Builder
+# region komodo.env Builder
 # ============================================================================
 
 def build_komodo_env(base_content, containers_dir, container_names):
@@ -305,9 +337,9 @@ def build_komodo_env(base_content, containers_dir, container_names):
 
     return serialize_sections(preamble, sections)
 
-
+# endregion
 # ============================================================================
-# README.md Builder
+# region README.md Builder
 # ============================================================================
 
 def build_readme(base_content, existing_content, containers_dir,
@@ -316,15 +348,17 @@ def build_readme(base_content, existing_content, containers_dir,
 
     Merge rules:
       1. If an existing stack README.md is available, it is used as the
-         starting point. Otherwise the base-README.md template is used
-         (with <stackName> replaced by the formatted stack directory name).
-      2. H1 headings that appear in ANY container README are considered
-         "shared" -- they are rebuilt entirely from container content each
-         run. This enables automatic cleanup when a container is removed
-         from the stack.
+         starting point. Otherwise the base-README.md template is used.
+      2. H1 headings that appear in the base-README.md or ANY container
+         README are considered "shared" -- they are rebuilt entirely from
+         base + container content each run. Base sections are applied
+         first, then container sections are layered on top. This enables
+         automatic cleanup when a container is removed from the stack
+         and ensures global base content stays up to date.
       3. H1 headings that exist ONLY in the stack README (manually added)
          are preserved untouched.
-      4. New H1 headings from containers not yet in the result are appended.
+      4. New H1 headings from base or containers not yet in the result
+         are appended.
 
     Args:
         base_content:    Content string of base-README.md.
@@ -336,17 +370,21 @@ def build_readme(base_content, existing_content, containers_dir,
     Returns:
         Generated README.md content string.
     """
+    pretty_name = stack_name.replace('-', ' ').title()
+    base_substituted = base_content.replace('<stackName>', pretty_name)
+
     # --- Determine starting content ---
     if existing_content is not None:
         start_content = existing_content
     else:
-        # First build: replace the <stackName> placeholder in the base
-        pretty_name = stack_name.replace('-', ' ').title()
-        start_content = base_content.replace('<stackName>', pretty_name)
+        start_content = base_substituted
 
     preamble, existing_sections = parse_sections(
         start_content, detect_markdown_heading
     )
+
+    # --- Parse base README sections (always used as shared source) ---
+    _, base_sections = parse_sections(base_substituted, detect_markdown_heading)
 
     # --- Collect all container README sections ---
     container_section_lists = []
@@ -358,51 +396,80 @@ def build_readme(base_content, existing_content, containers_dir,
         _, sections = parse_sections(content, detect_markdown_heading)
         container_section_lists.append(sections)
 
-    # --- Identify which H1 texts are "shared" (appear in any container) ---
+    # Base sections come first, then container sections layer on top
+    all_section_lists = [base_sections] + container_section_lists
+
+    # --- Identify which H1 texts are "shared" (appear in base or any container) ---
     shared_h1_texts = set()
-    for section_list in container_section_lists:
+    for section_list in all_section_lists:
         for section in section_list:
             shared_h1_texts.add(section.heading_text)
 
-    # --- Rebuild shared headings; preserve stack-only headings ---
+    # Helper: rebuild a section by merging content from all sources
+    def rebuild_from_sources(heading_line, heading_text, level):
+        rebuilt = Section(
+            heading_line=heading_line,
+            heading_text=heading_text,
+            level=level,
+        )
+        for section_list in all_section_lists:
+            for src_sec in section_list:
+                if src_sec.heading_text == heading_text:
+                    rebuilt.content_lines.extend(src_sec.content_lines)
+                    rebuilt.children = merge_sections(
+                        rebuilt.children, src_sec.children
+                    )
+                    break
+        return rebuilt
+
+    # --- Build result with enforced H1 ordering ---
+    # Order: 1) Stack-only  2) Base (in base order)  3) Container-only
     result = []
     seen = set()
 
+    # 1) Stack-only H1s: preserve as-is, in their existing order
     for existing_sec in existing_sections:
-        if existing_sec.heading_text in shared_h1_texts:
-            # Shared: rebuild entirely from current containers
-            rebuilt = Section(
-                heading_line=existing_sec.heading_line,
-                heading_text=existing_sec.heading_text,
-                level=existing_sec.level,
-            )
-            for section_list in container_section_lists:
-                for cont_sec in section_list:
-                    if cont_sec.heading_text == rebuilt.heading_text:
-                        rebuilt.content_lines.extend(cont_sec.content_lines)
-                        rebuilt.children = merge_sections(
-                            rebuilt.children, cont_sec.children
-                        )
-                        break
-            result.append(rebuilt)
-        else:
-            # Stack-only: preserve as-is
+        if existing_sec.heading_text not in shared_h1_texts:
             result.append(deepcopy(existing_sec))
+            seen.add(existing_sec.heading_text)
 
-        seen.add(existing_sec.heading_text)
+    # 2) Base H1s: in base-README.md order, rebuilt from all sources
+    for base_sec in base_sections:
+        if base_sec.heading_text not in seen:
+            # Use the existing heading line if available (preserves any
+            # manual heading-level tweaks the user made in the stack README)
+            heading_line = base_sec.heading_line
+            for existing_sec in existing_sections:
+                if existing_sec.heading_text == base_sec.heading_text:
+                    heading_line = existing_sec.heading_line
+                    break
+            result.append(rebuild_from_sources(
+                heading_line, base_sec.heading_text, base_sec.level
+            ))
+            seen.add(base_sec.heading_text)
 
-    # --- Append new container H1 headings not already present ---
+    # 3) Container-only H1s: not in base, rebuilt from all sources
     for section_list in container_section_lists:
         for cont_sec in section_list:
             if cont_sec.heading_text not in seen:
-                result.append(deepcopy(cont_sec))
+                heading_line = cont_sec.heading_line
+                for existing_sec in existing_sections:
+                    if existing_sec.heading_text == cont_sec.heading_text:
+                        heading_line = existing_sec.heading_line
+                        break
+                result.append(rebuild_from_sources(
+                    heading_line, cont_sec.heading_text, cont_sec.level
+                ))
                 seen.add(cont_sec.heading_text)
+
+    # --- Remove sections that have no content and no children ---
+    result = prune_empty_sections(result)
 
     return serialize_sections(preamble, result)
 
-
+# endregion
 # ============================================================================
-# Testing .env Generator
+# region Testing .env Generator
 # ============================================================================
 
 def parse_env_file(path):
@@ -548,9 +615,110 @@ def generate_test_env(komodo_content, existing_values, override_values,
 
     return '\n'.join(output_lines) + '\n'
 
-
+# endregion
 # ============================================================================
-# Project Root Discovery
+# region Post-Processing: Deduplication & Password Generation
+# ============================================================================
+
+def generate_password(length=16):
+    """Generate a random alphanumeric password.
+
+    Args:
+        length: Number of characters (default 16).
+
+    Returns:
+        Random string of ASCII letters and digits.
+    """
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def dedup_komodo_env(content):
+    """Comment out duplicate KEY: VALUE lines in komodo.env content.
+
+    Scans through the content line by line. For each KEY: VALUE line,
+    if the key has already appeared, the line is prefixed with '# ' to
+    comment it out. The first occurrence of each key is kept as-is.
+
+    Args:
+        content: The generated komodo.env content string.
+
+    Returns:
+        Content with duplicate keys commented out.
+    """
+    seen_keys = set()
+    lines = content.splitlines()
+    result = []
+
+    for line in lines:
+        stripped = line.strip()
+        m = re.match(r'^([A-Za-z_][A-Za-z0-9_]*)\s*:', stripped)
+        if m:
+            key = m.group(1)
+            if key in seen_keys:
+                result.append(f'# {line}')
+            else:
+                seen_keys.add(key)
+                result.append(line)
+        else:
+            result.append(line)
+
+    # Preserve original trailing newline
+    if content.endswith('\n'):
+        return '\n'.join(result) + '\n'
+    return '\n'.join(result)
+
+
+def dedup_env(content):
+    """Comment out duplicate keys and generate passwords in .env content.
+
+    Two post-processing steps applied to the generated .env:
+
+    1. Password generation: For keys ending in '_PASSWORD' or '_PASS'
+       whose resolved value is empty, a random 16-character alphanumeric
+       password is generated and set as the value.
+
+    2. Deduplication: The first occurrence of each key is kept. Subsequent
+       occurrences are commented out with '# '. Duplicate _PASSWORD entries
+       use the same password value as the first occurrence.
+
+    Args:
+        content: The generated .env content string.
+
+    Returns:
+        Content with passwords filled and duplicates commented out.
+    """
+    seen_keys = {}  # key -> resolved value (for consistent duplicate values)
+    lines = content.splitlines()
+    result = []
+
+    for line in lines:
+        stripped = line.strip()
+        m = re.match(r'^([A-Za-z_][A-Za-z0-9_]*)=(.*)', stripped)
+        if m:
+            key = m.group(1)
+            value = m.group(2)
+
+            if key in seen_keys:
+                # Duplicate: comment out with the first occurrence's value
+                result.append(f'# {key}={seen_keys[key]}')
+            else:
+                # First occurrence
+                if (key.endswith('_PASSWORD') or key.endswith('_PASS')) and value == '':
+                    value = generate_password()
+                seen_keys[key] = value
+                result.append(f'{key}={value}')
+        else:
+            result.append(line)
+
+    # Preserve original trailing newline
+    if content.endswith('\n'):
+        return '\n'.join(result) + '\n'
+    return '\n'.join(result)
+
+# endregion
+# ============================================================================
+# region Project Root Discovery
 # ============================================================================
 
 def find_project_root():
@@ -584,9 +752,9 @@ def find_project_root():
     print(f"  Checked: {cwd}")
     sys.exit(1)
 
-
+# endregion
 # ============================================================================
-# Per-Stack Build
+# region Per-Stack Build
 # ============================================================================
 
 def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
@@ -624,7 +792,8 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
     komodo_output = build_komodo_env(
         base_komodo, containers_dir, container_names
     )
-    (stack_dir / 'komodo.env').write_text(komodo_output, encoding='utf-8')
+    komodo_deduped = dedup_komodo_env(komodo_output)
+    (stack_dir / 'komodo.env').write_text(komodo_deduped, encoding='utf-8')
     print("    Created: komodo.env")
 
     # --- Generate README.md ---
@@ -650,15 +819,18 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
         container_env.update(
             parse_komodo_values(containers_dir / name / 'testing.env')
         )
+    # Use the original (non-deduped) komodo content so that duplicate KEY:
+    # VALUE lines are converted to KEY=VALUE before dedup_env processes them.
     env_output = generate_test_env(
         komodo_output, existing_env, override_values, container_env
     )
+    env_output = dedup_env(env_output)
     (stack_dir / '.env').write_text(env_output, encoding='utf-8')
     print("    Created: .env (testing)")
 
-
+# endregion
 # ============================================================================
-# Entry Point
+# region Entry Point
 # ============================================================================
 
 def main():
@@ -711,6 +883,8 @@ def main():
         print()
 
     print("Build complete.")
+
+# endregion
 
 
 if __name__ == '__main__':

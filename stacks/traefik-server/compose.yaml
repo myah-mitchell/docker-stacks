@@ -80,3 +80,31 @@ services:
       PING: 1 #optional
       POST: 1 #optional
       VERSION: 1 #optional
+
+  redis:
+    extends:
+      file: ../../containers/redis/compose.yaml
+      service: .redis-public
+
+  traefik-kop:
+    extends:
+      file: ../../containers/traefik-kop/compose.yaml
+      service: .traefik-kop
+    depends_on:
+      redis:
+        condition: service_healthy  
+
+  vmagent:
+    extends:
+      file: ../../containers/vmagent/compose.yaml
+      service: .vmagent-traefik
+
+  vlagent:
+    extends:
+      file: ../../containers/vlagent/compose.yaml
+      service: .vlagent
+
+  vector:
+    extends:
+      file: ../../containers/vector/compose.yaml
+      service: .vector-traefik

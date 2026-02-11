@@ -1,0 +1,233 @@
+data_dir: "/var/lib/vector"
+
+api:
+  enabled: true
+  address: "0.0.0.0:8686"
+
+sources:
+  # -------------------------------------------------------------------------
+  # Source: Traefik Logs
+  # -------------------------------------------------------------------------
+  traefik_logs:
+    type: "file"
+    include:
+      - "/var/log/traefik/access.log"
+      - "/var/log/traefik/access.log.1"
+    # Use "beginning" to ensure we capture files created during rotation.
+    # NOTE: Vector uses checkpoints in 'data_dir' to remember its position.
+    # It will NOT re-ingest old logs on restart unless the data_dir is deleted.
+    read_from: "beginning"
+
+  # Internal self-monitoring metrics for Vector
+  vector_metrics:
+    type: internal_metrics
+
+transforms:
+  parse_traefik:
+    type: "remap"
+    inputs: ["traefik_logs"]
+    source: |
+      # -----------------------------------------------------------------------
+      # 1. Parsing & Merging
+      # -----------------------------------------------------------------------
+      # Parse the raw JSON log line provided by Traefik
+      parsed_log, err = parse_json(.message)
+
+      if err == null {
+        # Merge parsed JSON fields into the root event object
+        ., err = merge(., parsed_log)
+
+        # -----------------------------------------------------------------------
+        # 2. Timestamp Standardization
+        # -----------------------------------------------------------------------
+        # Convert Traefik's timestamp to Vector's standard @timestamp.
+        # We prefer StartUTC as it complies with ISO 8601 / RFC 3339.
+        # Uniqueness Note: Using the exact source timestamp allows VictoriaLogs 
+        # to deduplicate events automatically if re-ingested.
+        if exists(.StartUTC) {
+           ts, err = parse_timestamp(.StartUTC, "%+")
+           if err == null {
+             .timestamp = ts
+             del(.StartUTC) 
+             del(.StartLocal) 
+             del(.time)
+           }
+        } else if exists(.time) {
+           ts, err = parse_timestamp(.time, "%+") 
+           if err == null {
+             .timestamp = ts
+             del(.time) 
+           }
+        }
+
+        # -----------------------------------------------------------------------
+        # 3. Type Coercion & Calculation
+        # -----------------------------------------------------------------------
+        # Ensure metrics are stored as integers for range queries (e.g., Duration > 1000)
+        ds_val, err = to_int(.DownstreamStatus)
+        .DownstreamStatus = if err == null { ds_val } else { 0 }
+        
+        dur_val, err = to_int(.Duration)
+        .Duration = if err == null { dur_val } else { 0 }
+
+        # Calculate a human-readable 'level' based on HTTP Status Code
+        if .DownstreamStatus >= 500 {
+          .level = "error"
+        } else if .DownstreamStatus >= 400 {
+          .level = "warn"
+        } else {
+          .level = "info"
+        }
+
+        # Parse User Agent into granular fields (Browser, OS, Device)
+        if exists(."request_User-Agent") {
+           ua, err = parse_user_agent(."request_User-Agent")
+           if err == null {
+             
+             # 1. Browser: Extract Family and append Major Version if safe
+             b_family = ua.family || "Other"
+             .ua_browser = b_family
+             
+             if ua.major != null && ua.major != "" { 
+                # Use strict error handling for concatenation
+                b_full, err = b_family + " " + ua.major 
+                if err == null {
+                   .ua_browser = b_full
+                }
+             }
+
+             # 2. OS: Extract Family and append Major Version if safe
+             os_family = ua.os.family || "Other"
+             .ua_os = os_family
+             
+             if ua.os.major != null && ua.os.major != "" { 
+                os_full, err = os_family + " " + ua.os.major 
+                if err == null {
+                   .ua_os = os_full
+                }
+             }
+
+             # 3. Device
+             .ua_device = ua.device.family || "Other"
+             
+             # Delete original long string
+             del(."request_User-Agent") 
+           }
+        }
+
+        # -----------------------------------------------------------------------
+        # 4. Message Construction
+        # -----------------------------------------------------------------------
+        # Build a concise summary string for log viewers (e.g. "GET 200 (5ms) example.com /api ")
+        duration_ms = .Duration / 1000000.0
+        
+        msg_parts = [
+          .RequestMethod || "-",
+          to_string(.DownstreamStatus),
+          .RequestAddr || "-",
+          .RequestPath || "-",
+          "(" + to_string(duration_ms) + "ms)"
+        ]
+
+        # Append specific Traefik error details if present (e.g. middleware failures)
+        if .msg != null && .msg != "" {
+          msg_parts = push(msg_parts, .msg)
+        }
+
+        # Join parts and cleanup source field
+        joined, err = join(msg_parts, " ")
+        .message = joined || ""
+        del(.msg)
+
+        # -----------------------------------------------------------------------
+        # 5. Privacy & Cleanup
+        # -----------------------------------------------------------------------
+        # Security: Redact sensitive authentication data
+        if exists(.request_Cookie) { .request_Cookie = "REDACTED" }
+        if exists(."request_Set-Cookie") { ."request_Set-Cookie" = "REDACTED" }
+        if exists(.Authorization) { .Authorization = "REDACTED" }
+
+        # Cleanup: Remove high-cardinality noise and static headers to save storage.
+        
+        # Browser Fingerprinting Headers
+        del(."request_Sec-Ch-Ua")
+        del(."request_Sec-Ch-Ua-Mobile")
+        del(."request_Sec-Ch-Ua-Platform")
+        del(."request_Sec-Fetch-Dest")
+        del(."request_Sec-Fetch-Mode")
+        del(."request_Sec-Fetch-Site")
+        del(."request_Sec-Fetch-User")
+        del(."request_Upgrade-Insecure-Requests")
+        del(."request_Dnt")
+        del(."request_Sec-Gpc")
+        del(."request_Priority")
+        
+        # Static/Redundant Downstream Headers
+        del(."downstream_Permissions-Policy")
+        del(."downstream_Strict-Transport-Security")
+        del(."downstream_X-Content-Type-Options")
+        del(."downstream_X-Frame-Options")
+        del(."downstream_X-Xss-Protection")
+        del(."downstream_X-Robots-Tag")
+        del(."downstream_Date")
+        del(."downstream_Vary")
+        del(."downstream_Referrer-Policy")
+        
+        # Static/Redundant Origin Headers
+        del(."origin_Permissions-Policy")
+        del(."origin_Strict-Transport-Security")
+        del(."origin_X-Content-Type-Options")
+        del(."origin_X-Frame-Options")
+        del(."origin_X-Xss-Protection")
+        del(."origin_X-Robots-Tag")
+        del(."origin_Date")
+        del(."origin_Vary")
+        del(."origin_Referrer-Policy")
+
+        # Misc High-Cardinality Fields
+        del(.ClientPort) 
+
+      } else {
+        # Capture parse errors for debugging
+        .error = err
+      }
+
+sinks:
+  victorialogs:
+    type: "elasticsearch"
+    inputs: ["parse_traefik"]
+    endpoints: [http://vlagent:9429/insert/elasticsearch/]
+    mode: "bulk" # Use Bulk API for performance (compresses many logs into one request)
+    api_version: v8
+    compression: "gzip"
+    healthcheck:
+      enabled: false 
+
+    # Batching: Send every 1MB or every 1 second, whichever comes first.
+    batch:
+      max_bytes: 1048576
+      timeout_secs: 1
+
+    # URL Query Parameters for Stream Identification
+    query:
+      # Fields that define the "Stream" (Service/App).
+      # WARNING: Do NOT include high-cardinality fields (IPs, RequestIDs) here.
+      _stream_fields: "RouterName,ServiceName"
+      
+      # UI Display preferences
+      _msg_field: "message"
+      _time_field: "@timestamp"
+    request:
+      headers:
+        AccountID: "0"
+        ProjectID: "0"
+    bulk:
+      index: "traefik-access"
+
+  # Sink: VictoriaMetrics (Internal Vector Health)
+  victoriametrics:
+    type: prometheus_remote_write
+    endpoint: http://vmagent:8429/api/v1/write
+    inputs: [vector_metrics]
+    healthcheck:
+      enabled: false

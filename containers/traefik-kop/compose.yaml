@@ -68,39 +68,27 @@ x-environment: &default_environment
 
 services:
 
-  .imageName:
+  .traefik-kop:
     <<: [*limits, *restart, *security, *logging]
-    image: ${IMAGENAME_IMAGE:-imageName}:${IMAGENAME_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
-    container_name: "${PROJECT_NAME}-${IMAGENAME_HOSTNAME}"
-    command:
-      - "COMMAND"
-    ports:
-      - "PORT:PORT"
+    image: ${TRAEFIK_KOP_IMAGE:-ghcr.io/jittering/traefik-kop}:${TRAEFIK_KOP_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${TRAEFIK_KOP_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${TRAEFIK_KOP_HOSTNAME}"
     environment:
       <<: [*environment_tz, *environment_user]
+      REDIS_ADDR: ${REDIS_SERVER}:6379
+      REDIS_PASS: ${REDIS_PASSWORD}
+      KOP_HOSTNAME: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+      KOP_POLL_INTERVAL: 10
+      BIND_IP: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+      DOCKER_PREFIX: kop-public
+      DEBUG: 0
+      #DOCKER_HOST: tcp://${PROJECT_NAME}-socket-proxy:2375
     volumes:
-      - "./imageName-config:/config"
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/imageName:/logs"
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/imageName-data:/data"
-    labels: ## Traefik
-      - "traefik.enable: true"
-      - "traefik.docker.network: ${PROXY_NETWORK}"
-        ## HTTP Routers
-      - "traefik.http.routers.$PROJECT_NAME-rtr.rule:
-        Host(`${IMAGENAME_HOSTNAME}.${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: bouncer,realip"
-        ## Middlewares
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: chain-no-auth@file"
-        ## HTTP Services
-      - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=9120"
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    userns_mode: "host"
     networks:
-      - proxy
-      - frontend
-      - backend
+    - frontend
+    - backend
     healthcheck:
-      test: ["CMD", "", ""]
+      test: ["CMD", "/traefik-kop", "--version"]
       <<: *default_healthcheck

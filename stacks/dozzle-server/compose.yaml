@@ -23,7 +23,10 @@ include:
 
 services:
 
-  dozzle:
+  dozzle-server:
     extends:
       file: ../../containers/dozzle/compose.yaml
       service: .dozzle-server
+    depends_on:
+      dozzle-agent:
+        condition: service_healthy

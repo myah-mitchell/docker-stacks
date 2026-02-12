@@ -92,8 +92,7 @@ services:
         crowdsecurity/appsec-virtual-patching" 
       CUSTOM_HOSTNAME: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     volumes:
-      - ./crowdsec-config/config.yaml:/etc/crowdsec/config.yaml
-      - ./crowdsec-config/custom-allowlist.yaml:/etc/crowdsec/parsers/s02-enrich/custom-allowlist.yaml
+      - ./config/custom-allowlist.yaml:/etc/crowdsec/parsers/s02-enrich/custom-allowlist.yaml
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-data:/var/lib/crowdsec/data
     networks:
       - frontend

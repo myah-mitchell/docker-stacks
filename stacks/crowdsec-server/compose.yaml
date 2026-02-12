@@ -25,6 +25,11 @@ services:
       file: ../../containers/crowdsec/compose.yaml
       service: .crowdsec-server
 
+  postgres:
+    extends:
+      file: ../../containers/postgres/compose.yaml
+      service: .postgres
+
   socket-proxy:
     extends:
       file: ../../containers/socket-proxy/compose.yaml

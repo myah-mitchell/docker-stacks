@@ -1,0 +1,88 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+  
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+  
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .geoipupdate:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: ${GEOIPUPDATE_IMAGE:-ghcr.io/maxmind/geoipupdate}:${GEOIPUPDATE_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${GEOIPUPDATE_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${GEOIPUPDATE_HOSTNAME}"
+    environment:
+      <<: [*environment_tz, *environment_user]
+      GEOIPUPDATE_EDITION_IDS: ${GEOIPUPDATE_EDITION_IDS}
+      GEOIPUPDATE_FREQUENCY: ${GEOIPUPDATE_FREQUENCY}
+      GEOIPUPDATE_ACCOUNT_ID: ${GEOIPUPDATE_ACCOUNT_ID}
+      GEOIPUPDATE_LICENSE_KEY: ${GEOIPUPDATE_LICENSE_KEY}
+    volumes:
+      - "${DOCKER_VOLUMES}/${PROJECT_NAME}/geoip-data:/usr/share/GeoIP"
+    networks:
+      - frontend
+    healthcheck:
+      test: ["CMD-SHELL", "geoipupdate -V"]
+      <<: *default_healthcheck

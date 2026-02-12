@@ -1,0 +1,156 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+  
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+  
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .authentik:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}"
+    environment:
+      <<: [*environment_tz, *environment_user]
+      AUTHENTIK_REDIS__HOST: ${PROJECT_NAME}-${REDIS_HOSTNAME}
+      AUTHENTIK_POSTGRESQL__HOST: ${PROJECT_NAME}-${POSTGRES_HOSTNAME}
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER}
+      AUTHENTIK_POSTGRESQL__NAME: ${POSTGRES_DB}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${POSTGRES_PASSWORD}
+      AUTHENTIK_DISABLE_STARTUP_ANALYTICS: ${AUTHENTIK_DISABLE_STARTUP_ANALYTICS}
+      AUTHENTIK_DISABLE_UPDATE_CHECK: ${AUTHENTIK_DISABLE_UPDATE_CHECK}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: ${AUTHENTIK_ERROR_REPORTING__ENABLED}
+      AUTHENTIK_LOG_LEVEL: ${AUTHENTIK_LOG_LEVEL}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_COOKIE_DOMAIN: ${AUTHENTIK_COOKIE_DOMAIN}
+      # AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS: ${AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS}
+    volumes:
+    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-media:/media
+    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-templates:/templates
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000')"]
+      <<: *default_healthcheck
+
+
+  .authentik-server:
+    extends: .authentik
+    hostname: ${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}-server.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}-server"
+    command: server
+    labels: ## Traefik Labels
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK}"
+        ## HTTP Routers
+      - "traefik.http.routers.$PROJECT_NAME-rtr.rule=
+        Host(`${AUTHENTIK_HOSTNAME}.${DOMAIN_NAME}`) ||
+        Host(`${AUTHENTIK_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${AUTHENTIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+        ## Middlewares
+      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=chain-no-auth@file"
+      # Catch any subdomain using individual application forward authentication
+      - "traefik.http.routers.$PROJECT_NAME-output-rtr.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) && PathPrefix(`/outpost.goauthentik.io/`)"
+      - "traefik.http.routers.$PROJECT_NAME-output-rtr.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.${DOMAIN_NAME}`) && PathPrefix(`/outpost.goauthentik.io/`)"
+        ## HTTP Services
+      - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=9000"
+        ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      - proxy
+    healthcheck:
+      start_period: 30s
+
+  .authentik-worker:
+    extends: .authentik
+    hostname: ${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}-worker.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}-worker"
+    command: worker
+    environment:
+      DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
+      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_EMAIL__HOST}
+      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_EMAIL__PORT}
+      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_EMAIL__USERNAME}
+      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_EMAIL__PASSWORD}
+      AUTHENTIK_EMAIL__USE_TLS: ${AUTHENTIK_EMAIL__USE_TLS}
+      AUTHENTIK_EMAIL__USE_SSL: ${AUTHENTIK_EMAIL__USE_SSL}
+      AUTHENTIK_EMAIL__TIMEOUT: ${AUTHENTIK_EMAIL__TIMEOUT}
+      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL__FROM}
+    volumes:
+    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-certs:/certs
+    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/geoip-data:/geoip
+    networks:
+      - socket_proxy
+    depends_on:
+      socket-proxy:
+        condition: service_healthy

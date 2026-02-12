@@ -68,8 +68,8 @@ x-environment: &default_environment
 
 services:
 
-  .vector-traefik:
-    <<: [*limits, *restart, *security, *user, *logging]
+  .vector:
+    <<: [*limits, *restart, *security, *logging]
     image: ${VECTOR_IMAGE:-docker.io/timberio/vector}:${VECTOR_VERSION:-latest}
     hostname: ${PROJECT_NAME}-${VECTOR_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VECTOR_HOSTNAME}"
@@ -80,9 +80,7 @@ services:
       VECTOR_LOG_FORMAT: json
       VECTOR_LOG: info
     volumes:
-      - ./config/vector-traefik.yml:/etc/vector/vector.yaml:ro
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/vector-data:/var/lib/vector
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik/:ro
     labels: ## Komodo Labels
       - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
     networks:
@@ -92,8 +90,27 @@ services:
         condition: service_healthy
       vmagent:
         condition: service_healthy
-      traefik:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "/usr/bin/vector", "validate", "--skip-healthchecks"]
       <<: *default_healthcheck
+
+  .vector-traefik:
+    extends: .vector
+    <<: [*user]
+    environment:
+    volumes:
+      - ./config/vector-traefik.yml:/etc/vector/vector.yaml:ro
+      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik/:ro
+    depends_on:
+      traefik:
+        condition: service_healthy
+
+  .vector-host:
+    extends: .vector
+    environment:
+      DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
+    volumes:
+      - ./config/vector-host.yml:/etc/vector/vector.yaml:ro
+    networks:
+      - frontend
+      - socket_proxy

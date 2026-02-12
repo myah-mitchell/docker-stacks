@@ -21,6 +21,12 @@ The `stacks\dozzle-agent\compose.yaml` will start up a Dozzle stack with Dozzle 
 
 The `stacks\komodo-server\compose.yaml` will start up a Komodo stack with an instance of Komodo running as a server to connect to instances of Komodo running on hosts. This should only be ran once in an environment.
 
+## Technitium Based Stacks
+
+### Technitium Stack (Server) Overview
+
+The `stacks\technitium-server\compose.yaml` will start up a Technitium stack with an instance of Technitium running as a server to connect to other instances of Technitium running on other servers. There is no server/agent mode here, all instances run the same config. This can only be run once per server.
+
 ## Traefik Based Stacks
 
 For each server you will start one of the following stacks. Only one should be run per server as they have overlapping services.

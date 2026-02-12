@@ -18,9 +18,6 @@ networks:
 #    name: ${PROJECT_NAME}_socket_proxy
 #    internal: true
 
-include:
-  - ../crowdsec-agent/compose.yaml
-
 services:
 
   crowdsec-server:

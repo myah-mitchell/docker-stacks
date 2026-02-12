@@ -91,6 +91,7 @@ services:
         crowdsecurity/appsec-generic-rules 
         crowdsecurity/appsec-virtual-patching" 
       CUSTOM_HOSTNAME: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+      DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
     volumes:
       - ./config/acquis.yaml:/etc/crowdsec/acquis.d/acquis-local.yaml
       - ./config/allowlist.yaml:/etc/crowdsec/parsers/s02-enrich/custom-allowlist.yaml
@@ -99,6 +100,10 @@ services:
       - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik
     networks:
       - frontend
+      - socket_proxy
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "cscli", "version"]
       <<: *default_healthcheck
@@ -114,20 +119,8 @@ services:
       - 6060 # metrics endpoint for prometheus
       - 7422 # appsec waf endpoint
     environment:
-      # Environment variables to configure CrowdSec LAPI for Postgres
-      DB_TYPE: postgres
-      DB_HOST: ${PROJECT_NAME}-${POSTGRES_HOSTNAME}
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      #LOCAL_API_URL: ${CROWDSEC_LAPI_URL}
       DISABLE_LOCAL_API: false # Disable LAPI and use this instance as an log processor only.
-      DISABLE_AGENT: true # Disable the log processor and use this instance as an LAPI only.
-    networks:
-      - backend
-    depends_on:
-      postgres:
-        condition: service_healthy
+      DISABLE_AGENT: false # Disable the log processor and use this instance as an LAPI only.
 
   .crowdsec-agent:
     extends: .crowdsec
@@ -139,9 +132,3 @@ services:
       AGENT_PASSWORD: ${CROWDSEC_AGENT_PASSWORD}
       DISABLE_LOCAL_API: true # Disable LAPI and use this instance as an log processor only.
       DISABLE_AGENT: false # Disable the log processor and use this instance as an LAPI only.
-      DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
-    networks:
-      - socket_proxy
-    depends_on:
-      socket-proxy:
-        condition: service_healthy

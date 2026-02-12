@@ -5,6 +5,16 @@
 ### Authentik Stack (Server) Overview
 The `stacks\authentic-server\compose.yaml` will start up an Authentik stack with a server and workinger. This stack should only be ran once per environment.
 
+## Crowdsec Based Stacks
+
+### Crowdsec Stack (Server) Overview
+
+The `stacks\crowdsec-server\compose.yaml` will start up a Crowdsec stack with an instance of Crowdsec running as a server and also the agent. This will only need to run on one server per environment.
+
+### Crowdsec Stack (Agent) Overview
+
+The `stacks\crowdsec-agent\compose.yaml` will start up a Crowdsec stack with Crowdsec running in agent mode collecting logs. This will relay all information to the crowdsec-server stack.
+
 ## Dozzle Based Stacks
 
 ### Dozzle Stack (Server) Overview

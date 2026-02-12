@@ -1,0 +1,9 @@
+---
+filenames:
+ - /var/log/traefik/access.log
+poll_without_inotify: true
+labels:
+  type: traefik
+---
+source: docker
+use_container_labels: true ## https://docs.crowdsec.net/docs/next/data_sources/docker#use_container_labels

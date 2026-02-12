@@ -1,0 +1,34 @@
+###############################################################################
+# Start of stack config
+###############################################################################
+# Project Name
+name: ${PROJECT_NAME}
+
+networks:
+#  proxy:
+#    name: ${PROXY_NETWORK}
+#    external: true
+  frontend:
+    name: ${PROJECT_NAME}_frontend
+    internal: false
+  backend:
+    name: ${PROJECT_NAME}_backend
+    internal: true
+#  socket_proxy:
+#    name: ${PROJECT_NAME}_socket_proxy
+#    internal: true
+
+include:
+  - ../crowdsec-agent/compose.yaml
+
+services:
+
+  crowdsec-server:
+    extends:
+      file: ../../containers/crowdsec/compose.yaml
+      service: .crowdsec-server
+
+  postgres:
+    extends:
+      file: ../../containers/postgres/compose.yaml
+      service: .postgres

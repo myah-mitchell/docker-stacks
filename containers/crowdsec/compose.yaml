@@ -1,0 +1,152 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+  
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+  
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .crowdsec:
+    <<: [*limits, *restart, *security, *logging]
+    image: ${CROWDSEC_IMAGE:-crowdsecurity/crowdsec}:${CROWDSEC_VERSION:-latest}
+    hostname: ${PROJECT_NAME}-${CROWDSEC_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${CROWDSEC_HOSTNAME}"
+    ports: 
+      - "8080:8080" # Local API port
+    expose:
+      - 8080 # http api for bouncers
+      - 6060 # metrics endpoint for prometheus
+      - 7422 # appsec waf endpoint
+    environment:
+      <<: [*environment_tz, *environment_user]
+      GID: "${PGID:-1000}"
+      COLLECTIONS: "
+        crowdsecurity/traefik 
+        crowdsecurity/http-cve 
+        crowdsecurity/http-dos 
+        crowdsecurity/base-http-scenarios 
+        crowdsecurity/appsec-crs 
+        crowdsecurity/appsec-generic-rules 
+        crowdsecurity/appsec-virtual-patching" 
+      CUSTOM_HOSTNAME: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    volumes:
+      - ./crowdsec-config/config.yaml:/etc/crowdsec/config.yaml
+      - ./crowdsec-config/custom-allowlist.yaml:/etc/crowdsec/parsers/s02-enrich/custom-allowlist.yaml
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-config:/etc/crowdsec
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-data:/var/lib/crowdsec/data
+    networks:
+      - frontend
+    healthcheck:
+      test: ["CMD", "cscli", "version"]
+      <<: *default_healthcheck
+
+  .crowdsec-server:
+    extends: .crwodsec
+    hostname: ${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-server.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-server"
+    ports: 
+      - "8080:8080" # Local API port
+    expose:
+      - 8080 # http api for bouncers
+      - 6060 # metrics endpoint for prometheus
+      - 7422 # appsec waf endpoint
+    environment:
+      # Environment variables to configure CrowdSec LAPI for Postgres
+      DB_TYPE: postgres
+      DB_HOST: ${PROJECT_NAME}-${POSTGRES_HOSTNAME}
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      #LOCAL_API_URL: ${CROWDSEC_LAPI_URL}
+      DISABLE_LOCAL_API: false # Disable LAPI and use this instance as an log processor only.
+      DISABLE_AGENT: true # Disable the log processor and use this instance as an LAPI only.
+    volumes:
+      - ./crowdsec-config/server-config.yaml:/etc/crowdsec/config.yaml
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  .crowdsec-agent:
+    extends: .crwodsec
+    hostname: ${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-agent.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-agent"
+    environment:
+      LOCAL_API_URL: ${CROWDSEC_LAPI_URL}
+      AGENT_USERNAME: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+      AGENT_PASSWORD: ${CROWDSEC_AGENT_PASSWORD}
+      DISABLE_LOCAL_API: true # Disable LAPI and use this instance as an log processor only.
+      DISABLE_AGENT: false # Disable the log processor and use this instance as an LAPI only.
+      DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
+    volumes:
+      - ./crowdsec-config/agent-config.yaml:/etc/crowdsec/config.yaml
+      - ./crowdsec-config/agent-acquis.yaml:/etc/crowdsec/acquis.d/acquis-local.yaml
+      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik
+    networks:
+      - socket_proxy
+    depends_on:
+      socket-proxy:
+        condition: service_healthy

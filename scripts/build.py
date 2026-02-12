@@ -26,6 +26,7 @@ Usage:
     python build.py                # from scripts/ directory
 """
 
+import argparse
 import re
 import secrets
 import string
@@ -638,7 +639,7 @@ def parse_komodo_values(path):
 
 
 def generate_test_env(komodo_content, existing_values, override_values,
-                      container_values):
+                      container_values, reset_env=False):
     """Generate a docker-compose-compatible .env from komodo.env content.
 
     Transforms the komodo.env format into standard KEY=VALUE pairs:
@@ -649,6 +650,8 @@ def generate_test_env(komodo_content, existing_values, override_values,
       - Regular comment lines are preserved.
 
     Value resolution order for each KEY (first non-empty wins):
+
+    Normal mode:
       1. existing_values   - preserves values the user already set in the
          stack's local .env so they are not overwritten on rebuild.
       2. override_values   - fills in defaults from scripts/base-testing.env
@@ -657,11 +660,19 @@ def generate_test_env(komodo_content, existing_values, override_values,
       4. container_values  - values from each container's testing.env file,
          providing container-specific test defaults.
 
+    Reset mode (--reset-env):
+      1. override_values
+      2. The raw value from komodo.env
+      3. container_values
+      4. existing_values   - only used as a last resort when no default
+         exists from any other source.
+
     Args:
         komodo_content:   The generated komodo.env content string.
         existing_values:  Dict of KEY=VALUE from the stack's current .env.
         override_values:  Dict of KEY=VALUE from the scripts override files.
         container_values: Dict of KEY=VALUE from each container's testing.env.
+        reset_env:        When True, use reset mode resolution order.
 
     Returns:
         Standard .env file content string.
@@ -697,19 +708,35 @@ def generate_test_env(komodo_content, existing_values, override_values,
             # Strip [[...]] Komodo references to get the base value
             base_value = re.sub(r'\[\[.*?\]\]', '', raw_value)
 
-            # Resolve: existing > override > base > container > VERSION default
-            if key in existing_values and existing_values[key] != '':
-                value = existing_values[key]
-            elif key in override_values and override_values[key] != '':
-                value = override_values[key]
-            elif base_value:
-                value = base_value
-            elif key in container_values and container_values[key] != '':
-                value = container_values[key]
-            elif key.endswith('_VERSION'):
-                value = 'latest'
+            # Resolve value from sources (first non-empty wins)
+            if reset_env:
+                # Reset: override > base > container > VERSION > existing
+                if key in override_values and override_values[key] != '':
+                    value = override_values[key]
+                elif base_value:
+                    value = base_value
+                elif key in container_values and container_values[key] != '':
+                    value = container_values[key]
+                elif key.endswith('_VERSION'):
+                    value = 'latest'
+                elif key in existing_values and existing_values[key] != '':
+                    value = existing_values[key]
+                else:
+                    value = ''
             else:
-                value = ''
+                # Normal: existing > override > base > container > VERSION
+                if key in existing_values and existing_values[key] != '':
+                    value = existing_values[key]
+                elif key in override_values and override_values[key] != '':
+                    value = override_values[key]
+                elif base_value:
+                    value = base_value
+                elif key in container_values and container_values[key] != '':
+                    value = container_values[key]
+                elif key.endswith('_VERSION'):
+                    value = 'latest'
+                else:
+                    value = ''
 
             output_lines.append(f"{key}={value}")
             continue
@@ -866,7 +893,7 @@ def find_project_root():
 # ============================================================================
 
 def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
-                override_values):
+                override_values, reset_env=False):
     """Build all generated files for a single stack.
 
     Reads the stack's compose.yaml to discover which containers it uses,
@@ -879,6 +906,7 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
         base_readme:     Content string of base-README.md.
         override_values: Dict of default KEY=VALUE pairs from scripts/
                          override files (base-testing.env, .env).
+        reset_env:       When True, reset .env values to defaults.
     """
     stack_name = stack_dir.name
     compose_path = stack_dir / 'compose.yaml'
@@ -930,7 +958,8 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
     # Use the original (non-deduped) komodo content so that duplicate KEY:
     # VALUE lines are converted to KEY=VALUE before dedup_env processes them.
     env_output = generate_test_env(
-        komodo_output, existing_env, override_values, container_env
+        komodo_output, existing_env, override_values, container_env,
+        reset_env=reset_env,
     )
     env_output = dedup_env(env_output)
     (stack_dir / '.env').write_text(env_output, encoding='utf-8')
@@ -943,6 +972,15 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
 
 def main():
     """Discover all stacks and build their generated files."""
+    parser = argparse.ArgumentParser(
+        description='Build stack files from base templates and containers.'
+    )
+    parser.add_argument(
+        '--reset-env', action='store_true',
+        help='Reset .env values to defaults. Existing values are only '
+             'preserved for keys that have no default from any other source.'
+    )
+    args = parser.parse_args()
 
     root = find_project_root()
     containers_dir = root / 'containers'
@@ -981,12 +1019,15 @@ def main():
         print("No stack directories found.")
         return
 
-    print(f"Found {len(stack_dirs)} stack(s)\n")
+    print(f"Found {len(stack_dirs)} stack(s)")
+    if args.reset_env:
+        print("Mode: --reset-env (resetting .env values to defaults)")
+    print()
 
     for stack_dir in stack_dirs:
         build_stack(
             stack_dir, containers_dir, base_komodo, base_readme,
-            override_values,
+            override_values, reset_env=args.reset_env,
         )
         print()
 

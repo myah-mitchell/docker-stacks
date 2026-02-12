@@ -82,7 +82,7 @@ services:
     volumes:
       - ./config/vector-traefik.yml:/etc/vector/vector.yaml:ro
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/vector-data:/var/lib/vector
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik-logs:/var/log/traefik/:ro
+      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik/:ro
     labels: ## Komodo Labels
       - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
     networks:

@@ -88,6 +88,7 @@ services:
       - "traefik.docker.network: ${PROXY_NETWORK}"
         ## HTTP Routers
       - "traefik.http.routers.$PROJECT_NAME-rtr.rule:
+        Host(`${IMAGENAME_SERVICE_NAME}.${DOMAIN_NAME}`) ||
         Host(`${IMAGENAME_HOSTNAME}.${DOMAIN_NAME}`) ||
         Host(`${IMAGENAME_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||

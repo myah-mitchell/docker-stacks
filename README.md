@@ -2,7 +2,7 @@
 
 ## Traefik Based Stacks
 
-For each server you will start one of the follwoing stacks, only one should be ran per server as the have overlaping services.
+For each server you will start one of the following stacks. Only one should be run per server as they have overlapping services.
 
 ### Traefik Stack (Basic) Overview
 
@@ -14,11 +14,11 @@ The `stacks\traefik-monitored\compose.yaml` will start up a basic Traefik stack 
 
 ### Traefik-kop Central Stack (Server) Overview
 
-The `stacks\traefik-server\compose.yaml` will start up a Traefik stack with Traefik-kop and a password protected Redis server that all Traefik-kop services can write too. This server will need to allow inbound 6379 (Redis) and then port 80/443 (HTTP/HTTPS). This compose file should only be deployed to one server. 
+The `stacks\traefik-server\compose.yaml` will start up a Traefik stack with Traefik-kop and a password-protected Redis server that all Traefik-kop services can write to. This server will need to allow inbound 6379 (Redis) and then port 80/443 (HTTP/HTTPS). This compose file should only be deployed to one server.
 
 ### Traefik-kop Stack (Agent) Overview
 
-The `stacks\traefik-agent\compose.yaml` will start up a Traefik stack with Traefik-kop. This server will only need port 80/443 (HTTP/HTTPS) inbound open. This server will need port 6379 (Redis) outbound open to talk to the `traefik-server` stack. This compose file can be ran on as many servers as you would like. Each server just needs to be able to acces the Redis server (6379 outbound) and be accessed by the DMZ servers (443 inbound). 
+The `stacks\traefik-agent\compose.yaml` will start up a Traefik stack with Traefik-kop. This server will only need port 80/443 (HTTP/HTTPS) inbound open. This server will need port 6379 (Redis) outbound open to talk to the `traefik-server` stack. This compose file can be run on as many servers as you would like. Each server just needs to be able to access the Redis server (6379 outbound) and be accessed by the DMZ servers (443 inbound).
 
 ### Bastion Host Stack (DMZ) Overview
 

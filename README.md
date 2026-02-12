@@ -10,6 +10,12 @@ This will start up a Dozzle stack with an instance of Dozzle running as a server
 
 This will start up a Dozzle stack with Dozzle running in agent mode collecting logs. This server will only need port 7007 inbound open for the Dozzle server to connect to this agent on. This compose file should only be ran once per server but can ran on as many servers as you would like.
 
+## Komodo Based Stacks
+
+### Komodo Stack (Server) Overview
+
+The `stacks\komodo-server\compose.yaml` will start up a Komodo stack with an instance of Komodo running as a server to connect to instances of Komodo running on hosts. This should only be ran once in an environment.
+
 ## Traefik Based Stacks
 
 For each server you will start one of the following stacks. Only one should be run per server as they have overlapping services.

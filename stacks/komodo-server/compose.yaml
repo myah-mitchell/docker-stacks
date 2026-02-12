@@ -1,0 +1,38 @@
+###############################################################################
+# Start of stack config
+###############################################################################
+# Project Name
+name: ${PROJECT_NAME}
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
+  frontend:
+    name: ${PROJECT_NAME}_frontend
+    internal: false
+  backend:
+    name: ${PROJECT_NAME}_backend
+    internal: true
+#  socket_proxy:
+#    name: ${PROJECT_NAME}_socket_proxy
+#    internal: true
+
+services:
+
+  ferretdb:
+    extends:
+      file: ../../containers/ferretdb/compose.yaml
+      service: .ferretdb
+
+  postgres:
+    extends:
+      file: ../../containers/ferretdb/compose.yaml
+      service: .postgres-documentdb
+
+  komodo:
+    extends:
+      file: ../../containers/komodo/compose.yaml
+      service: .komodo
+
+    

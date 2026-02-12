@@ -80,7 +80,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/postgres-data:/var/lib/postgresql/data
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/postgres-data:/var/lib/postgresql
     networks:
       - backend
     healthcheck:

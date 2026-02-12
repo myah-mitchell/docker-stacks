@@ -8,8 +8,9 @@ services:
       file: ../../containers/ferretdb/compose.yaml
       service: .ferretdb
 
+  # FerretDB Postgres with DocumentDB Included
   postgres:
     extends:
       file: ../../containers/ferretdb/compose.yaml
-      service: .postgres-documentdb
+      service: .postgres
 ```

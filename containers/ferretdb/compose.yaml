@@ -91,6 +91,7 @@ services:
     #  test: ["CMD", "", ""]
     #  <<: *default_healthcheck
 
+  # FerretDB Postgres with DocumentDB Included
   .postgres:
     <<: [*limits, *restart, *security, *logging]
     image: ${POSTGRES_DOCUMENTDB_IMAGE:-ghcr.io/ferretdb/postgres-documentdb}:${POSTGRES_DOCUMENTDB_VERSION:-latest}

@@ -23,14 +23,6 @@ include:
 
 services:
 
-  traefik:
-    extends:
-      file: ../traefik-monitored/compose.yaml
-      service: traefik
-    command:
-      # Docker Redis provider for storing proxy labels from traefik-kop hosts
-      - --providers.redis.endpoints=redis:6379
-
   redis:
     extends:
       file: ../../containers/redis/compose.yaml

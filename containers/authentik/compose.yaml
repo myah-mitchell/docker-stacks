@@ -113,7 +113,7 @@ services:
       - "traefik.docker.network=${PROXY_NETWORK}"
         ## HTTP Routers
       - "traefik.http.routers.$PROJECT_NAME-rtr.rule=
-        Host(`${AUTHENTIK_ALIAS}.${DOMAIN_NAME}`) ||
+        Host(`${AUTHENTIK_SERVICE_NAME}.${DOMAIN_NAME}`) ||
         Host(`${AUTHENTIK_HOSTNAME}.${DOMAIN_NAME}`) ||
         Host(`${AUTHENTIK_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${AUTHENTIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||

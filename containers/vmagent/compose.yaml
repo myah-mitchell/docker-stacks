@@ -69,7 +69,7 @@ x-environment: &default_environment
 services:
 
   .vmagent-traefik:
-    <<: [*limits, *restart, *security, *logging]
+    <<: [*limits, *restart, *security, *user, *logging]
     image: ${VMAGENT_IMAGE:-victoriametrics/vmagent}:${VMAGENT_VERSION:-latest}
     hostname: ${PROJECT_NAME}-${VMAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VMAGENT_HOSTNAME}"

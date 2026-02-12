@@ -34,6 +34,6 @@ sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 ## Create needed folders for geoipupdate
 
 ```bash
-mkdir -p /opt/docker/volumes/$projectName/geoipupdate-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/geoipupdate-*
+mkdir -p /opt/docker/volumes/$projectName/geoip-data
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/geoip-*
 ```

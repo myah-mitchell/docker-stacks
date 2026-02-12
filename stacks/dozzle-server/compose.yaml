@@ -1,0 +1,29 @@
+###############################################################################
+# Start of stack config
+###############################################################################
+# Project Name
+name: ${PROJECT_NAME}
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
+  frontend:
+    name: ${PROJECT_NAME}_frontend
+    internal: false
+#  backend:
+#    name: ${PROJECT_NAME}_backend
+#    internal: true
+  socket_proxy:
+    name: ${PROJECT_NAME}_socket_proxy
+    internal: true
+
+include:
+  - ../dozzle-agent/compose.yaml
+
+services:
+
+  dozzle:
+    extends:
+      file: ../../containers/dozzle/compose.yaml
+      service: .dozzle-server

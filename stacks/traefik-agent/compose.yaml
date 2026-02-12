@@ -27,6 +27,3 @@ services:
     extends:
       file: ../../containers/traefik-kop/compose.yaml
       service: .traefik-kop
-    depends_on:
-      redis:
-        condition: service_healthy  

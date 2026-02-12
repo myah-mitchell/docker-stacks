@@ -6,6 +6,7 @@
 
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/crowdsec-data
-mkdir -p /opt/docker/volumes/$projectName/crowdsec-config
+mkdir -p /opt/docker/volumes/$projectName/crowdsec-agent
+mkdir -p /opt/docker/volumes/$projectName/crowdsec-server
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/crowdsec-*
 ```

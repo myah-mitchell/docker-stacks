@@ -103,7 +103,7 @@ services:
       <<: *default_healthcheck
 
   .crowdsec-server:
-    extends: .crwodsec
+    extends: .crowdsec
     hostname: ${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-server.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-server"
     ports: 
@@ -131,7 +131,7 @@ services:
         condition: service_healthy
 
   .crowdsec-agent:
-    extends: .crwodsec
+    extends: .crowdsec
     hostname: ${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-agent.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-agent"
     environment:

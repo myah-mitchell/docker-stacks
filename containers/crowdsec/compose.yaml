@@ -92,8 +92,11 @@ services:
         crowdsecurity/appsec-virtual-patching" 
       CUSTOM_HOSTNAME: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     volumes:
-      - ./config/custom-allowlist.yaml:/etc/crowdsec/parsers/s02-enrich/custom-allowlist.yaml
+      - ./config/acquis.yaml:/etc/crowdsec/acquis.d/acquis-local.yaml
+      - ./config/allowlist.yaml:/etc/crowdsec/parsers/s02-enrich/custom-allowlist.yaml
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-data:/var/lib/crowdsec/data
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-config:/etc/crowdsec
+      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik
     networks:
       - frontend
     healthcheck:
@@ -120,9 +123,6 @@ services:
       #LOCAL_API_URL: ${CROWDSEC_LAPI_URL}
       DISABLE_LOCAL_API: false # Disable LAPI and use this instance as an log processor only.
       DISABLE_AGENT: true # Disable the log processor and use this instance as an LAPI only.
-    volumes:
-      - ./config/server-config.yaml:/etc/crowdsec/config.yaml
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-server:/etc/crowdsec
     networks:
       - backend
     depends_on:
@@ -140,10 +140,6 @@ services:
       DISABLE_LOCAL_API: true # Disable LAPI and use this instance as an log processor only.
       DISABLE_AGENT: false # Disable the log processor and use this instance as an LAPI only.
       DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
-    volumes:
-      - ./config/agent-config.yaml:/etc/crowdsec/config.yaml
-      - ./config/agent-acquis.yaml:/etc/crowdsec/acquis.d/acquis-local.yaml
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik
     networks:
       - socket_proxy
     depends_on:

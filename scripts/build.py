@@ -159,6 +159,9 @@ def parse_sections(content, heading_detector):
 # region Merging: Combine Section Trees
 # ============================================================================
 
+_KEY_VALUE_RE = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*)\s*[:=]\s*(.*)')
+
+
 def merge_sections(base_sections, new_sections):
     """Merge new_sections into base_sections by matching heading text.
 
@@ -167,9 +170,14 @@ def merge_sections(base_sections, new_sections):
         only unique content lines and recursively merge children.
       - If no match: append as a new section.
 
-    Blank lines are always allowed through to preserve formatting
-    between groups of lines from different containers. Non-blank lines
-    are deduplicated so that identical entries are not repeated.
+    Deduplication rules for content lines within a section:
+      - Blank lines are always kept to preserve formatting.
+      - Identical non-blank lines are not repeated.
+      - KEY: VALUE / KEY=VALUE lines are deduplicated by key:
+          * Same key, same value (or both blank) -> skip duplicate.
+          * Same key, existing blank, new has value -> replace with new.
+          * Same key, existing has value, new blank -> skip new.
+          * Same key, different non-empty values -> keep both (no data loss).
 
     Returns a new list; inputs are not modified.
     """
@@ -183,12 +191,43 @@ def merge_sections(base_sections, new_sections):
         )
 
         if match:
-            existing = set(l for l in match.content_lines if l.strip())
+            existing_lines = set(l for l in match.content_lines if l.strip())
+            # Track keys already present: key -> (index, value)
+            existing_keys = {}
+            for i, line in enumerate(match.content_lines):
+                km = _KEY_VALUE_RE.match(line.strip())
+                if km:
+                    existing_keys[km.group(1)] = (i, km.group(2).strip())
+
             for line in new_sec.content_lines:
-                if not line.strip() or line not in existing:
+                if not line.strip():
                     match.content_lines.append(line)
-                    if line.strip():
-                        existing.add(line)
+                    continue
+
+                km = _KEY_VALUE_RE.match(line.strip())
+                if km:
+                    key, new_val = km.group(1), km.group(2).strip()
+                    if key in existing_keys:
+                        idx, old_val = existing_keys[key]
+                        if old_val == new_val:
+                            # Same value (or both blank) -> skip
+                            continue
+                        if not old_val and new_val:
+                            # Existing blank, new has value -> replace
+                            match.content_lines[idx] = line
+                            existing_keys[key] = (idx, new_val)
+                            continue
+                        if old_val and not new_val:
+                            # Existing has value, new blank -> skip
+                            continue
+                        # Different non-empty values -> keep both
+                    existing_keys[key] = (len(match.content_lines), new_val)
+                    match.content_lines.append(line)
+                    existing_lines.add(line)
+                elif line not in existing_lines:
+                    match.content_lines.append(line)
+                    existing_lines.add(line)
+
             match.children = merge_sections(match.children, new_sec.children)
         else:
             result.append(deepcopy(new_sec))
@@ -645,8 +684,10 @@ def generate_test_env(komodo_content, existing_values, override_values,
     Transforms the komodo.env format into standard KEY=VALUE pairs:
       - Komodo headings (#=, #==) become # comment separators.
       - KEY: VALUE lines become KEY=VALUE lines.
-      - [[Variable]] Komodo references are replaced with empty strings
-        so users can fill in local test values.
+      - [[Variable]] Komodo references are resolved by looking up the
+        referenced key name in the override and container value sources.
+        If found, the reference is replaced with that value. Otherwise
+        the reference is replaced with an empty string.
       - Regular comment lines are preserved.
 
     Value resolution order for each KEY (first non-empty wins):
@@ -656,7 +697,7 @@ def generate_test_env(komodo_content, existing_values, override_values,
          stack's local .env so they are not overwritten on rebuild.
       2. override_values   - fills in defaults from scripts/base-testing.env
          and scripts/.env for any variables still empty.
-      3. The raw value from komodo.env (with [[...]] refs stripped).
+      3. The raw value from komodo.env (with [[...]] refs resolved).
       4. container_values  - values from each container's testing.env file,
          providing container-specific test defaults.
 
@@ -678,6 +719,13 @@ def generate_test_env(komodo_content, existing_values, override_values,
         Standard .env file content string.
     """
     output_lines = []
+    # Track resolved values so [[KEY]] references can resolve to values
+    # from earlier in the same file (e.g. POSTGRES_PASSWORD: [[KOMODO_DB_PASSWORD]]
+    # resolves to whatever KOMODO_DB_PASSWORD was resolved to).
+    resolved_values = {}
+    # Map of key -> referenced komodo key for [[KEY]] references, so
+    # dedup_env can cross-resolve after password generation.
+    ref_map = {}
 
     for line in komodo_content.splitlines():
         stripped = line.strip()
@@ -705,8 +753,19 @@ def generate_test_env(komodo_content, existing_values, override_values,
         if m:
             key = m.group(1)
             raw_value = m.group(2).strip()
-            # Strip [[...]] Komodo references to get the base value
-            base_value = re.sub(r'\[\[.*?\]\]', '', raw_value)
+            # Resolve [[KEY]] Komodo references by looking up the
+            # referenced key in override files, container testing files,
+            # and already-resolved values from earlier in this file.
+            def _resolve_ref(ref_match):
+                ref_key = ref_match.group(1)
+                if ref_key in override_values and override_values[ref_key] != '':
+                    return override_values[ref_key]
+                if ref_key in container_values and container_values[ref_key] != '':
+                    return container_values[ref_key]
+                if ref_key in resolved_values and resolved_values[ref_key] != '':
+                    return resolved_values[ref_key]
+                return ''
+            base_value = re.sub(r'\[\[([^\]]+)\]\]', _resolve_ref, raw_value)
 
             # Resolve value from sources (first non-empty wins)
             if reset_env:
@@ -738,6 +797,12 @@ def generate_test_env(komodo_content, existing_values, override_values,
                 else:
                     value = ''
 
+            resolved_values[key] = value
+            # Track [[KEY]] references for post-processing resolution
+            refs = re.findall(r'\[\[([^\]]+)\]\]', raw_value)
+            if refs:
+                for ref_key in refs:
+                    ref_map[key] = ref_key
             output_lines.append(f"{key}={value}")
             continue
 
@@ -748,7 +813,7 @@ def generate_test_env(komodo_content, existing_values, override_values,
     while output_lines and output_lines[-1].strip() == '':
         output_lines.pop()
 
-    return '\n'.join(output_lines) + '\n'
+    return '\n'.join(output_lines) + '\n', ref_map
 
 # endregion
 # ============================================================================
@@ -804,10 +869,10 @@ def dedup_komodo_env(content):
     return '\n'.join(result)
 
 
-def dedup_env(content):
+def dedup_env(content, ref_map=None):
     """Comment out duplicate keys and generate passwords in .env content.
 
-    Two post-processing steps applied to the generated .env:
+    Three post-processing steps applied to the generated .env:
 
     1. Password generation: For keys ending in '_PASSWORD' or '_PASS'
        whose resolved value is empty, a random 16-character alphanumeric
@@ -817,15 +882,29 @@ def dedup_env(content):
        occurrences are commented out with '# '. Duplicate _PASSWORD entries
        use the same password value as the first occurrence.
 
+    3. Cross-reference resolution: Keys that referenced another key via
+       [[KEY]] in the komodo.env are updated to match the referenced
+       key's final value (e.g. POSTGRES_PASSWORD referencing
+       [[KOMODO_DB_PASSWORD]] will get the same generated password).
+
     Args:
-        content: The generated .env content string.
+        content:  The generated .env content string.
+        ref_map:  Optional dict mapping key -> referenced komodo key name.
+                  Used to resolve [[KEY]] cross-references after passwords
+                  are generated.
 
     Returns:
-        Content with passwords filled and duplicates commented out.
+        Content with passwords filled, references resolved, and duplicates
+        commented out.
     """
+    if ref_map is None:
+        ref_map = {}
+
     seen_keys = {}  # key -> resolved value (for consistent duplicate values)
     lines = content.splitlines()
     result = []
+    # Track line index for each key so we can update values in place
+    key_line_idx = {}  # key -> index in result list
 
     for line in lines:
         stripped = line.strip()
@@ -842,9 +921,20 @@ def dedup_env(content):
                 if (key.endswith('_PASSWORD') or key.endswith('_PASS')) and value == '':
                     value = generate_password()
                 seen_keys[key] = value
+                key_line_idx[key] = len(result)
                 result.append(f'{key}={value}')
         else:
             result.append(line)
+
+    # Resolve cross-references: if key A referenced [[KEY_B]], update A's
+    # value to match B's final resolved value.
+    for key, ref_key in ref_map.items():
+        if ref_key in seen_keys and key in seen_keys:
+            ref_value = seen_keys[ref_key]
+            if ref_value and seen_keys[key] != ref_value:
+                seen_keys[key] = ref_value
+                if key in key_line_idx:
+                    result[key_line_idx[key]] = f'{key}={ref_value}'
 
     # Preserve original trailing newline
     if content.endswith('\n'):
@@ -957,11 +1047,11 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
         )
     # Use the original (non-deduped) komodo content so that duplicate KEY:
     # VALUE lines are converted to KEY=VALUE before dedup_env processes them.
-    env_output = generate_test_env(
+    env_output, ref_map = generate_test_env(
         komodo_output, existing_env, override_values, container_env,
         reset_env=reset_env,
     )
-    env_output = dedup_env(env_output)
+    env_output = dedup_env(env_output, ref_map)
     (stack_dir / '.env').write_text(env_output, encoding='utf-8')
     print("    Created: .env (testing)")
 

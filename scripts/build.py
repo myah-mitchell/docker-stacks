@@ -430,9 +430,13 @@ def build_readme(base_content, existing_content, containers_dir,
          first, then container sections are layered on top. This enables
          automatic cleanup when a container is removed from the stack
          and ensures global base content stays up to date.
-      3. H1 headings that exist ONLY in the stack README (manually added)
+      3. Base H1 headings are only included if at least one container
+         contributes non-empty content or children to that heading.
+         Base-only sections (where no container adds real content) are
+         dropped so scaffolding headings only appear when needed.
+      4. H1 headings that exist ONLY in the stack README (manually added)
          are preserved untouched.
-      4. New H1 headings from base or containers not yet in the result
+      5. New H1 headings from base or containers not yet in the result
          are appended.
 
     Args:
@@ -508,9 +512,38 @@ def build_readme(base_content, existing_content, containers_dir,
             result.append(deepcopy(existing_sec))
             seen.add(existing_sec.heading_text)
 
-    # 2) Base H1s: in base-README.md order, rebuilt from all sources
+    # 2) Base H1s: in base-README.md order, rebuilt from all sources.
+    #    Only include if at least one container contributes to this heading;
+    #    base-only sections are dropped when no containers need them.
     for base_sec in base_sections:
         if base_sec.heading_text not in seen:
+            # Build a temporary merge of only container contributions to
+            # this H1.  If no container adds non-empty children or content,
+            # the base section is unnecessary for this stack.
+            container_only = Section(
+                heading_line=base_sec.heading_line,
+                heading_text=base_sec.heading_text,
+                level=base_sec.level,
+            )
+            for sl in container_section_lists:
+                for src_sec in sl:
+                    if src_sec.heading_text == base_sec.heading_text:
+                        container_only.content_lines.extend(
+                            src_sec.content_lines
+                        )
+                        container_only.children = merge_sections(
+                            container_only.children, src_sec.children
+                        )
+                        break
+            container_only.children = prune_empty_sections(
+                container_only.children
+            )
+            has_content = any(
+                line.strip() for line in container_only.content_lines
+            )
+            if not has_content and not container_only.children:
+                seen.add(base_sec.heading_text)
+                continue
             # Use the existing heading line if available (preserves any
             # manual heading-level tweaks the user made in the stack README)
             heading_line = base_sec.heading_line

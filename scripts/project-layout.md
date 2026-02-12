@@ -168,10 +168,10 @@ The .env file is a standard Docker Compose environment file using `KEY=VALUE` fo
 
 5. **H1 ordering**: The final README enforces this order for top-level headings:
    1. **Stack-only H1s** - preserved as-is from the existing README, in their original order.
-   2. **Base H1s** - in the order they appear in _base-README.md_, rebuilt from all sources (base + containers).
+   2. **Base H1s** - in the order they appear in _base-README.md_, rebuilt from all sources (base + containers). Only included if at least one container contributes to that heading; base-only H1s (where no container references the heading) are dropped.
    3. **Container-only H1s** - H1s unique to containers (not in base), rebuilt from all sources, in container discovery order.
 
-6. **Shared H1 rebuilding**: Shared H1 sections are rebuilt entirely from base + container content each run. This enables automatic cleanup when a container is removed from a stack, and ensures global base content stays up to date.
+6. **Shared H1 rebuilding**: Shared H1 sections are rebuilt entirely from base + container content each run. This enables automatic cleanup when a container is removed from a stack, and ensures global base content stays up to date. Base H1s that no container references are excluded entirely, so scaffolding sections like "Create and Setup Required Folders" only appear when containers actually need them.
 
 7. **Empty section pruning**: After all merging, any sections that have no content (all blank lines) and no children (after their children are also pruned) are removed from the output.
 

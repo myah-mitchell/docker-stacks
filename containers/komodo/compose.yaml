@@ -84,7 +84,7 @@ services:
       KOMODO_TITLE: ${KOMODO_TITLE:-Komodo}
       KOMODO_HOST: ${PROJECT_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}   
     volumes:
-      - ./komodo-config/core.config.toml:/config/config.toml:ro
+      - ./config/core.config.toml:/config/config.toml:ro
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-backups:/backups
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-sync:/syncs
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-cache:/repo-cache

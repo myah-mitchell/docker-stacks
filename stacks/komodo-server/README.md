@@ -21,7 +21,7 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/ferretdb-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/ferretdb-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/ferretdb-*
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 ```
 

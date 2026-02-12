@@ -122,8 +122,8 @@ services:
       DISABLE_LOCAL_API: false # Disable LAPI and use this instance as an log processor only.
       DISABLE_AGENT: true # Disable the log processor and use this instance as an LAPI only.
     volumes:
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-server:/etc/crowdsec
       - ./config/server-config.yaml:/etc/crowdsec/config.yaml
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-server:/etc/crowdsec
     networks:
       - backend
     depends_on:
@@ -142,7 +142,6 @@ services:
       DISABLE_AGENT: false # Disable the log processor and use this instance as an LAPI only.
       DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
     volumes:
-      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/crowdsec-agent:/etc/crowdsec
       - ./config/agent-config.yaml:/etc/crowdsec/config.yaml
       - ./config/agent-acquis.yaml:/etc/crowdsec/acquis.d/acquis-local.yaml
       - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik

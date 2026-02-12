@@ -11,12 +11,12 @@ networks:
   frontend:
     name: ${PROJECT_NAME}_frontend
     internal: false
-  backend:
-    name: ${PROJECT_NAME}_backend
-    internal: true
-#  socket_proxy:
-#    name: ${PROJECT_NAME}_socket_proxy
+#  backend:
+#    name: ${PROJECT_NAME}_backend
 #    internal: true
+  socket_proxy:
+    name: ${PROJECT_NAME}_socket_proxy
+    internal: true
 
 services:
 

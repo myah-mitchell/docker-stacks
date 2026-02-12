@@ -115,20 +115,6 @@ services:
     environment:
       DISABLE_LOCAL_API: false # Disable LAPI and use this instance as an log processor only.
       DISABLE_AGENT: false # Disable the log processor and use this instance as an LAPI only.
-      CONFIG_FILE: /etc/crowdsec-config.yaml
-      # Environment variables to configure CrowdSec LAPI for Postgres
-      DB_TYPE: postgres
-      DB_HOST: ${PROJECT_NAME}-${POSTGRES_HOSTNAME}
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - ./config/server-config.yaml:/etc/crowdsec-config.yaml
-    networks:
-      - backend
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   .crowdsec-agent:
     extends: .crowdsec

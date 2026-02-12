@@ -10,10 +10,16 @@ services:
       file: ../../containers/crowdsec/compose.yaml
       service: .crowdsec-server
 
-  postgres:
+  socket-proxy:
     extends:
-      file: ../../containers/postgres/compose.yaml
-      service: .postgres
+      file: ../../containers/socket-proxy/compose.yaml
+      service: .socket-proxy
+    environment:
+      CONTAINERS: 1 #optional
+      EVENTS: 1 #optional
+      INFO: 1 #optional
+      PING: 1 #optional
+      VERSION: 1 #optional
 ```
 
 For the Crowdsec Agent that will connect to LAPI Server:
@@ -30,6 +36,7 @@ services:
       file: ../../containers/socket-proxy/compose.yaml
       service: .socket-proxy
     environment:
+      CONTAINERS: 1 #optional
       EVENTS: 1 #optional
       INFO: 1 #optional
       PING: 1 #optional

@@ -275,13 +275,70 @@ def serialize_sections(preamble, sections):
 # region Compose Parsing: Discover Container References
 # ============================================================================
 
-def extract_container_refs(compose_path):
+def _parse_include_paths(content, base_dir):
+    """Extract include file paths from a compose.yaml's content.
+
+    Supports two Docker Compose include formats:
+      - Simple:  ``include: [../other/compose.yaml]``  (list of strings)
+      - Object:  ``include: [{path: ../other/compose.yaml}]``
+
+    Paths are resolved relative to *base_dir* (the directory containing the
+    compose file that declares the include).
+
+    Args:
+        content:  Full compose.yaml content string.
+        base_dir: Directory of the compose file (for path resolution).
+
+    Returns:
+        List of resolved Path objects for each include.
+    """
+    paths = []
+    in_include = False
+
+    for line in content.splitlines():
+        stripped = line.strip()
+
+        if stripped.startswith('#'):
+            continue
+
+        # Detect the start of the include: block
+        if re.match(r'^include\s*:', stripped):
+            in_include = True
+            continue
+
+        if in_include:
+            if stripped.startswith('-'):
+                # "- path: <value>" (object form)
+                m = re.match(r'^-\s+path\s*:\s*(.+)', stripped)
+                if m:
+                    raw = m.group(1).strip().strip('"').strip("'")
+                    paths.append(base_dir / raw)
+                else:
+                    # "- <path>" (simple string form)
+                    m = re.match(r'^-\s+(.+)', stripped)
+                    if m:
+                        raw = m.group(1).strip().strip('"').strip("'")
+                        # Skip sub-keys (e.g. "env_file: ..." on same line)
+                        if ':' not in raw:
+                            paths.append(base_dir / raw)
+            elif stripped:
+                # Non-blank, non-list line: we've left the include block
+                in_include = False
+
+    return paths
+
+
+def extract_container_refs(compose_path, _visited=None):
     """Extract unique container names from a stack's compose.yaml.
 
     Scans for 'extends > file' references matching the pattern
-    containers/<name>/compose.yaml. Skips YAML comment lines.
-    Each container is returned only once, even if multiple services
-    extend from the same container directory.
+    containers/<name>/compose.yaml. Also follows Docker Compose
+    ``include`` directives recursively so that containers from
+    included compose files are discovered as well.
+
+    Skips YAML comment lines. Each container is returned only once,
+    even if multiple services extend from the same container directory.
+    Visited files are tracked to prevent infinite loops.
 
     Args:
         compose_path: Path to the stack's compose.yaml.
@@ -289,10 +346,28 @@ def extract_container_refs(compose_path):
     Returns:
         List of container directory names in order of first appearance.
     """
+    if _visited is None:
+        _visited = set()
+
+    resolved = compose_path.resolve()
+    if resolved in _visited:
+        return []
+    _visited.add(resolved)
+
     content = compose_path.read_text(encoding='utf-8')
     seen = set()
     containers = []
 
+    # Recursively process included compose files first so that base
+    # containers appear before the current file's own containers.
+    for inc_path in _parse_include_paths(content, compose_path.parent):
+        if inc_path.exists():
+            for name in extract_container_refs(inc_path, _visited):
+                if name not in seen:
+                    seen.add(name)
+                    containers.append(name)
+
+    # Extract container refs from extends directives in this file
     for line in content.splitlines():
         if line.strip().startswith('#'):
             continue

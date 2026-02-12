@@ -18,62 +18,10 @@ networks:
     name: ${PROJECT_NAME}_socket_proxy
     internal: true
 
+include:
+  - ../traefik-basic/compose.yaml
+
 services:
-
-  traefik:
-    extends:
-      file: ../../containers/traefik/compose.yaml
-      service: .traefik
-    depends_on:
-      socket-proxy:
-        condition: service_healthy
-      error-pages:
-        condition: service_healthy
-
-  error-pages:
-    extends:
-      file: ../../containers/error-pages/compose.yaml
-      service: .error-pages
-
-  socket-proxy:
-    extends:
-      file: ../../containers/socket-proxy/compose.yaml
-      service: .socket-proxy
-    environment:
-      CONTAINERS: 1 #optional
-      EVENTS: 1 #optional
-      INFO: 1 #optional
-      LOG_LEVEL: err #optional
-      NETWORKS: 1 #optional
-      NODES: 1 #optional
-      PING: 1 #optional
-      SERVICES: 1 #optional
-      TASKS: 1 #optional
-      VERSION: 1 #optional
-
-  logrotate:
-    extends:
-      file: ../../containers/logrotate/compose.yaml
-      service: .logrotate
-    depends_on:
-      traefik:
-        condition: service_healthy
-      socket-proxy-rw:
-        condition: service_healthy
-
-  socket-proxy-rw:
-    extends:
-      file: ../../containers/socket-proxy/compose.yaml
-      service: .socket-proxy-rw
-    environment:
-      CONTAINERS: 1 #optional
-      INFO: 1 #optional
-      LOG_LEVEL: err #optional
-      PING: 1 #optional
-      POST: 1 #optional
-      VERSION: 1 #optional
-
-
 
   vmagent:
     extends:

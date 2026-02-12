@@ -44,7 +44,7 @@ api:
       - ::1
     online_client:
       credentials_path: /etc/crowdsec//online_api_credentials.yaml
-    enable: false
+    enable: true
 #prometheus:
 #  enabled: true
 #  level: full

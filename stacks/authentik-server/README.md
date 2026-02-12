@@ -1,5 +1,6 @@
 # Authentik Stack (Server) Overview
-<information about the stack>
+
+The `stacks\authentic-server\compose.yaml` will start up an Authentik stack with a server and workinger. This stack should only be ran once per environment.
 
 # Create and Setup Requried Folders
 ## Create Stack Folders
@@ -19,7 +20,7 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/authentik-media
-mkdir -p /opt/docker/volumes/$projectName/authentik-template
+mkdir -p /opt/docker/volumes/$projectName/authentik-templates
 mkdir -p /opt/docker/volumes/$projectName/authentik-certs
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/authentik-*
 ```

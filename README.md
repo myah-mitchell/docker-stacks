@@ -3,7 +3,7 @@
 ## Authentik Based Stacks
 
 ### Authentik Stack (Server) Overview
-<information about the stack>
+The `stacks\authentic-server\compose.yaml` will start up an Authentik stack with a server and workinger. This stack should only be ran once per environment.
 
 ## Dozzle Based Stacks
 

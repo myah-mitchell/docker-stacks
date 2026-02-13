@@ -71,7 +71,7 @@ services:
   .victoriatraces:
     <<: [*limits, *restart, *security, *user, *logging]
     image: ${VICTORIATRACES_IMAGE:-victoriametrics/victoria-traces}:${VICTORIATRACES_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-${VICTORIATRACES_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    hostname: ${VICTORIATRACES_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VICTORIATRACES_HOSTNAME}"
     command:
       - "--loggerFormat=json"

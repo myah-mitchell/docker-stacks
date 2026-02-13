@@ -71,7 +71,7 @@ services:
   .victorialogs:
     <<: [*limits, *restart, *security, *user, *logging]
     image: ${VICTORIALOGS_IMAGE:-victoriametrics/victoria-logs}:${VICTORIALOGS_VERSION:-latest}
-    hostname: ${PROJECT_NAME}-${VICTORIALOGS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    hostname: ${VICTORIALOGS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VICTORIALOGS_HOSTNAME}"
     command:
       - "--loggerFormat=json"

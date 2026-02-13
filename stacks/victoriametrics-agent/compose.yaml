@@ -23,7 +23,7 @@ services:
   vlagent:
     extends:
       file: ../../containers/vlagent/compose.yaml
-      service: .vlagent
+      service: .vlagent-host
 
   vmagent:
     extends:
@@ -38,7 +38,7 @@ services:
   cadvisor:
     extends:
       file: ../../containers/cadvisor/compose.yaml
-      service: .cadvisor
+      service: .cadvisor-host
 
   socket-proxy:
     extends:

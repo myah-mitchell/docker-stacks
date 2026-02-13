@@ -93,3 +93,7 @@ services:
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9429/health"]
       <<: *default_healthcheck
+
+  .vlagent-host:
+    extends: .vlagent
+    hostname: ${VLAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}

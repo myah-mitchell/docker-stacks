@@ -104,6 +104,7 @@ services:
 
   .vmagent-host:
     extends: .vmagent
+    hostname: ${VMAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     environment:
       NODE_EXPORTER_USER: ${NODE_EXPORTER_USER}
       NODE_EXPORTER_PASS: ${NODE_EXPORTER_PASS}

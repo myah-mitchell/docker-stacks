@@ -92,3 +92,7 @@ services:
     healthcheck:
       test: ["CMD", "/usr/bin/cadvisor", "-version"]
       <<: *default_healthcheck
+  
+  .cadvisor-host:
+    extends: .cadvisor
+    hostname: ${CADVISOR_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}

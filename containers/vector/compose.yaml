@@ -107,10 +107,18 @@ services:
 
   .vector-host:
     extends: .vector
+    ports:
+      - "5140:5140/udp"
+      - "5140:5140/tcp"
     environment:
       DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
     volumes:
       - ./config/vector-host.yml:/etc/vector/vector.yaml:ro
+      # Volumes for host log collection
+      - /etc/machine-id:/etc/machine-id:ro
+      - /var/log:/var/log:ro
+      - /run/log/journal:/run/log/journal:ro
     networks:
       - frontend
       - socket_proxy
+    userns_mode: "host"

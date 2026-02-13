@@ -70,7 +70,7 @@ services:
 
   .technitium:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${TECHNITIUM_IMAGE:-technitium/dns-server}:${TECHNITIUM_VERSION:-latest}
+    image: technitium/dns-server:14.3.0
     hostname: ${PROJECT_NAME}-${TECHNITIUM_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${TECHNITIUM_HOSTNAME}"
     ports:

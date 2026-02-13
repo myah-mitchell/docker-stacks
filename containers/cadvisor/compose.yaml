@@ -70,7 +70,7 @@ services:
 
   .cadvisor:
     <<: [*limits, *restart, *security, *logging]
-    image: ${CADVISOR_IMAGE:-gcr.io/cadvisor/cadvisor}:${CADVISOR_VERSION:-latest}
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     hostname: ${PROJECT_NAME}-${CADVISOR_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${CADVISOR_HOSTNAME}"
     #ports:

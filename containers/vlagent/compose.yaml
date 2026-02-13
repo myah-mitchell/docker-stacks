@@ -70,14 +70,14 @@ services:
 
   .vlagent:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${VLAGENT_IMAGE:-victoriametrics/vlagent}:${VLAGENT_VERSION:-latest}
+    image: victoriametrics/vlagent:v1.43.0
     hostname: ${PROJECT_NAME}-${VLAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VLAGENT_HOSTNAME}"
     command:
       - "--loggerFormat=json"
       #- '--syslog.listenAddr.tcp=0.0.0.0:8094'
       - '--remoteWrite.tmpDataPath=/vlagent'
-      - '--remoteWrite.maxDiskUsagePerURL=${VLAGENT_DISK_USAGE:-200MB}'
+      - '--remoteWrite.maxDiskUsagePerURL=100MB'
       - "--remoteWrite.basicAuth.username=${VMAUTH_USER}"
       - "--remoteWrite.basicAuth.password=${VMAUTH_PASS}"
       - "--remoteWrite.url=https://${VMAUTH_HOST}/insert/native"

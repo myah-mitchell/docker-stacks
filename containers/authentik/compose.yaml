@@ -70,7 +70,7 @@ services:
 
   .authentik:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_VERSION:-latest}
+    image: ghcr.io/goauthentik/server:2025.8.4
     hostname: ${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${AUTHENTIK_HOSTNAME}"
     environment:

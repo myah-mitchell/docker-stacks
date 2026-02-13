@@ -70,7 +70,7 @@ services:
 
   .ferretdb:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${FERRETDB_IMAGE:-ghcr.io/ferretdb/ferretdb}:${FERRETDB_VERSION:-latest}
+    image: ghcr.io/ferretdb/ferretdb:2.7
     hostname: ${PROJECT_NAME}-${FERRETDB_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${FERRETDB_HOSTNAME}"
     # ports:
@@ -94,7 +94,7 @@ services:
   # FerretDB Postgres with DocumentDB Included
   .postgres:
     <<: [*limits, *restart, *security, *logging]
-    image: ${POSTGRES_DOCUMENTDB_IMAGE:-ghcr.io/ferretdb/postgres-documentdb}:${POSTGRES_DOCUMENTDB_VERSION:-latest}
+    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0
     hostname: ${PROJECT_NAME}-${POSTGRES_DOCUMENTDB_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${POSTGRES_DOCUMENTDB_HOSTNAME}"
     # ports:

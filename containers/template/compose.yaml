@@ -70,7 +70,7 @@ services:
 
   .imageName:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${IMAGENAME_IMAGE:-imageName}:${IMAGENAME_VERSION:-latest}
+    image: imageName:latest
     hostname: ${PROJECT_NAME}-${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${IMAGENAME_HOSTNAME}"
     command:

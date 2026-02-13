@@ -11,10 +11,10 @@ docker-stacks
     * komodo.env - _Only contains items specific to this container_
     * README.md - _Container-level documentation (not used by build.py)_
     * stack-README.md - _Sections to merge into stack README.md files_
-    * testing.env - _Container-specific test defaults in KEY: VALUE format_
+    * testing.env - _Container-specific non-sensitive testing defaults in KEY: VALUE format_
 * **stacks** - _Folder containing all stacks_
   * **\<stackName>** - _Friendly name of stack_
-    * **\<imageName>-config** - _Any containers that need config outside of the compose file will store that config in a folder named **\<imageName>-config**_
+    * **config** - _Any containers that need config outside of the compose file will store that config in a folder named **config**_
     * compose.yaml - _This is the compose file that will control the stack. May use `include` to reference other stack compose files._
     * komodo.env - _This file is created by build.py_
     * .env - _This file is created by build.py (gitignored, for local testing)_

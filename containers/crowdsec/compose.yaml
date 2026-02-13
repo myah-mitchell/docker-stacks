@@ -70,7 +70,7 @@ services:
 
   .crowdsec:
     <<: [*limits, *restart, *security, *logging]
-    image: ${CROWDSEC_IMAGE:-crowdsecurity/crowdsec}:${CROWDSEC_VERSION:-latest}
+    image: crowdsecurity/crowdsec:latest
     hostname: ${PROJECT_NAME}-${CROWDSEC_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${CROWDSEC_HOSTNAME}"
     environment:

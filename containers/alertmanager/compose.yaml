@@ -70,7 +70,7 @@ services:
 
   .alertmanager:
     <<: [*limits, *restart, *security, *logging]
-    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager}:${ALERTMANAGER_VERSION:-latest}
+    image: prom/alertmanager:v0.30.0
     hostname: ${PROJECT_NAME}-${ALERTMANAGER_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${ALERTMANAGER_HOSTNAME}"
     command:

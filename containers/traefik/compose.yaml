@@ -69,7 +69,7 @@ x-environment: &default_environment
 services:
   .traefik:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${TRAEFIK_IMAGE:-traefik}:${TRAEFIK_VERSION:-latest}
+    image: traefik:latest
     hostname: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
     container_name: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}
     command:

@@ -70,7 +70,7 @@ services:
 
   .geoipupdate:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${GEOIPUPDATE_IMAGE:-ghcr.io/maxmind/geoipupdate}:${GEOIPUPDATE_VERSION:-latest}
+    image: ghcr.io/maxmind/geoipupdate:latest
     hostname: ${PROJECT_NAME}-${GEOIPUPDATE_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${GEOIPUPDATE_HOSTNAME}"
     environment:

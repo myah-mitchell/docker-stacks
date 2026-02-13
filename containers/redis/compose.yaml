@@ -70,7 +70,7 @@ services:
 
   .redis:
     <<: [*limits, *restart, *security, *logging]
-    image: ${REDIS_IMAGE:-redis}:${REDIS_VERSION:-latest}
+    image: redis:latest
     hostname: ${PROJECT_NAME}-${REDIS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${REDIS_HOSTNAME}"
     command: redis-server --appendonly yes

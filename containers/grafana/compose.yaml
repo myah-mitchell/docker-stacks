@@ -70,7 +70,7 @@ services:
 
   .grafana:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${GRAFANA_IMAGE:-grafana/grafana}:${GRAFANA_VERSION:-latest}
+    image: grafana/grafana:12.3.1
     hostname: ${PROJECT_NAME}-${GRAFANA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${GRAFANA_HOSTNAME}"
     #ports:

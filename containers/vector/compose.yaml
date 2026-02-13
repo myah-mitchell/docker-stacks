@@ -70,7 +70,7 @@ services:
 
   .vector:
     <<: [*limits, *restart, *security, *logging]
-    image: ${VECTOR_IMAGE:-docker.io/timberio/vector}:${VECTOR_VERSION:-latest}
+    image: docker.io/timberio/vector:0.52.X-debian
     hostname: ${PROJECT_NAME}-${VECTOR_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VECTOR_HOSTNAME}"
     #ports:

@@ -70,7 +70,7 @@ services:
 
   .victoriatraces:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${VICTORIATRACES_IMAGE:-victoriametrics/victoria-traces}:${VICTORIATRACES_VERSION:-latest}
+    image: victoriametrics/victoria-traces:v0.5.1
     hostname: ${VICTORIATRACES_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VICTORIATRACES_HOSTNAME}"
     command:

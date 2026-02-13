@@ -70,7 +70,7 @@ services:
 
   .vmauth:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${VMAUTH_IMAGE:-victoriametrics/vmauth}:${VMAUTH_VERSION:-latest}
+    image: victoriametrics/vmauth:v1.133.0
     hostname: ${VMAUTH_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VMAUTH_HOSTNAME}"
     command:

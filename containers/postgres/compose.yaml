@@ -70,7 +70,7 @@ services:
 
   .postgres:
     <<: [*limits, *restart, *security, *logging]
-    image: ${POSTGRES_IMAGE:-docker.io/library/postgres}:${POSTGRES_VERSION:-latest}
+    image: docker.io/library/postgres:18-alpine
     hostname: ${PROJECT_NAME}-${POSTGRES_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${POSTGRES_HOSTNAME}"
     shm_size: 128mb # https://hub.docker.com/_/postgres

@@ -70,7 +70,7 @@ services:
 
   .victoriametrics:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${VICTORIAMETRICS_IMAGE:-victoriametrics/victoria-metrics}:${VICTORIAMETRICS_VERSION:-latest}
+    image: victoriametrics/victoria-metrics:v1.133.0
     hostname: ${VICTORIAMETRICS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VICTORIAMETRICS_HOSTNAME}"
     command:

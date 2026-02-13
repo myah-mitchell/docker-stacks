@@ -70,14 +70,14 @@ services:
 
   .vmagent:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: ${VMAGENT_IMAGE:-victoriametrics/vmagent}:${VMAGENT_VERSION:-latest}
+    image: victoriametrics/vmagent:v1.133.0
     hostname: ${PROJECT_NAME}-${VMAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${VMAGENT_HOSTNAME}"
     command:
       - "--loggerFormat=json"
       - "--promscrape.config=/etc/prometheus/prometheus.yml"
       - "--remoteWrite.tmpDataPath=/vmagent"
-      - '--remoteWrite.maxDiskUsagePerURL=${VMAGENT_DISK_USAGE:-200MB}'
+      - '--remoteWrite.maxDiskUsagePerURL=100MB'
       - "--remoteWrite.basicAuth.username=${VMAUTH_USER}"
       - "--remoteWrite.basicAuth.password=${VMAUTH_PASS}"
       - "--remoteWrite.url=https://${VMAUTH_HOST}/api/v1/write"

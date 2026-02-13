@@ -70,7 +70,7 @@ services:
 
   .traefik-kop:
     <<: [*limits, *restart, *security, *logging]
-    image: ${TRAEFIK_KOP_IMAGE:-ghcr.io/jittering/traefik-kop}:${TRAEFIK_KOP_VERSION:-latest}
+    image: ghcr.io/jittering/traefik-kop:latest
     hostname: ${PROJECT_NAME}-${TRAEFIK_KOP_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${TRAEFIK_KOP_HOSTNAME}"
     environment:

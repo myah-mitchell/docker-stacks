@@ -62,3 +62,11 @@ The `stacks\traefik-agent\compose.yaml` will start up a Traefik stack with Traef
 The `stacks\traefik-dmz\compose.yaml` will start up a Traefik stack that is configured to have Redis replicate data from the server stack. Then using a Traefik provider add routers and services from Redis to the proxy config. This stack is intended to be used on the edge of your network in a heavily restricted DMZ network. Only Port 443 (HTTPS) to your internal Traefik servers, and port 6379 (Redis) to the server running `traefik-server` need to be opened out of the DMZ. This compose file can be deployed to one or more servers in the DMZ. This is your HTTP/HTTPS Bastion host.
 
 * Note: For this to work the _TRAEFIK_EXTRA_COMMAND_ Env Var must be set to **"--providers.redis.endpoints=redis:6379"**. This will enable Traefik to load labels out of the local Redis database.
+
+## VictoriaMetrics Based Stacks
+
+### VictoriaMetrics Control Stack (Server) Overview
+This will start up a VictoriaMetrics server stack with VictoriaMetrics, VictoriaLogs, VictoriaTraces, Grafana, and many other services. This compose file should only be deployed to one server. This stack also includes and deploys the Agent stack, so you don't need to deploy both on the same server.
+
+### VictoriaMetrics Agent Stack (Agent) Overview
+This will start up a Vector, VMAgent, VLAgent and some other services. This stack will collect, buffer and then forward onto the server stack. This stack should only be deployed once per server.

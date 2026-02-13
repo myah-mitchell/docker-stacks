@@ -514,13 +514,36 @@ def extract_container_refs(compose_path, _visited=None):
 
     return containers, service_map
 
+
+_PROJECT_NAME_RE = re.compile(
+    r'^#\s*Project\s+Name\s*:\s*"([^"]+)"', re.MULTILINE
+)
+
+
+def extract_project_name(compose_path):
+    """Extract the project name from a compose.yaml comment.
+
+    Looks for a line matching ``# Project Name: "<name>"`` in the
+    compose file. This value is used to populate the PROJECT_NAME
+    variable in generated komodo.env and .env files.
+
+    Args:
+        compose_path: Path to the stack's compose.yaml.
+
+    Returns:
+        The project name string, or None if not found.
+    """
+    content = compose_path.read_text(encoding='utf-8')
+    m = _PROJECT_NAME_RE.search(content)
+    return m.group(1) if m else None
+
 # endregion
 # ============================================================================
 # region komodo.env Builder
 # ============================================================================
 
 def build_komodo_env(base_content, containers_dir, container_names,
-                     service_map=None):
+                     service_map=None, project_name=None):
     """Build a stack's komodo.env from base + container komodo.env files.
 
     Starts from base-komodo.env content and merges each container's
@@ -534,6 +557,8 @@ def build_komodo_env(base_content, containers_dir, container_names,
         container_names: Ordered list of container names to merge.
         service_map:     Optional dict mapping container name to set of
                          active service variant names for tag filtering.
+        project_name:    Optional project name extracted from compose.yaml.
+                         Sets the PROJECT_NAME value in the output.
 
     Returns:
         Generated komodo.env content string.
@@ -558,7 +583,16 @@ def build_komodo_env(base_content, containers_dir, container_names,
 
         sections = merge_sections(sections, container_sections)
 
-    return serialize_sections(preamble, sections)
+    output = serialize_sections(preamble, sections)
+
+    # Set PROJECT_NAME from compose.yaml if available and currently empty
+    if project_name:
+        output = re.sub(
+            r'^(PROJECT_NAME:\s*)$', f'PROJECT_NAME: {project_name}',
+            output, count=1, flags=re.MULTILINE,
+        )
+
+    return output
 
 # endregion
 # ============================================================================
@@ -1178,12 +1212,16 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
         print(f"  Skipping '{stack_name}': no container extends references found")
         return
 
+    # --- Extract project name from compose.yaml ---
+    project_name = extract_project_name(compose_path)
+
     print(f"  Stack: {stack_name}")
     print(f"    Containers: {', '.join(container_names)}")
 
     # --- Generate komodo.env ---
     komodo_output = build_komodo_env(
-        base_komodo, containers_dir, container_names, service_map
+        base_komodo, containers_dir, container_names, service_map,
+        project_name=project_name,
     )
     komodo_deduped = dedup_komodo_env(komodo_output)
     (stack_dir / 'komodo.env').write_text(komodo_deduped, encoding='utf-8')

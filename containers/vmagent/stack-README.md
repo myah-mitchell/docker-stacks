@@ -1,7 +1,7 @@
 # Initial Deployment Requirements
 ## Prerequisites for using vmagent
 
-### Setting Up Node Exporter
+### Setting Up Node Exporter [vmagent-host]
 
 Node Exporter is expected to be installed by the Agent stack and is used to collect metrics off of the host.
 

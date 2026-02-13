@@ -39,8 +39,42 @@ The script loops through all stack folders and reads each one's compose.yaml fil
 1. Read the stack's `compose.yaml`.
 2. Follow any `include` directives recursively (supports both simple string form and `path:` object form). Visited files are tracked to prevent infinite loops.
 3. Extract all `extends > file` references matching `containers/<name>/compose.yaml`.
-4. Containers from included files appear first, followed by the current file's containers.
-5. Each container name is returned only once, in order of first appearance.
+4. For each extends block, also extract the `service:` value (with leading `.` stripped) to build a service map used for tag-based section filtering.
+5. Containers from included files appear first, followed by the current file's containers.
+6. Each container name is returned only once, in order of first appearance.
+
+### Tag-Based Conditional Sections
+
+Headings in container files (_komodo.env_, _testing.env_, _stack-README.md_) can include tags in square brackets to conditionally include/exclude sections based on which service variant the stack uses.
+
+**Syntax:**
+```
+## Heading Text [service-name]
+## Multi-variant Heading [service-a, service-b]
+## Always Included Heading
+```
+
+**Rules:**
+- Tags appear at the end of any heading line in square brackets.
+- Multiple tags are comma-separated.
+- Headings with no tags are always included.
+- Tags are matched against the `service:` names from the stack's compose.yaml (with leading `.` stripped). For example, if a stack references `service: .crowdsec-server`, the active tag is `crowdsec-server`.
+- When a heading is filtered out, all its sub-headings are also removed regardless of their own tags.
+- Tags are stripped from headings in the generated output files.
+- This works across all three file types: markdown (`## Heading [tag]`), komodo (`#== Heading [tag]`), and testing.env (`#== Heading [tag]`).
+
+**Example:** A container with server/agent variants:
+```
+#== Crowdsec Common Settings
+CROWDSEC_IMAGE: crowdsecurity/crowdsec
+
+#== Crowdsec Server [crowdsec-server]
+CROWDSEC_LAPI_KEY: ...
+
+#== Crowdsec Agent [crowdsec-agent]
+CROWDSEC_AGENT_PASSWORD: ...
+```
+A stack using `service: .crowdsec-server` would include "Common Settings" and "Server" sections, but exclude "Agent".
 
 ---
 

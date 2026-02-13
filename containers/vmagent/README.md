@@ -10,7 +10,7 @@ services:
       service: .vmagent-traefik
 ```
 
-For using host data colletion
+For using host data colletion with node-exporter
 ```yaml
 services:
   vmagent:

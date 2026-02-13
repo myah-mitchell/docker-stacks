@@ -1,7 +1,7 @@
 # Initial Deployment Requirements
 ## Prerequisites for using vector
 
-### Setting Up Syslog Collection
+### Setting Up Syslog Collection [vector-host]
 
 #### Open Port in UFW for Syslog
 

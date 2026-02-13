@@ -2,7 +2,7 @@
 ## Prerequisites for using crowdsec
 
 # Helpful Commands
-## Crowdsec LAPI Server Commands
+## Crowdsec LAPI Server Commands [crowdsec-server]
 
 To Enroll the Server run the following:
 

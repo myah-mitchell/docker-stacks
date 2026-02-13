@@ -47,26 +47,30 @@ class Section:
     at a deeper nesting level).
 
     Attributes:
-        heading_line:  Full heading line as it appears in the file.
-        heading_text:  Heading text without the prefix markers.
+        heading_line:  Full heading line as it appears in the file (tags stripped).
+        heading_text:  Heading text without the prefix markers or tags.
         level:         Nesting depth (1 = top-level, 2 = sub-section, etc.).
         content_lines: Lines belonging directly to this section.
         children:      Child Section objects at a deeper level.
+        tags:          Set of tag strings from [tag1, tag2] syntax. Empty
+                       set means the section is always included.
     """
 
     def __init__(self, heading_line="", heading_text="", level=0,
-                 content_lines=None):
+                 content_lines=None, tags=None):
         self.heading_line = heading_line
         self.heading_text = heading_text
         self.level = level
         self.content_lines = content_lines if content_lines is not None else []
         self.children = []
+        self.tags = tags if tags is not None else set()
 
     def __repr__(self):
+        tag_str = f", tags={self.tags!r}" if self.tags else ""
         return (
             f"Section(level={self.level}, text={self.heading_text!r}, "
             f"content={len(self.content_lines)} lines, "
-            f"children={len(self.children)})"
+            f"children={len(self.children)}{tag_str})"
         )
 
 # endregion
@@ -99,6 +103,40 @@ def detect_markdown_heading(line):
         return len(m.group(1)), m.group(2).strip()
     return None
 
+
+_TAG_RE = re.compile(r'\s*\[([^\]]+)\]\s*$')
+
+
+def extract_tags(text):
+    """Extract [tag1, tag2] from the end of heading text.
+
+    Tags are optional annotations in square brackets at the end of a
+    heading that control conditional inclusion based on which service
+    variant a stack uses.
+
+    Args:
+        text: Heading text (without prefix markers like # or #=).
+
+    Returns:
+        (clean_text, tags) where clean_text has the [tags] removed
+        and tags is a set of stripped tag strings. Empty set means
+        "always include" (no tags present).
+
+    Examples:
+        >>> extract_tags("Crowdsec Server [crowdsec-server]")
+        ('Crowdsec Server', {'crowdsec-server'})
+        >>> extract_tags("Shared [crowdsec-server, crowdsec-agent]")
+        ('Shared', {'crowdsec-server', 'crowdsec-agent'})
+        >>> extract_tags("No Tags Here")
+        ('No Tags Here', set())
+    """
+    m = _TAG_RE.search(text)
+    if m:
+        tags = {t.strip() for t in m.group(1).split(',') if t.strip()}
+        clean_text = text[:m.start()].rstrip()
+        return clean_text, tags
+    return text, set()
+
 # endregion
 # ============================================================================
 # region Parsing: Content -> Section Tree
@@ -127,7 +165,13 @@ def parse_sections(content, heading_detector):
         heading = heading_detector(line)
         if heading:
             level, text = heading
-            current = Section(heading_line=line, heading_text=text, level=level)
+            clean_text, tags = extract_tags(text)
+            # Strip tags from the heading line so output files are clean
+            clean_line = _TAG_RE.sub('', line).rstrip()
+            current = Section(
+                heading_line=clean_line, heading_text=clean_text,
+                level=level, tags=tags,
+            )
             flat.append(current)
         elif current is None:
             preamble.append(line)
@@ -153,6 +197,37 @@ def parse_sections(content, heading_detector):
         stack.append(section)
 
     return preamble, top_level
+
+
+def filter_sections_by_tags(sections, active_tags):
+    """Remove sections whose tags don't match any active service tag.
+
+    Filtering rules:
+      - Sections with no tags (empty set) are always kept.
+      - Sections with tags are kept only if at least one tag is in
+        active_tags.
+      - When a section is filtered out, ALL its children are removed
+        too, regardless of their own tags.
+      - Children of a kept section are recursively filtered.
+
+    Args:
+        sections:    List of Section objects.
+        active_tags: Set of active service tag strings.
+
+    Returns:
+        Filtered list of Section objects (new list; originals not modified).
+    """
+    result = []
+    for section in sections:
+        if section.tags and not (section.tags & active_tags):
+            # Has tags but none match -> exclude with all children
+            continue
+        filtered = deepcopy(section)
+        filtered.children = filter_sections_by_tags(
+            section.children, active_tags
+        )
+        result.append(filtered)
+    return result
 
 # endregion
 # ============================================================================
@@ -369,12 +444,13 @@ def _parse_include_paths(content, base_dir):
 
 
 def extract_container_refs(compose_path, _visited=None):
-    """Extract unique container names from a stack's compose.yaml.
+    """Extract container names and service variants from a compose.yaml.
 
     Scans for 'extends > file' references matching the pattern
-    containers/<name>/compose.yaml. Also follows Docker Compose
-    ``include`` directives recursively so that containers from
-    included compose files are discovered as well.
+    containers/<name>/compose.yaml and also extracts the ``service:``
+    value from each extends block. Follows Docker Compose ``include``
+    directives recursively so that containers from included compose
+    files are discovered as well.
 
     Skips YAML comment lines. Each container is returned only once,
     even if multiple services extend from the same container directory.
@@ -384,31 +460,42 @@ def extract_container_refs(compose_path, _visited=None):
         compose_path: Path to the stack's compose.yaml.
 
     Returns:
-        List of container directory names in order of first appearance.
+        (container_names, service_map) where:
+          container_names: List of container dir names in first-appearance order.
+          service_map:     Dict mapping container dir name to set of service
+                           variant names (leading '.' stripped). Used for
+                           tag-based section filtering.
     """
     if _visited is None:
         _visited = set()
 
     resolved = compose_path.resolve()
     if resolved in _visited:
-        return []
+        return [], {}
     _visited.add(resolved)
 
     content = compose_path.read_text(encoding='utf-8')
     seen = set()
     containers = []
+    service_map = {}
 
     # Recursively process included compose files first so that base
     # containers appear before the current file's own containers.
     for inc_path in _parse_include_paths(content, compose_path.parent):
         if inc_path.exists():
-            for name in extract_container_refs(inc_path, _visited):
+            inc_containers, inc_services = extract_container_refs(
+                inc_path, _visited
+            )
+            for name in inc_containers:
                 if name not in seen:
                     seen.add(name)
                     containers.append(name)
+            for name, svcs in inc_services.items():
+                service_map.setdefault(name, set()).update(svcs)
 
-    # Extract container refs from extends directives in this file
-    for line in content.splitlines():
+    # Extract container refs and service names from extends directives
+    lines = content.splitlines()
+    for i, line in enumerate(lines):
         if line.strip().startswith('#'):
             continue
         m = re.search(r'containers/([^/]+)/compose\.yaml', line)
@@ -418,28 +505,42 @@ def extract_container_refs(compose_path, _visited=None):
                 seen.add(name)
                 containers.append(name)
 
-    return containers
+            # Look at nearby lines for the service: directive
+            for j in range(max(0, i - 2), min(len(lines), i + 3)):
+                svc_m = re.match(r'\s+service:\s+\.?([\w-]+)', lines[j])
+                if svc_m:
+                    service_map.setdefault(name, set()).add(svc_m.group(1))
+                    break
+
+    return containers, service_map
 
 # endregion
 # ============================================================================
 # region komodo.env Builder
 # ============================================================================
 
-def build_komodo_env(base_content, containers_dir, container_names):
+def build_komodo_env(base_content, containers_dir, container_names,
+                     service_map=None):
     """Build a stack's komodo.env from base + container komodo.env files.
 
     Starts from base-komodo.env content and merges each container's
     komodo.env by heading. Same headings are combined; new headings
-    are appended.
+    are appended. Tagged sections are filtered based on which service
+    variants the stack uses.
 
     Args:
         base_content:    Content string of base-komodo.env.
         containers_dir:  Path to the containers/ directory.
         container_names: Ordered list of container names to merge.
+        service_map:     Optional dict mapping container name to set of
+                         active service variant names for tag filtering.
 
     Returns:
         Generated komodo.env content string.
     """
+    if service_map is None:
+        service_map = {}
+
     preamble, sections = parse_sections(base_content, detect_komodo_heading)
 
     for name in container_names:
@@ -448,6 +549,13 @@ def build_komodo_env(base_content, containers_dir, container_names):
             continue
         content = env_path.read_text(encoding='utf-8')
         _, container_sections = parse_sections(content, detect_komodo_heading)
+
+        active_tags = service_map.get(name, set())
+        if active_tags:
+            container_sections = filter_sections_by_tags(
+                container_sections, active_tags
+            )
+
         sections = merge_sections(sections, container_sections)
 
     return serialize_sections(preamble, sections)
@@ -458,7 +566,7 @@ def build_komodo_env(base_content, containers_dir, container_names):
 # ============================================================================
 
 def build_readme(base_content, existing_content, containers_dir,
-                 container_names, stack_name):
+                 container_names, stack_name, service_map=None):
     """Build a stack's README.md from existing/base + container READMEs.
 
     Merge rules:
@@ -478,6 +586,8 @@ def build_readme(base_content, existing_content, containers_dir,
          are preserved untouched.
       5. New H1 headings from base or containers not yet in the result
          are appended.
+      6. Tagged sections in container READMEs are filtered based on which
+         service variants the stack uses.
 
     Args:
         base_content:    Content string of base-README.md.
@@ -485,10 +595,14 @@ def build_readme(base_content, existing_content, containers_dir,
         containers_dir:  Path to the containers/ directory.
         container_names: Ordered list of container names to merge.
         stack_name:      Stack directory name (for template substitution).
+        service_map:     Optional dict mapping container name to set of
+                         active service variant names for tag filtering.
 
     Returns:
         Generated README.md content string.
     """
+    if service_map is None:
+        service_map = {}
     pretty_name = stack_name.replace('-', ' ').title()
     base_substituted = base_content.replace('<stackName>', pretty_name)
 
@@ -513,6 +627,11 @@ def build_readme(base_content, existing_content, containers_dir,
             continue
         content = readme_path.read_text(encoding='utf-8')
         _, sections = parse_sections(content, detect_markdown_heading)
+
+        active_tags = service_map.get(name, set())
+        if active_tags:
+            sections = filter_sections_by_tags(sections, active_tags)
+
         container_section_lists.append(sections)
 
     # Base sections come first, then container sections layer on top
@@ -666,6 +785,54 @@ def parse_komodo_values(path):
         return values
 
     for line in path.read_text(encoding='utf-8').splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+        m = re.match(r'^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)', stripped)
+        if m:
+            value = re.sub(r'\[\[.*?\]\]', '', m.group(2)).strip()
+            values[m.group(1)] = value
+
+    return values
+
+
+def parse_komodo_values_filtered(path, active_tags=None):
+    """Parse a komodo-format file with optional tag-based filtering.
+
+    When active_tags is provided, the file is parsed into sections,
+    tagged sections that don't match are removed, then KEY: VALUE
+    pairs are extracted from the surviving sections. When active_tags
+    is None or empty, delegates to parse_komodo_values() (no filtering).
+
+    Args:
+        path:        Path to the komodo-format file.
+        active_tags: Optional set of active service names for filtering.
+
+    Returns:
+        Dict of {key: value} pairs. Empty dict if file doesn't exist.
+    """
+    if not active_tags:
+        return parse_komodo_values(path)
+
+    if not path.exists():
+        return {}
+
+    content = path.read_text(encoding='utf-8')
+    preamble, sections = parse_sections(content, detect_komodo_heading)
+    sections = filter_sections_by_tags(sections, active_tags)
+
+    # Extract KEY: VALUE pairs from preamble + surviving sections
+    all_lines = list(preamble)
+
+    def collect_lines(section_list):
+        for sec in section_list:
+            all_lines.extend(sec.content_lines)
+            collect_lines(sec.children)
+
+    collect_lines(sections)
+
+    values = {}
+    for line in all_lines:
         stripped = line.strip()
         if not stripped or stripped.startswith('#'):
             continue
@@ -1005,8 +1172,8 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
         print(f"  Skipping '{stack_name}': no compose.yaml found")
         return
 
-    # --- Discover containers referenced by this stack ---
-    container_names = extract_container_refs(compose_path)
+    # --- Discover containers and service variants ---
+    container_names, service_map = extract_container_refs(compose_path)
     if not container_names:
         print(f"  Skipping '{stack_name}': no container extends references found")
         return
@@ -1016,7 +1183,7 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
 
     # --- Generate komodo.env ---
     komodo_output = build_komodo_env(
-        base_komodo, containers_dir, container_names
+        base_komodo, containers_dir, container_names, service_map
     )
     komodo_deduped = dedup_komodo_env(komodo_output)
     (stack_dir / 'komodo.env').write_text(komodo_deduped, encoding='utf-8')
@@ -1030,7 +1197,7 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
 
     readme_output = build_readme(
         base_readme, existing_readme, containers_dir,
-        container_names, stack_name
+        container_names, stack_name, service_map
     )
     (stack_dir / 'README.md').write_text(readme_output, encoding='utf-8')
     print("    Created: README.md")
@@ -1042,8 +1209,12 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
     # These files use komodo format (KEY: VALUE), not standard .env format
     container_env = {}
     for name in container_names:
+        active_tags = service_map.get(name, set())
         container_env.update(
-            parse_komodo_values(containers_dir / name / 'testing.env')
+            parse_komodo_values_filtered(
+                containers_dir / name / 'testing.env',
+                active_tags=active_tags if active_tags else None,
+            )
         )
     # Use the original (non-deduped) komodo content so that duplicate KEY:
     # VALUE lines are converted to KEY=VALUE before dedup_env processes them.

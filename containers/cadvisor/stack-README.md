@@ -5,9 +5,6 @@
 ## Create needed folders for cadvisor
 
 ```bash
-mkdir -p /opt/docker/logs/$projectName/cadvisor
-sudo chown 101000:101000 /opt/docker/logs/$projectName/cadvisor
-
 mkdir -p /opt/docker/volumes/$projectName/cadvisor-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/cadvisor-*
 ```

@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+- job_name: victoriametrics
+  static_configs:
+    - targets:
+      - victoriametrics.%{SERVER_ADDRESS}:8428
+- job_name: victorialogs
+  static_configs:
+    - targets:
+      - victorialogs.%{SERVER_ADDRESS}:9428
+- job_name: victoriatraces
+  static_configs:
+    - targets:
+      - victoriatraces.%{SERVER_ADDRESS}:10428
+- job_name: vmauth
+  static_configs:
+    - targets:
+      - vmauth.%{SERVER_ADDRESS}:8427
+  basic_auth:
+    username: %{VMAUTH_USER}
+    password: %{VMAUTH_PASS}
+- job_name: vmalert
+  static_configs:
+    - targets:
+      - vmalert.%{SERVER_ADDRESS}:8880

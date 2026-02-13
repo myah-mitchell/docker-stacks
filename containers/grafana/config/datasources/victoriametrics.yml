@@ -1,0 +1,34 @@
+apiVersion: 1
+
+datasources:
+  - name: VictoriaLogs
+    type: victoriametrics-logs-datasource
+    access: proxy
+    url:  http://vmauth:8427/
+    basicAuth: true
+    basicAuthUser: ${VMAUTH_USER}
+    secureJsonData:
+      basicAuthPassword: ${VMAUTH_PASS}
+
+  - name: VictoriaMetrics-prometheus
+    type: prometheus
+    access: proxy
+    url: http://vmauth:8427/
+    basicAuth: true
+    basicAuthUser: ${VMAUTH_USER}
+    secureJsonData:
+      basicAuthPassword: ${VMAUTH_PASS}
+
+  - name: VictoriaMetrics
+    type: victoriametrics-metrics-datasource
+    access: proxy
+    url: http://vmauth:8427/
+    basicAuth: true
+    basicAuthUser: ${VMAUTH_USER}
+    secureJsonData:
+      basicAuthPassword: ${VMAUTH_PASS}
+
+  - name: VictoriaTraces
+    type: jaeger
+    access: proxy
+    url:  http://victoriatraces:10428/select/jaeger/

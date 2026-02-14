@@ -242,6 +242,9 @@ services:
       - frontend
       - backend
       - socket_proxy
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       <<: *default_healthcheck

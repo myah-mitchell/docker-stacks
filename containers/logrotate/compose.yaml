@@ -88,6 +88,9 @@ services:
     networks:
       - backend
       - socket_proxy
+    depends_on:
+      socket-proxy-rw:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "logrotate", "--version"]
       <<: *default_healthcheck

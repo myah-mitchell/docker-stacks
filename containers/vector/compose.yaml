@@ -121,4 +121,7 @@ services:
     networks:
       - frontend
       - socket_proxy
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
     userns_mode: "host"

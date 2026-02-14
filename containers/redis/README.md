@@ -11,6 +11,16 @@ services:
       service: .redis-public
 ```
 
+Replica of Public Redis stack. Note requires password.
+
+```yaml
+services:
+  redis:
+    extends:
+      file: ../../containers/redis/compose.yaml
+      service: .redis-replica
+```
+
 Internal Redis that only current stack can use. No password required.
 
 ```yaml

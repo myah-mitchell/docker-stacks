@@ -6,5 +6,5 @@
 
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/dockns-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/dockns-*
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/dockns-*
 ```

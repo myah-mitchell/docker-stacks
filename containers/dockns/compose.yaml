@@ -80,11 +80,10 @@ services:
       DOCKNS_LOG_LEVEL: info
       DOCKNS_DB_FILE: /data/record-db.json
       #DOCKNS_DRY_RUN: "true"
-      DOCKNS_RECORD_DEFAULTS_TTL: 300
       DOCKNS_NS_CLOUDFLARE_SERVICE: cloudflare
-      DOCKNS_NS_CLOUDFLARE_API_KEY: ${DOCKNS_CF_API_TOKEN}
+      DOCKNS_NS_CLOUDFLARE_API_KEY: ${DOCKNS_CF_API_KEY}
       DOCKNS_NS_CLOUDFLARE_ACCOUNT_ID: ${DOCKNS_CF_ACCOUNT_ID}
-      DOCKNS_NS_CLOUDFLARE_ZONE_IDS: "${DOMAIN_NAME}=${DOCKNS_CF_ZONE_ID}"
+      DOCKNS_NS_CLOUDFLARE_ZONE_IDS: ${DOCKNS_CF_ZONE_ID}
       DOCKNS_NS_CLOUDFLARE_RECORD_DEFAULTS_TTL: 300
       DOCKNS_NS_CLOUDFLARE_RECORD_DEFAULTS_A_IP: ${DOCKNS_WAN_IP}
 
@@ -95,11 +94,14 @@ services:
       DOCKNS_NS_TECHNITIUM_RECORD_DEFAULTS_CNAME_TARGET_DOMAIN: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
 
     volumes:
-      - "./config:/config"
+    #  - "./config:/config"
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/dockns-data:/data"
     networks:
       - frontend
       - socket_proxy
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "", ""]
       <<: *default_healthcheck

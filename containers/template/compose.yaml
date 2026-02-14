@@ -80,24 +80,52 @@ services:
     environment:
       <<: [*environment_tz, *environment_user]
     volumes:
-      - "./imageName-config:/config"
+      - "./config:/config"
       - ${DOCKER_LOGS}/${PROJECT_NAME}/imageName:/logs"
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/imageName-data:/data"
     labels: ## Traefik
-      - "traefik.enable: true"
-      - "traefik.docker.network: ${PROXY_NETWORK}"
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK}"
         ## HTTP Routers
-      - "traefik.http.routers.$PROJECT_NAME-rtr.rule:
+      - "traefik.http.routers.$PROJECT_NAME-rtr.rule=
         Host(`${IMAGENAME_SERVICE_NAME}.${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${DOMAIN_NAME}`) ||
-        Host(`${IMAGENAME_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: bouncer,realip"
         ## Middlewares
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares: chain-no-auth@file"
+      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=chain-no-auth@file"
         ## HTTP Services
       - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=9120"
+
+      ## Traefik-KOP Labels
+      - "kop-public.traefik.enable=true"
+       ## HTTP Routers
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-kop-rtr.rule=
+        Host(`${IMAGENAME_SERVICE_NAME}.${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${IMAGENAME_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+      ## Middlewares
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-kop-rtr.middlewares=chain-no-auth@file"
+       ## HTTP Services
+        # This is needed to force https:// instead of http://<URL>:80
+      - "kop-public.traefik.http.services.$PROJECT_NAME-kop-svc.loadbalancer.server.url=https://${IMAGENAME_SERVICE_NAME}" 
+        # This is needed otherwise loadbalancer.server.url is https://<IP>
+      - "kop.bind.ip=${IMAGENAME_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## DockNS Labels
+      ### Cloudflare Records
+      - "dockns.cloudflare.record=A"
+      - "dockns.cloudflare.name=${IMAGENAME_SERVICE_NAME}.${DOMAIN_NAME}"
+
+      ### Technitium Records
+      - "dockns.technitium.0.record=CNAME"
+      - "dockns.technitium.0.name=${IMAGENAME_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+      - "dockns.technitium.1.record=CNAME"
+      - "dockns.technitium.1.name=${IMAGENAME_HOSTNAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
     networks:
       - proxy
       - frontend

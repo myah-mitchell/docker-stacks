@@ -1,0 +1,24 @@
+[name_servers.internaldns]
+service = "technitium"
+host = ""
+api_key = ""
+
+[name_servers.internaldns.record_defaults]
+A.ip = "192.168.1.50"
+CNAME.target_domain = "domain.tld"
+ttl = 60
+
+
+[name_servers.externaldns]
+service = "cloudflare"
+api_key = "" 
+account_id = ""
+
+zone_id = {
+    "domain.tld" = "zone id" 
+}
+
+[name_servers.externaldns.record_defaults]
+A.ip = "192.168.1.50"
+CNAME.target_domain = "domain.tld"
+ttl = 300

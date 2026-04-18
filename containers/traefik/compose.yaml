@@ -119,9 +119,9 @@ services:
           127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
           # Middlewares
       - --entrypoints.http.http.middlewares=
-          middlewares-bouncer@file,
           middlewares-rate-limit@file,
           middlewares-secure-headers@file
+          #middlewares-bouncer@file
 
       # HTTPS
       - --entrypoints.https.address=:443
@@ -136,10 +136,10 @@ services:
           127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
           # Middlewares
       - --entrypoints.https.http.middlewares=
-          middlewares-bouncer@file,
           middlewares-rate-limit@file,
           middlewares-secure-headers@file,
           middlewares-compress@file
+          #middlewares-bouncer@file,
 
       # Dashboard
       - --entrypoints.dashboard.address=:8443

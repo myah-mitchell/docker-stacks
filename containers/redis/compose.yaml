@@ -93,3 +93,5 @@ services:
   .redis-replica:
     extends: .redis
     command: redis-server --appendonly yes --replicaof ${REDIS_SERVER} 6379 --masterauth ${REDIS_PASSWORD}
+    networks:
+      - frontend

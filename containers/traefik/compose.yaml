@@ -183,7 +183,7 @@ services:
       ################################################################
       # Plugins
       ################################################################
-      - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      #- --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
       #- --experimental.plugins.bouncer.version=v1.4.6
       - --experimental.plugins.bouncer.version=v1.5.0
 
@@ -212,8 +212,8 @@ services:
       LE_EMAIL: letsencrypt@${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
       DOMAIN_NAME: ${DOMAIN_NAME}
       AUTHENTIC_HOST: ${AUTHENTIC_HOST}
-      CROWDSEC_LAPI_KEY: ${CROWDSEC_LAPI_KEY}
-      CROWDSEC_LAPI_HOST: ${CROWDSEC_LAPI_HOST}
+      #CROWDSEC_LAPI_KEY: ${CROWDSEC_LAPI_KEY}
+      #CROWDSEC_LAPI_HOST: ${CROWDSEC_LAPI_HOST}
     volumes:
       - "./rules:/etc/traefik/rules/"
       - "${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/etc/traefik/log/"

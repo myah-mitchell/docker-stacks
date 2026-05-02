@@ -78,7 +78,7 @@ services:
       - "--storageDataPath=/storage"
       - "--promscrape.config=/etc/prometheus/prometheus.yml"
       - "--vmalert.proxyURL=http://vmalert:8880"
-      - "--retentionPeriod=1m"
+      - "--retentionPeriod=60d"
     #ports:
     #  - "8428:8428"
     environment:

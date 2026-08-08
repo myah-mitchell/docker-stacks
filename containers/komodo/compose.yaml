@@ -77,7 +77,7 @@ services:
       - 9120:9120
     environment:
       <<: [*environment_tz, *environment_user]
-      KOMODO_DATABASE_ADDRESS: ferretdb:27017
+      KOMODO_DATABASE_ADDRESS: ${PROJECT_NAME}-${FERRETDB_HOSTNAME}:27017
       KOMODO_DATABASE_USERNAME: ${KOMODO_DB_USERNAME}
       KOMODO_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD}
       KOMODO_PASSKEY: ${KOMODO_PASSKEY}
@@ -108,9 +108,8 @@ services:
       - frontend
       - backend
     depends_on:
-      - ferretdb
-    #  ferretdb:
-    #    condition: service_healthy
+      ferretdb:
+        condition: service_healthy
     ## Allows for systemd Periphery connection at 
     ## "https://host.docker.internal:8120"
     ##extra_hosts:

@@ -77,7 +77,7 @@ services:
       TEMPLATE_NAME: lost-in-space
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik_backend
+      - traefik.docker.network=${PROJECT_NAME}_backend
 
       # use as default "fallback" for any non-registered services (with priority below normal)
       - traefik.http.routers.error-pages-rtr.rule=HostRegexp(`.+`)
@@ -94,5 +94,5 @@ services:
     networks:
       - backend
     healthcheck:
-      #test: ["CMD", "", ""]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
       <<: *default_healthcheck

@@ -2,7 +2,7 @@
 
 This will start up a Traefik stack with Traefik-kop and a password-protected Redis server that all Traefik-kop services can write to. This server will need to allow inbound 6379 (Redis) and then port 80/443 (HTTP/HTTPS). This compose file should only be deployed to one server.
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create Stack Folders
 
 ```bash

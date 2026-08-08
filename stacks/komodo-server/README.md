@@ -2,7 +2,7 @@
 
 This will start up a Komodo stack with an instance of Komodo running as a server to connect to instances of Komodo running on hosts. This should only be ran once in an environment.
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create Stack Folders
 
 ```bash

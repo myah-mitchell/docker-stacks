@@ -2,7 +2,7 @@
 
 The `stacks\authentic-server\compose.yaml` will start up an Authentik stack with a server and workinger. This stack should only be ran once per environment.
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create Stack Folders
 
 ```bash

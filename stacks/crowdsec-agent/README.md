@@ -2,7 +2,7 @@
 
 This will start up a Crowdsec stack with Crowdsec running in agent mode collecting logs. This will relay all information to the crowdsec-server stack.
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create Stack Folders
 
 ```bash

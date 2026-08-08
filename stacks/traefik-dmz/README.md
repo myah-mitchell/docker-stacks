@@ -4,7 +4,7 @@ This will start up a Traefik stack that is configured to have Redis replicate da
 
 * Note: For this to work the _TRAEFIK_EXTRA_COMMAND_ Env Var must be set to **"--providers.redis.endpoints=redis:6379"**. This will enable Traefik to load labels out of the local Redis database.
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create Stack Folders
 
 ```bash

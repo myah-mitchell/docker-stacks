@@ -30,7 +30,7 @@ sudo ufw app update WebProxy
 sudo ufw app list
 sudo ufw allow WebProxy
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create needed folders for vector
 
 ```bash

@@ -1,5 +1,5 @@
 # Initial Deployment Requirements
 ## Prerequisites for using logrotate
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create needed folders for logrotate

@@ -2,7 +2,7 @@
 
 This will start up a basic Traefik stack with monitoring and log collection but without Traefik-kop support. This is a working Traefik stack with a socket-proxy, custom error pages, access log rotation, vlagent, vmagent, and vector.
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create Stack Folders
 
 ```bash

@@ -1,7 +1,7 @@
 # Initial Deployment Requirements
 ## Prerequisites for using victoriatraces
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create needed folders for victoriatraces
 
 ```bash

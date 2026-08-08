@@ -2,7 +2,7 @@
 
 The `stacks\technitium-server\compose.yaml` will start up a Technitium stack with an instance of Technitium running as a server to connect to other instances of Technitium running on other servers. There is no server/agent mode here, all instances run the same config. This can only be run once per server.
 
-# Create and Setup Requried Folders
+# Create and Setup Required Folders
 ## Create Stack Folders
 
 ```bash

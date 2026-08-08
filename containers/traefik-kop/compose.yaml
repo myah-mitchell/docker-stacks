@@ -83,6 +83,9 @@ services:
       DOCKER_PREFIX: kop-public
       DEBUG: 0
       #DOCKER_HOST: tcp://${PROJECT_NAME}-socket-proxy:2375
+    # NOTE: traefik-kop needs the raw Docker socket (not socket-proxy). Unlike traefik/crowdsec/
+    # dozzle-agent/dockns, it currently doesn't support talking to Docker over socket-proxy's
+    # filtered TCP endpoint, so it's mounted directly here rather than going through DOCKER_HOST above.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     userns_mode: "host"

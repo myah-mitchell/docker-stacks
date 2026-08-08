@@ -148,7 +148,7 @@ services:
       - --entrypoints.dashboard.http.tls.domains[0].main=${DOMAIN_NAME}
       - --entrypoints.dashboard.http.tls.domains[0].sans=*.${DOMAIN_NAME},*.${SUB_DOMAIN_NAME}${DOMAIN_NAME},*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
           # Trusted IPs (Local)
-      - --entrypoints.https.forwardedheaders.trustedips=
+      - --entrypoints.dashboard.forwardedheaders.trustedips=
           127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
 
       ################################################################
@@ -211,7 +211,7 @@ services:
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
       LE_EMAIL: letsencrypt@${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
       DOMAIN_NAME: ${DOMAIN_NAME}
-      AUTHENTIC_HOST: ${AUTHENTIC_HOST}
+      AUTHENTIK_HOST: ${AUTHENTIK_HOST}
       #CROWDSEC_LAPI_KEY: ${CROWDSEC_LAPI_KEY}
       #CROWDSEC_LAPI_HOST: ${CROWDSEC_LAPI_HOST}
     volumes:

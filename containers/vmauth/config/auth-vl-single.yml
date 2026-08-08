@@ -1,10 +1,18 @@
-# route requests between VictoriaMetrics and VictoriaLogs
+# route requests between VictoriaMetrics, VictoriaLogs and VictoriaTraces
 unauthorized_user:
   url_map:
   - src_paths:
     - "/api/v1/.*"
-    url_prefix: 
+    url_prefix:
     - http://victoriametrics:8428
+    # VictoriaTraces (Jaeger query API + OTLP ingestion) - must come before the
+    # general /select/.* and /insert/.* VictoriaLogs routes below since vmauth
+    # matches src_paths top-down and takes the first match.
+  - src_paths:
+    - "/select/jaeger/.*"
+    - "/insert/opentelemetry/.*"
+    url_prefix:
+    - http://victoriatraces:10428
   - src_paths:
     - "/select/.*"
     - "/insert/.*"

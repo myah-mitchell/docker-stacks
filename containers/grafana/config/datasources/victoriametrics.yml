@@ -31,4 +31,8 @@ datasources:
   - name: VictoriaTraces
     type: jaeger
     access: proxy
-    url:  http://victoriatraces:10428/select/jaeger/
+    url: http://vmauth:8427/select/jaeger/
+    basicAuth: true
+    basicAuthUser: ${VMAUTH_USER}
+    secureJsonData:
+      basicAuthPassword: ${VMAUTH_PASS}

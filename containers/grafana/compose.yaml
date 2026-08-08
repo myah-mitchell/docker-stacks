@@ -84,9 +84,9 @@ services:
       GF_LOG_FORMAT: json
     volumes:
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/grafana-data:/var/lib/grafana
-      - ./config/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml
-      - ./config/provisioning:/etc/grafana/provisioning/dashboards
-      - ./config/dashboards:/var/lib/grafana/dashboards
+      - ./config/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml:ro
+      - ./config/provisioning:/etc/grafana/provisioning/dashboards:ro
+      - ./config/dashboards:/var/lib/grafana/dashboards:ro
       #- ./grafana-config/dashboards/victorialogs.json:/var/lib/grafana/dashboards/vl.json
     labels: ## Traefik Labels
       - "traefik.enable=true"

@@ -88,7 +88,7 @@ services:
       VMAUTH_PASS: ${VMAUTH_PASS}
     volumes:
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/victoriametrics-data:/storage
-      - ./config/prometheus-vl-single.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus-vl-single.yml:/etc/prometheus/prometheus.yml:ro
     labels: ## Traefik Labels
       - "traefik.enable=true"
       - "traefik.docker.network=${PROXY_NETWORK}"

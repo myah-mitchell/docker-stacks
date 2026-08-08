@@ -83,7 +83,7 @@ services:
     environment:
       <<: [*environment_tz, *environment_user]
     volumes:
-      - ./config/auth-vl-single.yml:/etc/auth.yml 
+      - ./config/auth-vl-single.yml:/etc/auth.yml:ro
     labels: ## Traefik Labels
       - "traefik.enable=true"
       - "traefik.docker.network=${PROXY_NETWORK}"

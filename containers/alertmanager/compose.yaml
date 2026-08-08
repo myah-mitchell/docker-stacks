@@ -81,7 +81,7 @@ services:
     environment:
       <<: [*environment_tz, *environment_user]
     volumes:
-      - ./config/alertmanager.yml:/config/alertmanager.yml
+      - ./config/alertmanager.yml:/config/alertmanager.yml:ro
     labels: ## Traefik Labels
       - "traefik.enable=true"
       - "traefik.docker.network=${PROXY_NETWORK}"

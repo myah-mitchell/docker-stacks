@@ -4,7 +4,7 @@ datasources:
   - name: VictoriaLogs
     type: victoriametrics-logs-datasource
     access: proxy
-    url:  http://vmauth:8427/
+    url: http://vmauth:8427/
     basicAuth: true
     basicAuthUser: ${VMAUTH_USER}
     secureJsonData:

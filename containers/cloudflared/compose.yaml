@@ -90,10 +90,12 @@ services:
     environment:
       <<: [*environment_tz, *environment_user]
     volumes:
-      # config.yml (ingress rules, committed to git — hostnames aren't secret) +
-      # <tunnel-id>.json (credentials, NOT committed — see .gitignore and stack-README)
-      # both live in this one folder, matching cloudflared's own expected layout.
+      # config.yml (ingress rules, committed to git — hostnames aren't secret)
+      # lives in config/. <tunnel-id>.json (real credentials, never committed —
+      # see stack-README) lives in secrets/, mounted separately so config/ never
+      # needs to hold anything sensitive.
       - ./config:/etc/cloudflared:ro
+      - ./secrets:/etc/cloudflared/secrets:ro
     labels: ## Komodo Labels
       - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
     networks:

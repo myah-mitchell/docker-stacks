@@ -5,13 +5,14 @@
 # One-time setup (from an admin machine with `cloudflared` installed, logged in via
 # `cloudflared tunnel login`):
 #   cloudflared tunnel create h1-edge
-#     -> writes ~/.cloudflared/<tunnel-id>.json — copy that file into this same
-#        config/ folder as <tunnel-id>.json (matches `credentials-file:` below)
+#     -> writes ~/.cloudflared/<tunnel-id>.json — copy that file into the
+#        secrets/ folder (not config/) as <tunnel-id>.json (matches
+#        `credentials-file:` below)
 #   cloudflared tunnel route dns h1-edge vault.example.com
 #     -> creates the public CNAME automatically; repeat per public hostname added
 
 tunnel: <tunnel-id>
-credentials-file: /etc/cloudflared/<tunnel-id>.json
+credentials-file: /etc/cloudflared/secrets/<tunnel-id>.json
 
 ingress:
   # Vaultwarden (Phase 10) — routes to the home-internal traefik-server over the

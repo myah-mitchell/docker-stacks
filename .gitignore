@@ -3,11 +3,9 @@
 */.env
 .env
 
-# Real per-deployment config (may contain secrets, e.g. mailrise.conf's ntfy token,
-# cloudflared's tunnel credentials.json) — only the committed *.example stays in git.
-containers/*/config/*
-!containers/*/config/*.example
-
-# Real per-deployment secrets on disk (e.g. step-ca's CA password file) — never committed.
+# config/ is never gitignored — it must never hold real secrets by convention.
+# Any container whose real config would contain a credential (e.g. mailrise's
+# ntfy token, cloudflared's tunnel credentials.json) keeps the real file in
+# secrets/ instead (see each container's stack-README), never in config/.
 containers/*/secrets/*
 !containers/*/secrets/.gitkeep

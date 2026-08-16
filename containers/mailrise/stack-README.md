@@ -6,9 +6,10 @@
 
 ```bash
 mkdir -p /opt/docker/stacks/$projectName/mailrise/config
+mkdir -p /opt/docker/stacks/$projectName/mailrise/secrets
 ```
 
-Copy `config/mailrise.conf.example` to `config/mailrise.conf` and fill in the `token` value with the ntfy publish-only token created in ntfy's own post-deploy step (see ntfy's stack-README).
+Copy `config/mailrise.conf.example` to **`secrets/mailrise.conf`** (not `config/`) and fill in the `token` value with the ntfy publish-only token created in ntfy's own post-deploy step (see ntfy's stack-README). `config/` only ever holds the non-secret `.example` template — the real file with a real token belongs in `secrets/`, matching every other container's convention.
 
 ## Point PBS and PVE at it
 

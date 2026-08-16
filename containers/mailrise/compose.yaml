@@ -1,0 +1,100 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .mailrise:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: yoryan/mailrise:1.2.0
+    hostname: ${PROJECT_NAME}-${MAILRISE_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${MAILRISE_HOSTNAME}"
+    command:
+      - "/etc/mailrise.conf"
+    # No Traefik routing — mailrise speaks SMTP, not HTTP. PBS and PVE live outside
+    # Docker entirely (Proxmox host/VM-level), so they need a plain host:port to
+    # point their SMTP notification settings at, not a Traefik-fronted hostname.
+    ports:
+      - "${MAILRISE_SMTP_PORT:-8025}:8025"
+    environment:
+      <<: [*environment_tz, *environment_user]
+    volumes:
+      - ./config/mailrise.conf:/etc/mailrise.conf:ro
+    labels:
+      ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      - backend
+    depends_on:
+      ntfy:
+        condition: service_healthy
+    healthcheck:
+      # The image has neither nc nor wget/curl (built FROM python:3-slim), but
+      # python3 is guaranteed present — open the SMTP socket directly and check
+      # for the 220 greeting banner instead of shelling out to a missing tool.
+      test: ["CMD", "python3", "-c", "import socket,sys; s=socket.create_connection(('127.0.0.1',8025),2); sys.exit(0 if s.recv(64).startswith(b'220') else 1)"]
+      <<: *default_healthcheck

@@ -1,0 +1,23 @@
+# mailrise.conf — copy to mailrise.conf and fill in the ntfy token.
+#
+# Mailrise routes by the recipient address's local-part: whatever's configured
+# to send mail "to" <key>@mailrise.local gets forwarded to that key's Apprise
+# URL(s). Point PBS/PVE notification targets at the matching address below.
+
+listen:
+  smtp:
+    hostname: 0.0.0.0
+    port: 8025
+
+configs:
+  # PBS and PVE notifications -> to: backups@mailrise.local
+  backups:
+    urls:
+      - "ntfy://REPLACE_WITH_NTFY_TOKEN@ntfy/alerts-backups"
+
+  # Everything else (vmalert Alertmanager webhook can also just hit ntfy's own
+  # HTTP API directly instead of going through mailrise — see Phase 2's
+  # vmalert -> ntfy wiring) -> to: infra@mailrise.local
+  infra:
+    urls:
+      - "ntfy://REPLACE_WITH_NTFY_TOKEN@ntfy/alerts-infra"

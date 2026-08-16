@@ -90,8 +90,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     userns_mode: "host"
     networks:
-    - frontend
-    - backend
+      - frontend
+      - backend
     healthcheck:
       test: ["CMD", "/traefik-kop", "--version"]
       <<: *default_healthcheck

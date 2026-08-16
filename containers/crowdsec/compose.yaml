@@ -46,7 +46,7 @@ x-healthcheck: &default_healthcheck
   timeout: ${HEALTH_TIMEOUT:-10s}
   retries: ${HEALTH_RETRIES:-5}
   start_period: ${HEALTH_START:-10s}
-  
+
   #####################################
   # Container environment defaults
   #####################################
@@ -60,7 +60,7 @@ x-environment-user: &environment_user
   ## All environment defaults in one
 x-environment: &default_environment
   <<: [*environment_tz, *environment_user]
-  
+
 #endregion
 ###############################################################################
 #region Stack config
@@ -77,13 +77,13 @@ services:
       <<: [*environment_tz, *environment_user]
       GID: "${PGID:-1000}"
       COLLECTIONS: "
-        crowdsecurity/traefik 
-        crowdsecurity/http-cve 
-        crowdsecurity/http-dos 
-        crowdsecurity/base-http-scenarios 
-        crowdsecurity/appsec-crs 
-        crowdsecurity/appsec-generic-rules 
-        crowdsecurity/appsec-virtual-patching" 
+        crowdsecurity/traefik
+        crowdsecurity/http-cve
+        crowdsecurity/http-dos
+        crowdsecurity/base-http-scenarios
+        crowdsecurity/appsec-crs
+        crowdsecurity/appsec-generic-rules
+        crowdsecurity/appsec-virtual-patching"
       CUSTOM_HOSTNAME: ${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
       DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
     volumes:
@@ -106,7 +106,7 @@ services:
     extends: .crowdsec
     hostname: ${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-server.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${CROWDSEC_HOSTNAME}-server"
-    ports: 
+    ports:
       - "8080:8080" # Local API port
     expose:
       - 8080 # http api for bouncers

@@ -21,7 +21,7 @@ groups:
           severity: warning
         annotations:
           summary: "vlagent is dropping data blocks that are rejected by remote storage"
-          description: "Job \"{{ $labels.job }}\" on instance {{ $labels.instance }} drops the rejected by 
+          description: "Job \"{{ $labels.job }}\" on instance {{ $labels.instance }} drops the rejected by
             remote-write server data blocks. Check the logs to find the reason for rejects."
 
       - alert: TooManyRemoteWriteErrors
@@ -55,7 +55,7 @@ groups:
         annotations:
           summary: "Persistent queue writes for instance {{ $labels.instance }} are saturated"
           description: "Persistent queue writes for vlagent \"{{ $labels.job }}\" (instance {{ $labels.instance }})
-            are saturated by more than 90% and vlagent won't be able to keep up with flushing data on disk. 
+            are saturated by more than 90% and vlagent won't be able to keep up with flushing data on disk.
             In this case, consider to decrease load on the vlagent or improve the disk throughput."
 
       - alert: PersistentQueueForReadsIsSaturated
@@ -66,7 +66,7 @@ groups:
         annotations:
           summary: "Persistent queue reads for instance {{ $labels.instance }} are saturated"
           description: "Persistent queue reads for vlagent \"{{ $labels.job }}\" (instance {{ $labels.instance }})
-            are saturated by more than 90% and vlagent won't be able to keep up with reading data from the disk. 
+            are saturated by more than 90% and vlagent won't be able to keep up with reading data from the disk.
             In this case, consider to decrease load on the vlagent or improve the disk throughput."
 
       - alert: RequestErrorsToAPI

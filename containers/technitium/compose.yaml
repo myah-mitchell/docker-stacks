@@ -46,7 +46,7 @@ x-healthcheck: &default_healthcheck
   timeout: ${HEALTH_TIMEOUT:-10s}
   retries: ${HEALTH_RETRIES:-5}
   start_period: ${HEALTH_START:-10s}
-  
+
   #####################################
   # Container environment defaults
   #####################################
@@ -60,7 +60,7 @@ x-environment-user: &environment_user
   ## All environment defaults in one
 x-environment: &default_environment
   <<: [*environment_tz, *environment_user]
-  
+
 #endregion
 ###############################################################################
 #region Stack config
@@ -97,8 +97,8 @@ services:
       - "traefik.docker.network=${PROXY_NETWORK}"
         ## HTTP Routers
       - "traefik.http.routers.$PROJECT_NAME-rtr.rule=
-        Host(`${TECHNITIUM_NS_NAME}.${DOMAIN_NAME}`) || 
-        Host(`${TECHNITIUM_NS_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) || 
+        Host(`${TECHNITIUM_NS_NAME}.${DOMAIN_NAME}`) ||
+        Host(`${TECHNITIUM_NS_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${TECHNITIUM_NS_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${TECHNITIUM_SERVICE_NAME}.${DOMAIN_NAME}`) ||
         Host(`${TECHNITIUM_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||

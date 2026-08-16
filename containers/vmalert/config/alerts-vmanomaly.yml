@@ -54,7 +54,7 @@ groups:
             Consider to increase the limit as fast as possible.
 
       - alert: TooHighCPUUsage
-        expr: > 
+        expr: >
           sum(rate(process_cpu_seconds_total{job=~".*vmanomaly.*"}[5m])) by (job, instance) /
           sum(vmanomaly_cpu_cores_available{job=~".*vmanomaly.*"}[5m]) by (job, instance) > 0.9
         for: 5m
@@ -77,7 +77,7 @@ groups:
             Too high memory usage may result into multiple issues such as OOMs or degraded performance.
             E.g. it can be caused by high churn rate in your input data.
             Consider to either increase available memory or decrease the load on the process.
-        
+
       - alert: LastConfigReloadFailed
         expr: vmanomaly_config_last_reload_successful == 0
         for: 10m
@@ -127,7 +127,7 @@ groups:
         annotations:
           summary: "High error rate in read requests for \"{{ $labels.job }}\"(\"{{ $labels.instance }}\") for url: {{ $labels.url }} during the last 5m"
           description: >
-            Reading errors may indicate issues with the input data source, server-side constraint violations, security or network issues. 
+            Reading errors may indicate issues with the input data source, server-side constraint violations, security or network issues.
             Investigate the logs for more details.
       - alert: HighWriteErrorRate
         expr: >
@@ -141,5 +141,5 @@ groups:
         annotations:
           summary: "High error rate in write requests for \"{{ $labels.job }}\"(\"{{ $labels.instance }}\") for url: {{ $labels.url }} during the last 5m"
           description: >
-            Writing errors may indicate issues with the destination source, server-side constraint violations, security, or network issues. 
+            Writing errors may indicate issues with the destination source, server-side constraint violations, security, or network issues.
             Investigate the logs for more details.

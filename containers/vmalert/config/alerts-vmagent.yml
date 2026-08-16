@@ -28,7 +28,7 @@ groups:
         annotations:
           dashboard: "http://localhost:3000/d/G7Z9GzMGz?viewPanel=79&var-instance={{ $labels.instance }}"
           summary: "Vmagent is dropping data blocks that are rejected by remote storage"
-          description: "Job \"{{ $labels.job }}\" on instance {{ $labels.instance }} drops the rejected by 
+          description: "Job \"{{ $labels.job }}\" on instance {{ $labels.instance }} drops the rejected by
             remote-write server data blocks. Check the logs to find the reason for rejects."
 
       - alert: TooManyScrapeErrors
@@ -80,7 +80,7 @@ groups:
         expr: |
           (
            rate(vmagent_remotewrite_send_duration_seconds_total[5m])
-           / 
+           /
            vmagent_remotewrite_queues
           ) > 0.9
         for: 15m
@@ -104,7 +104,7 @@ groups:
           dashboard: "http://localhost:3000/d/G7Z9GzMGz?viewPanel=98&var-instance={{ $labels.instance }}"
           summary: "Persistent queue writes for instance {{ $labels.instance }} are saturated"
           description: "Persistent queue writes for vmagent \"{{ $labels.job }}\" (instance {{ $labels.instance }})
-            are saturated by more than 90% and vmagent won't be able to keep up with flushing data on disk. 
+            are saturated by more than 90% and vmagent won't be able to keep up with flushing data on disk.
             In this case, consider to decrease load on the vmagent or improve the disk throughput."
 
       - alert: PersistentQueueForReadsIsSaturated
@@ -116,7 +116,7 @@ groups:
           dashboard: "http://localhost:3000/d/G7Z9GzMGz?viewPanel=99&var-instance={{ $labels.instance }}"
           summary: "Persistent queue reads for instance {{ $labels.instance }} are saturated"
           description: "Persistent queue reads for vmagent \"{{ $labels.job }}\" (instance {{ $labels.instance }})
-            are saturated by more than 90% and vmagent won't be able to keep up with reading data from the disk. 
+            are saturated by more than 90% and vmagent won't be able to keep up with reading data from the disk.
             In this case, consider to decrease load on the vmagent or improve the disk throughput."
 
       - alert: SeriesLimitHourReached
@@ -126,7 +126,7 @@ groups:
         annotations:
           dashboard: "http://localhost:3000/d/G7Z9GzMGz?viewPanel=88&var-instance={{ $labels.instance }}"
           summary: "Instance {{ $labels.instance }} reached 90% of the limit"
-          description: "Max series limit set via -remoteWrite.maxHourlySeries flag is close to reaching the max value. 
+          description: "Max series limit set via -remoteWrite.maxHourlySeries flag is close to reaching the max value.
             Then samples for new time series will be dropped instead of sending them to remote storage systems."
 
       - alert: SeriesLimitDayReached
@@ -136,7 +136,7 @@ groups:
         annotations:
           dashboard: "http://localhost:3000/d/G7Z9GzMGz?viewPanel=90&var-instance={{ $labels.instance }}"
           summary: "Instance {{ $labels.instance }} reached 90% of the limit"
-          description: "Max series limit set via -remoteWrite.maxDailySeries flag is close to reaching the max value. 
+          description: "Max series limit set via -remoteWrite.maxDailySeries flag is close to reaching the max value.
             Then samples for new time series will be dropped instead of sending them to remote storage systems."
 
       - alert: ConfigurationReloadFailure

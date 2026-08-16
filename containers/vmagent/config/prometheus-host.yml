@@ -25,5 +25,5 @@ scrape_configs:
     username: %{NODE_EXPORTER_USER} # the user you set in the node-exporter in the node
     password: %{NODE_EXPORTER_PASS} # the plain text password which you hashed in the Encryption step
   static_configs:
-    - targets: 
+    - targets:
       - %{SERVER_ADDRESS}:9100

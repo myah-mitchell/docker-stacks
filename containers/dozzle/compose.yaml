@@ -46,7 +46,7 @@ x-healthcheck: &default_healthcheck
   timeout: ${HEALTH_TIMEOUT:-10s}
   retries: ${HEALTH_RETRIES:-5}
   start_period: ${HEALTH_START:-10s}
-  
+
   #####################################
   # Container environment defaults
   #####################################
@@ -60,7 +60,7 @@ x-environment-user: &environment_user
   ## All environment defaults in one
 x-environment: &default_environment
   <<: [*environment_tz, *environment_user]
-  
+
 #endregion
 ###############################################################################
 #region Stack config
@@ -75,7 +75,7 @@ services:
     container_name: "${PROJECT_NAME}-${DOZZLE_HOSTNAME}"
     environment:
       <<: [*environment_tz, *environment_user]
-      DOZZLE_HOSTNAME: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
+      DOZZLE_HOSTNAME: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     networks:
       - frontend
     healthcheck:
@@ -87,7 +87,7 @@ services:
     hostname: ${PROJECT_NAME}-${DOZZLE_HOSTNAME}-server.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${DOZZLE_HOSTNAME}-server"
     environment:
-      DOZZLE_HOSTNAME: server.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
+      DOZZLE_HOSTNAME: server.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
       DOZZLE_REMOTE_AGENT: ${DOZZLE_REMOTE_AGENT:-}
     labels: ## Traefik Labels
       - "traefik.enable=true"

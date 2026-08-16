@@ -42,21 +42,21 @@ transforms:
         # -----------------------------------------------------------------------
         # Convert Traefik's timestamp to Vector's standard @timestamp.
         # We prefer StartUTC as it complies with ISO 8601 / RFC 3339.
-        # Uniqueness Note: Using the exact source timestamp allows VictoriaLogs 
+        # Uniqueness Note: Using the exact source timestamp allows VictoriaLogs
         # to deduplicate events automatically if re-ingested.
         if exists(.StartUTC) {
            ts, err = parse_timestamp(.StartUTC, "%+")
            if err == null {
              .timestamp = ts
-             del(.StartUTC) 
-             del(.StartLocal) 
+             del(.StartUTC)
+             del(.StartLocal)
              del(.time)
            }
         } else if exists(.time) {
-           ts, err = parse_timestamp(.time, "%+") 
+           ts, err = parse_timestamp(.time, "%+")
            if err == null {
              .timestamp = ts
-             del(.time) 
+             del(.time)
            }
         }
 
@@ -66,7 +66,7 @@ transforms:
         # Ensure metrics are stored as integers for range queries (e.g., Duration > 1000)
         ds_val, err = to_int(.DownstreamStatus)
         .DownstreamStatus = if err == null { ds_val } else { 0 }
-        
+
         dur_val, err = to_int(.Duration)
         .Duration = if err == null { dur_val } else { 0 }
 
@@ -83,14 +83,14 @@ transforms:
         if exists(."request_User-Agent") {
            ua, err = parse_user_agent(."request_User-Agent")
            if err == null {
-             
+
              # 1. Browser: Extract Family and append Major Version if safe
              b_family = ua.family || "Other"
              .ua_browser = b_family
-             
-             if ua.major != null && ua.major != "" { 
+
+             if ua.major != null && ua.major != "" {
                 # Use strict error handling for concatenation
-                b_full, err = b_family + " " + ua.major 
+                b_full, err = b_family + " " + ua.major
                 if err == null {
                    .ua_browser = b_full
                 }
@@ -99,9 +99,9 @@ transforms:
              # 2. OS: Extract Family and append Major Version if safe
              os_family = ua.os.family || "Other"
              .ua_os = os_family
-             
-             if ua.os.major != null && ua.os.major != "" { 
-                os_full, err = os_family + " " + ua.os.major 
+
+             if ua.os.major != null && ua.os.major != "" {
+                os_full, err = os_family + " " + ua.os.major
                 if err == null {
                    .ua_os = os_full
                 }
@@ -109,9 +109,9 @@ transforms:
 
              # 3. Device
              .ua_device = ua.device.family || "Other"
-             
+
              # Delete original long string
-             del(."request_User-Agent") 
+             del(."request_User-Agent")
            }
         }
 
@@ -120,7 +120,7 @@ transforms:
         # -----------------------------------------------------------------------
         # Build a concise summary string for log viewers (e.g. "GET 200 (5ms) example.com /api ")
         duration_ms = .Duration / 1000000.0
-        
+
         msg_parts = [
           .RequestMethod || "-",
           to_string(.DownstreamStatus),
@@ -148,7 +148,7 @@ transforms:
         if exists(.Authorization) { .Authorization = "REDACTED" }
 
         # Cleanup: Remove high-cardinality noise and static headers to save storage.
-        
+
         # Browser Fingerprinting Headers
         del(."request_Sec-Ch-Ua")
         del(."request_Sec-Ch-Ua-Mobile")
@@ -161,7 +161,7 @@ transforms:
         del(."request_Dnt")
         del(."request_Sec-Gpc")
         del(."request_Priority")
-        
+
         # Static/Redundant Downstream Headers
         del(."downstream_Permissions-Policy")
         del(."downstream_Strict-Transport-Security")
@@ -172,7 +172,7 @@ transforms:
         del(."downstream_Date")
         del(."downstream_Vary")
         del(."downstream_Referrer-Policy")
-        
+
         # Static/Redundant Origin Headers
         del(."origin_Permissions-Policy")
         del(."origin_Strict-Transport-Security")
@@ -185,7 +185,7 @@ transforms:
         del(."origin_Referrer-Policy")
 
         # Misc High-Cardinality Fields
-        del(.ClientPort) 
+        del(.ClientPort)
 
       } else {
         # Capture parse errors for debugging
@@ -201,7 +201,7 @@ sinks:
     api_version: v8
     compression: "gzip"
     healthcheck:
-      enabled: false 
+      enabled: false
 
     # Batching: Send every 1MB or every 1 second, whichever comes first.
     batch:
@@ -213,7 +213,7 @@ sinks:
       # Fields that define the "Stream" (Service/App).
       # WARNING: Do NOT include high-cardinality fields (IPs, RequestIDs) here.
       _stream_fields: "RouterName,ServiceName"
-      
+
       # UI Display preferences
       _msg_field: "message"
       _time_field: "@timestamp"

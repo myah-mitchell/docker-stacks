@@ -12,5 +12,5 @@ scrape_configs:
       - '%{PROJECT_NAME}-vlagent.%{SERVER_ADDRESS}:9429'
 - job_name: 'traefik-%{PROJECT_NAME}'
   static_configs:
-    - targets: 
+    - targets:
       - '%{PROJECT_NAME}-traefik.%{SERVER_ADDRESS}:8080'

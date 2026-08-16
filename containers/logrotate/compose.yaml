@@ -46,7 +46,7 @@ x-healthcheck: &default_healthcheck
   timeout: ${HEALTH_TIMEOUT:-10s}
   retries: ${HEALTH_RETRIES:-5}
   start_period: ${HEALTH_START:-10s}
-  
+
   #####################################
   # Container environment defaults
   #####################################

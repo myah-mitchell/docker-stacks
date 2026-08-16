@@ -31,7 +31,7 @@ http:
         #customRequestHeaders:
         #  X-Forwarded-Proto: "https"
 
-        frameDeny: true # Prevent clickjacking by disallowing site to be loaded inside iframes 
+        frameDeny: true # Prevent clickjacking by disallowing site to be loaded inside iframes
         customFrameOptionsValue: SAMEORIGIN # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options
 
         contentTypeNosniff: true # X-Content-Type-Options
@@ -47,7 +47,7 @@ http:
         accessControlMaxAge: 100
 
         # HTTP-Strict-Transport-Security (HSTS)
-        stsSeconds: 63072000 
-        stsIncludeSubdomains: true 
-        stsPreload: true 
-        forceSTSHeader: true 
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true

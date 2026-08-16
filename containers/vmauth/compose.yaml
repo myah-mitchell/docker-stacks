@@ -46,7 +46,7 @@ x-healthcheck: &default_healthcheck
   timeout: ${HEALTH_TIMEOUT:-10s}
   retries: ${HEALTH_RETRIES:-5}
   start_period: ${HEALTH_START:-10s}
-  
+
   #####################################
   # Container environment defaults
   #####################################
@@ -60,7 +60,7 @@ x-environment-user: &environment_user
   ## All environment defaults in one
 x-environment: &default_environment
   <<: [*environment_tz, *environment_user]
-  
+
 #endregion
 ###############################################################################
 #region Stack config
@@ -109,6 +109,6 @@ services:
         condition: service_healthy
       victoriametrics:
         condition: service_healthy
-    healthcheck: 
+    healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8427/health"]
       <<: *default_healthcheck

@@ -46,7 +46,7 @@ x-healthcheck: &default_healthcheck
   timeout: ${HEALTH_TIMEOUT:-10s}
   retries: ${HEALTH_RETRIES:-5}
   start_period: ${HEALTH_START:-10s}
-  
+
   #####################################
   # Container environment defaults
   #####################################
@@ -60,7 +60,7 @@ x-environment-user: &environment_user
   ## All environment defaults in one
 x-environment: &default_environment
   <<: [*environment_tz, *environment_user]
-  
+
 #endregion
 ###############################################################################
 #region Stack config
@@ -82,7 +82,7 @@ services:
       KOMODO_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD}
       KOMODO_PASSKEY: ${KOMODO_PASSKEY}
       KOMODO_TITLE: ${KOMODO_TITLE:-Komodo}
-      KOMODO_HOST: ${PROJECT_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}   
+      KOMODO_HOST: ${PROJECT_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     volumes:
       - ./config/core.config.toml:/config/config.toml:ro
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-backups:/backups
@@ -110,7 +110,7 @@ services:
     depends_on:
       ferretdb:
         condition: service_healthy
-    ## Allows for systemd Periphery connection at 
+    ## Allows for systemd Periphery connection at
     ## "https://host.docker.internal:8120"
     ##extra_hosts:
     ##  - host.docker.internal:host-gateway

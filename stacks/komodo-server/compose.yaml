@@ -48,4 +48,3 @@ services:
       file: ../../containers/komodo/compose.yaml
       service: .komodo
 
-    

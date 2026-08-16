@@ -46,7 +46,7 @@ x-healthcheck: &default_healthcheck
   timeout: ${HEALTH_TIMEOUT:-10s}
   retries: ${HEALTH_RETRIES:-5}
   start_period: ${HEALTH_START:-10s}
-  
+
   #####################################
   # Container environment defaults
   #####################################
@@ -70,7 +70,7 @@ services:
   .traefik:
     <<: [*limits, *restart, *security, *user, *logging]
     image: traefik:latest
-    hostname: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
+    hostname: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}
     command:
       ################################################################
@@ -166,11 +166,11 @@ services:
       ################################################################
       # Configuration reload frequency
       - --providers.providersthrottleduration=2s
- 
+
       # Folder with dynamic configuration
       - --providers.file.directory=/etc/traefik/rules
       - --providers.file.watch=true
-      
+
       # Docker provider for connecting all apps that are inside of the docker network
       - --providers.docker.watch=true
       - --providers.docker.network=proxy
@@ -209,7 +209,7 @@ services:
       <<: [*environment_tz, *environment_user]
       CF_API_EMAIL: ${CF_API_EMAIL}
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
-      LE_EMAIL: letsencrypt@${SUB_DOMAIN_NAME}${DOMAIN_NAME}  
+      LE_EMAIL: letsencrypt@${SUB_DOMAIN_NAME}${DOMAIN_NAME}
       DOMAIN_NAME: ${DOMAIN_NAME}
       AUTHENTIK_HOST: ${AUTHENTIK_HOST}
       #CROWDSEC_LAPI_KEY: ${CROWDSEC_LAPI_KEY}

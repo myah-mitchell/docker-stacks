@@ -23,7 +23,7 @@ services:
     extends:
       file: ../../containers/dozzle/compose.yaml
       service: .dozzle-agent
-      
+
   socket-proxy:
     extends:
       file: ../../containers/socket-proxy/compose.yaml

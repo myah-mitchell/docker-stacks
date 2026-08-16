@@ -4,16 +4,16 @@ global:
 scrape_configs:
 - job_name: vmagent
   static_configs:
-    - targets:
-      - vmagent.%{SERVER_ADDRESS}:8429
+  - targets:
+    - vmagent.%{SERVER_ADDRESS}:8429
 - job_name: vlagent
   static_configs:
-    - targets:
-      - vlagent.%{SERVER_ADDRESS}:9429
+  - targets:
+    - vlagent.%{SERVER_ADDRESS}:9429
 - job_name: cadvisor
   static_configs:
-    - targets:
-      - cadvisor.%{SERVER_ADDRESS}:8080
+  - targets:
+    - cadvisor.%{SERVER_ADDRESS}:8080
 - job_name: node
   scheme: https
   tls_config:
@@ -25,5 +25,5 @@ scrape_configs:
     username: %{NODE_EXPORTER_USER} # the user you set in the node-exporter in the node
     password: %{NODE_EXPORTER_PASS} # the plain text password which you hashed in the Encryption step
   static_configs:
-    - targets:
-      - %{SERVER_ADDRESS}:9100
+  - targets:
+    - %{SERVER_ADDRESS}:9100

@@ -4,13 +4,13 @@ global:
 scrape_configs:
 - job_name: 'vmagent-%{PROJECT_NAME}'
   static_configs:
-    - targets:
-      - '%{PROJECT_NAME}-vmagent.%{SERVER_ADDRESS}:8429'
+  - targets:
+    - '%{PROJECT_NAME}-vmagent.%{SERVER_ADDRESS}:8429'
 - job_name: 'vlagent-%{PROJECT_NAME}'
   static_configs:
-    - targets:
-      - '%{PROJECT_NAME}-vlagent.%{SERVER_ADDRESS}:9429'
+  - targets:
+    - '%{PROJECT_NAME}-vlagent.%{SERVER_ADDRESS}:9429'
 - job_name: 'traefik-%{PROJECT_NAME}'
   static_configs:
-    - targets:
-      - '%{PROJECT_NAME}-traefik.%{SERVER_ADDRESS}:8080'
+  - targets:
+    - '%{PROJECT_NAME}-traefik.%{SERVER_ADDRESS}:8080'

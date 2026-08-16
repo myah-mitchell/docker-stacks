@@ -88,8 +88,8 @@ services:
       AUTHENTIK_COOKIE_DOMAIN: ${AUTHENTIK_COOKIE_DOMAIN}
       # AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS: ${AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS}
     volumes:
-    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-media:/media
-    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-templates:/templates
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-media:/media
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-templates:/templates
     networks:
       - frontend
       - backend
@@ -148,8 +148,8 @@ services:
       AUTHENTIK_EMAIL__TIMEOUT: ${AUTHENTIK_EMAIL__TIMEOUT}
       AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_EMAIL__FROM}
     volumes:
-    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-certs:/certs
-    - ${DOCKER_VOLUMES}/${PROJECT_NAME}/geoip-data:/geoip
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/authentik-certs:/certs
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/geoip-data:/geoip
     networks:
       - socket_proxy
     depends_on:

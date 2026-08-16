@@ -19,8 +19,8 @@ scrape_configs:
   - targets:
     - vmauth.%{SERVER_ADDRESS}:8427
   basic_auth:
-    username: %{VMAUTH_USER}
-    password: %{VMAUTH_PASS}
+    username: "%{VMAUTH_USER}"
+    password: "%{VMAUTH_PASS}"
 - job_name: vmalert
   static_configs:
   - targets:

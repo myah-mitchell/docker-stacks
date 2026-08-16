@@ -26,10 +26,6 @@ sudo ufw app list
 sudo ufw allow Vector-Syslog
 ```
 
-sudo ufw app update WebProxy
-sudo ufw app list
-sudo ufw allow WebProxy
-
 # Create and Setup Required Folders
 ## Create needed folders for vector
 

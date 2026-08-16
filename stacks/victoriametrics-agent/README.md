@@ -188,9 +188,9 @@ sudo ufw app list
 sudo ufw allow Node-Exporter
 ```
 
-sudo ufw app update WebProxy
+sudo ufw app update Node-Exporter
 sudo ufw app list
-sudo ufw allow WebProxy
+sudo ufw allow Node-Exporter
 
 ## Prerequisites for using vector
 
@@ -218,10 +218,6 @@ sudo ufw app update Vector-Syslog
 sudo ufw app list
 sudo ufw allow Vector-Syslog
 ```
-
-sudo ufw app update WebProxy
-sudo ufw app list
-sudo ufw allow WebProxy
 
 # Create and Setup Required Folders
 ## Create Stack Folders

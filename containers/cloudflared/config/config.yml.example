@@ -1,0 +1,27 @@
+# cloudflared config.yml — copy to config.yml (git-ignored) and fill in the real
+# tunnel ID. Ingress rules themselves aren't secret and stay in git; only the
+# tunnel ID (used just to name the credentials file) and credentials.json are.
+#
+# One-time setup (from an admin machine with `cloudflared` installed, logged in via
+# `cloudflared tunnel login`):
+#   cloudflared tunnel create h1-edge
+#     -> writes ~/.cloudflared/<tunnel-id>.json — copy that file into this same
+#        config/ folder as <tunnel-id>.json (matches `credentials-file:` below)
+#   cloudflared tunnel route dns h1-edge vault.example.com
+#     -> creates the public CNAME automatically; repeat per public hostname added
+
+tunnel: <tunnel-id>
+credentials-file: /etc/cloudflared/<tunnel-id>.json
+
+ingress:
+  # Vaultwarden (Phase 10) — routes to the home-internal traefik-server over the
+  # VLAN-routed path via this stack's own traefik-dmz, never a WAN port. Container
+  # name is `traefik-traefik`, not `traefik-dmz-traefik` — every traefik-* stack's
+  # komodo.env templates PROJECT_NAME to the literal "traefik" (safe since these
+  # stacks never share a Docker host), not a folder-matching name.
+  - hostname: vault.example.com
+    service: http://traefik-traefik:80
+
+  # Catch-all: anything not explicitly matched above gets a 404 from cloudflared
+  # itself, rather than being silently proxied somewhere unintended.
+  - service: http_status:404

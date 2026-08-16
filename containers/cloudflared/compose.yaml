@@ -1,0 +1,109 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  # Outbound-only Cloudflare Tunnel connector — no inbound WAN port anywhere, ever.
+  # Deliberately run in named-tunnel/local-config mode (a credentials JSON + this
+  # repo's own config.yml), NOT `--token` remote-managed mode: ingress rules
+  # (public hostname -> internal service) live in git as config, not clicked
+  # together in the Cloudflare dashboard, matching how everything else in this repo
+  # is managed. Belongs in the same stack as traefik-dmz (stacks/traefik-dmz) on
+  # vm-edge — see that container's stack-README for one-time tunnel creation.
+  .cloudflared:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: cloudflare/cloudflared:2026.7.3
+    hostname: ${PROJECT_NAME}-${CLOUDFLARED_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${CLOUDFLARED_HOSTNAME}"
+    command:
+      - "tunnel"
+      - "--config"
+      - "/etc/cloudflared/config.yml"
+      - "--metrics"
+      - "0.0.0.0:2000"
+      - "run"
+    environment:
+      <<: [*environment_tz, *environment_user]
+    volumes:
+      # config.yml (ingress rules, committed to git — hostnames aren't secret) +
+      # <tunnel-id>.json (credentials, NOT committed — see .gitignore and stack-README)
+      # both live in this one folder, matching cloudflared's own expected layout.
+      - ./config:/etc/cloudflared:ro
+    labels: ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      - proxy
+    healthcheck:
+      # The image ships neither wget nor curl, so this can't be a plain HTTP check —
+      # `cloudflared tunnel ready` is the native subcommand for exactly this,
+      # querying the same --metrics endpoint above and exiting 0 only once the
+      # tunnel has an established connection to Cloudflare's edge (see cloudflared
+      # PR #1135, which added this subcommand specifically because the image can't
+      # run wget/curl).
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      <<: *default_healthcheck

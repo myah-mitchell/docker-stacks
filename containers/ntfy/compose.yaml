@@ -1,0 +1,132 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .ntfy:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: binwiederhier/ntfy:v2.11.0
+    hostname: ${PROJECT_NAME}-${NTFY_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${NTFY_HOSTNAME}"
+    command:
+      - "serve"
+    environment:
+      <<: [*environment_tz, *environment_user]
+      NTFY_BASE_URL: "https://${NTFY_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+      NTFY_LISTEN_HTTP: ":80"
+      NTFY_BEHIND_PROXY: "true"
+      NTFY_CACHE_FILE: "/var/lib/ntfy/cache.db"
+      NTFY_CACHE_DURATION: "12h"
+      NTFY_AUTH_FILE: "/var/lib/ntfy/auth.db"
+      NTFY_AUTH_DEFAULT_ACCESS: "deny-all" # publishers/subscribers need an explicit ACL entry or token — see stack-README
+      NTFY_ENABLE_SIGNUP: "false"
+      NTFY_ENABLE_LOGIN: "true"
+    volumes:
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/ntfy-data:/var/lib/ntfy
+    labels: ## Traefik Labels
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK}"
+        ## HTTP Routers
+      - "traefik.http.routers.$PROJECT_NAME-ntfy-rtr.rule=
+        Host(`${NTFY_SERVICE_NAME}.${DOMAIN_NAME}`) ||
+        Host(`${NTFY_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${NTFY_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${NTFY_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+        ## Middlewares
+        # ntfy does its own auth (NTFY_AUTH_*) — publishers/subscribers authenticate
+        # to ntfy itself, not via Authentik forward-auth, so webhook-style POSTs
+        # from vmalert/mailrise/PBS/PVE keep working without a browser SSO flow.
+      - "traefik.http.routers.$PROJECT_NAME-ntfy-rtr.middlewares=chain-no-auth@file"
+        ## HTTP Services
+      - "traefik.http.services.$PROJECT_NAME-ntfy-svc.loadbalancer.server.port=80"
+
+      ## Traefik-KOP Labels
+      - "kop-public.traefik.enable=true"
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-ntfy-kop-rtr.rule=
+        Host(`${NTFY_SERVICE_NAME}.${DOMAIN_NAME}`) ||
+        Host(`${NTFY_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${NTFY_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${NTFY_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-ntfy-kop-rtr.middlewares=chain-no-auth@file"
+      - "kop-public.traefik.http.services.$PROJECT_NAME-ntfy-kop-svc.loadbalancer.server.url=https://${NTFY_SERVICE_NAME}"
+      - "kop.bind.ip=${NTFY_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## DockNS Labels
+      ### Internal (UniFi gateway, via dockns) — internal-only, no public Cloudflare record
+      - "dockns.technitium.0.record=CNAME" # NOTE: rename to dockns' UniFi record type once confirmed (see root README)
+      - "dockns.technitium.0.name=${NTFY_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      - proxy
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/v1/health"]
+      <<: *default_healthcheck

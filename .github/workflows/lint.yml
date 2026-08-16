@@ -1,0 +1,60 @@
+name: Lint
+
+# Cheap validation sitting in front of the existing Komodo GitOps deploy path — this is
+# deliberately NOT a step toward replacing Komodo with Actions-based deploys (no fleet
+# SSH/deploy credentials live here at all). It only catches a broken compose file or
+# obviously-malformed YAML before Komodo's ResourceSync ever tries to apply it.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  compose-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install --quiet yamllint
+
+      - name: yamllint containers/ and stacks/
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable, truthy: disable, comments-indentation: disable, indentation: {indent-sequences: consistent}}}" containers stacks
+
+      # scripts/build.py generates each stack's local-testing .env (non-sensitive
+      # defaults, random passwords for blank *_PASSWORD keys) — needed so `docker
+      # compose config` below has something to interpolate against. This is the same
+      # generator every stack's real komodo.env/README.md already comes from, so a
+      # failure here also means the codegen itself is broken, not just a compose file.
+      - name: Generate testing .env files
+        run: python3 scripts/build.py
+
+      - name: Validate every stack's compose config
+        run: |
+          set -euo pipefail
+          status=0
+          for f in stacks/*/compose.yaml; do
+            dir="$(dirname "$f")"
+            echo "::group::${dir}"
+            if [ -f "${dir}/.env" ]; then
+              docker compose --env-file "${dir}/.env" -f "$f" config -q || status=1
+            else
+              echo "No .env generated for ${dir} (template/no containers referenced) — skipping"
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+      - name: Fail if build.py left the tree dirty
+        # A generated file that doesn't match what's committed means someone hand-edited
+        # a komodo.env/README.md/.env instead of editing the container source and
+        # re-running build.py — the next real run would silently overwrite their change.
+        run: |
+          git diff --exit-code -- containers stacks \
+            || { echo "::error::scripts/build.py output differs from what's committed — run 'python3 scripts/build.py' locally and commit the result."; exit 1; }

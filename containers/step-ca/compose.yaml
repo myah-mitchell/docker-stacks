@@ -1,0 +1,127 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  # Internal PKI: TLS ACME server (second Traefik cert resolver, *.h1.example.internal) and,
+  # from Phase 7 onward, the SSH CA. DOCKER_STEPCA_INIT_SSH is enabled from first
+  # boot even though Phase 7 wires up the actual SSH provisioner later — step-ca's
+  # SSH CA keypair is generated at `step ca init` time, and re-running init later to
+  # bolt it on would mean rebuilding trust fleet-wide, so this is set up once, now.
+  #
+  # OFFLINE ROOT: the automatic bootstrap below generates BOTH root and intermediate
+  # keys into the same secrets/ volume. That's only safe for the few minutes it takes
+  # to complete the manual root-key extraction runbook in stack-README.md — do that
+  # immediately after first boot, before this holds anything real. See plan Phase 5 /
+  # Risk #7.
+  .step-ca:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: smallstep/step-ca:0.30.2
+    hostname: ${PROJECT_NAME}-${STEPCA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${STEPCA_HOSTNAME}"
+    environment:
+      <<: [*environment_tz, *environment_user]
+      DOCKER_STEPCA_INIT_NAME: ${STEPCA_CA_NAME:-h1 Internal CA}
+      # Every hostname/wildcard this CA needs to issue for — internal zone only,
+      # never the public example.com domain (Cloudflare/Let's Encrypt owns that).
+      DOCKER_STEPCA_INIT_DNS_NAMES: ${STEPCA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME},${SUB_DOMAIN_NAME}${DOMAIN_NAME},*.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+      DOCKER_STEPCA_INIT_PROVISIONER_NAME: ${STEPCA_PROVISIONER_NAME:-admin}
+      DOCKER_STEPCA_INIT_PASSWORD_FILE: /home/step/secrets/password
+      DOCKER_STEPCA_INIT_ACME: "true"
+      DOCKER_STEPCA_INIT_SSH: "true"
+    volumes:
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/step-ca-data:/home/step
+      # CA password, generated once and never committed — see stack-README. Same
+      # "sensitive file lives on disk, not in an env var" pattern as cloudflared's
+      # tunnel credentials and step-ca's own root key.
+      - ./secrets/password:/home/step/secrets/password:ro
+    labels: ## Traefik
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK}"
+        ## HTTP Routers
+      - "traefik.http.routers.$PROJECT_NAME-rtr.rule=
+        Host(`${STEPCA_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${STEPCA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+        ## Middlewares — internal PKI infrastructure, not gated behind Authentik:
+        # step-ca does its own provisioner-level authn (JWK/ACME/OIDC per
+        # provisioner), and a forward-auth hop in front of the ACME/SSH-CA API
+        # would break the very automation (Traefik's own ACME client, `step ssh
+        # login`) that needs to reach it unattended.
+      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=chain-no-auth@file"
+        ## HTTP Services — step-ca serves its own TLS (self-signed off its own
+        # root at first boot); Traefik talks to it over https on 9000.
+      - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=9000"
+      - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.scheme=https"
+
+      ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "step", "ca", "health", "--ca-url", "https://127.0.0.1:9000"]
+      <<: *default_healthcheck

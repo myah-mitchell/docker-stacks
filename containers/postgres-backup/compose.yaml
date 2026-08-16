@@ -1,0 +1,109 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  # Scheduled pg_dump + retention sidecar for any stack extending containers/postgres/
+  # or containers/ferretdb/'s .postgres service. One instance per stack, pointed at
+  # that stack's own postgres service via POSTGRES_HOST (defaults to "postgres", the
+  # service name every DB-bearing stack already uses) — never a shared/cross-stack
+  # backup service. Plain SQL dumps, not PBS/VM snapshots: this is the "restore just
+  # this one app's data without touching anything else" layer, complementary to the
+  # VM-level PBS backups that already cover disaster recovery.
+  .postgres-backup:
+    <<: [*limits, *restart, *security, *logging]
+    image: prodrigestivill/postgres-backup-local:18
+    hostname: ${PROJECT_NAME}-${POSTGRES_BACKUP_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${POSTGRES_BACKUP_HOSTNAME}"
+    environment:
+      <<: [*environment_tz, *environment_user]
+      POSTGRES_HOST: ${POSTGRES_BACKUP_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_BACKUP_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_BACKUP_DB}
+      POSTGRES_USER: ${POSTGRES_BACKUP_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_BACKUP_PASSWORD}
+      SCHEDULE: ${POSTGRES_BACKUP_SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: ${POSTGRES_BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${POSTGRES_BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${POSTGRES_BACKUP_KEEP_MONTHS:-6}
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/postgres-backup-data:/backups
+    labels: ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      - backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The image's own entrypoint writes a healthcheck file scraped over
+    # HEALTHCHECK_PORT; this just applies our standard interval/timeout/retries
+    # on top of the check the image documents.
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "8080"]
+      <<: *default_healthcheck

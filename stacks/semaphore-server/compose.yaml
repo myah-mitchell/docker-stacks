@@ -1,0 +1,37 @@
+###############################################################################
+# Start of stack config
+###############################################################################
+# Project Name: "semaphore"
+name: ${PROJECT_NAME}
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
+  frontend:
+    name: ${PROJECT_NAME}_frontend
+    internal: false
+  backend:
+    name: ${PROJECT_NAME}_backend
+    internal: true
+
+services:
+
+  semaphore:
+    extends:
+      file: ../../containers/semaphore/compose.yaml
+      service: .semaphore
+
+  postgres:
+    extends:
+      file: ../../containers/postgres/compose.yaml
+      service: .postgres
+
+  postgres-backup:
+    extends:
+      file: ../../containers/postgres-backup/compose.yaml
+      service: .postgres-backup
+    environment:
+      POSTGRES_BACKUP_DB: ${POSTGRES_DB}
+      POSTGRES_BACKUP_USER: ${POSTGRES_USER}
+      POSTGRES_BACKUP_PASSWORD: ${POSTGRES_PASSWORD}

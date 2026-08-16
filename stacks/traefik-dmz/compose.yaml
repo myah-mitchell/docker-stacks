@@ -27,3 +27,11 @@ services:
     extends:
       file: ../../containers/redis/compose.yaml
       service: .redis-replica
+
+  # Phase 4: outbound-only Cloudflare Tunnel connector — the only way into this VM
+  # from the internet. See containers/cloudflared/stack-README.md for the one-time
+  # tunnel-creation steps this depends on before it'll actually connect.
+  cloudflared:
+    extends:
+      file: ../../containers/cloudflared/compose.yaml
+      service: .cloudflared

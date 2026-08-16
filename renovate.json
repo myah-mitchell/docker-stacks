@@ -1,0 +1,38 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "America/Chicago",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 5,
+  "docker-compose": {
+    "fileMatch": [
+      "(^|/)containers/[^/]+/compose\\.ya?ml$",
+      "(^|/)stacks/[^/]+/compose\\.ya?ml$"
+    ]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Bump <NAME>_VERSION keys in komodo.env/testing.env. Per scripts/project-layout.md's convention, a container can pin a version via a _VERSION key instead of hardcoding the tag directly in compose.yaml's image: line — none currently do (every container hardcodes its tag today, handled by the docker-compose manager above instead), so this is forward-looking scaffolding. To use it: add a `# renovate: datasource=docker depName=<image>` comment directly above the `SOMETHING_VERSION: x.y.z` line.",
+      "fileMatch": [
+        "(^|/)containers/[^/]+/(komodo|testing)\\.env$",
+        "(^|/)scripts/base-(komodo|testing)\\.env$"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n[A-Za-z0-9_]+_VERSION[:=]\\s*(?<currentValue>\\S+)"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Major version bumps get their own dashboard-approval gate — everything else (minor/patch) opens a normal PR straight away. Komodo's ResourceSync is what actually redeploys once you merge; Renovate only opens the PR.",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["major"],
+      "labels": ["dependencies", "major-version"],
+      "dependencyDashboardApproval": true
+    }
+  ]
+}

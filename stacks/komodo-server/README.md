@@ -1,7 +1,3 @@
-# Komodo Stack (Server) Overview
-
-This will start up a Komodo stack with an instance of Komodo running as a server to connect to instances of Komodo running on hosts. This should only be ran once in an environment.
-
 # Create and Setup Required Folders
 ## Create Stack Folders
 
@@ -23,6 +19,28 @@ mkdir -p /opt/docker/volumes/$projectName/ferretdb-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/ferretdb-*
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
+```
+
+## Create needed folders for postgres-backup
+
+```bash
+mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-*
+```
+
+## Restore from a dump (verify this actually works — an untested backup isn't a backup)
+
+List available dumps (daily/weekly/monthly subfolders, gzip-compressed SQL):
+
+```bash
+docker exec -it ${projectName}-postgres-backup ls -la /backups
+```
+
+Restore into a *scratch* postgres instance first, never directly into the live one, to confirm the dump is actually valid before trusting it:
+
+```bash
+gunzip -c /opt/docker/volumes/$projectName/postgres-backup-data/daily/<dump-file>.sql.gz \
+  | docker exec -i <scratch-postgres-container> psql -U <user> -d <db>
 ```
 
 ## Create needed folders for komodo

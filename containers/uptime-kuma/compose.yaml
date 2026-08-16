@@ -1,0 +1,100 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .uptime-kuma:
+    <<: [*limits, *restart, *security, *user, *logging]
+    image: louislam/uptime-kuma:1.23.16
+    hostname: ${PROJECT_NAME}-${UPTIME_KUMA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${UPTIME_KUMA_HOSTNAME}"
+    environment:
+      <<: [*environment_tz, *environment_user]
+    volumes:
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/uptime-kuma-data:/app/data
+    labels: ## Traefik Labels
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK}"
+      - "traefik.http.routers.$PROJECT_NAME-uptime-kuma-rtr.rule=
+        Host(`${UPTIME_KUMA_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${UPTIME_KUMA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+        # Gated behind Authentik by default (decision #13/Phase 2) — swap to
+        # chain-no-auth@file only if you deliberately want a public status page,
+        # and route that through the Cloudflare Tunnel edge, not a new WAN path.
+      - "traefik.http.routers.$PROJECT_NAME-uptime-kuma-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.services.$PROJECT_NAME-uptime-kuma-svc.loadbalancer.server.port=3001"
+      ## Komodo Labels
+      - "komodo.skip"
+    networks:
+      - proxy
+      - frontend
+      - backend
+    healthcheck:
+      # The non-alpine 1.23.16 image's Debian base installs curl, not wget.
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3001/"]
+      <<: *default_healthcheck

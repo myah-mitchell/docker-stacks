@@ -72,4 +72,3 @@ services:
       PING: 1 #optional
       POST: 1 #optional
       VERSION: 1 #optional
-

@@ -47,4 +47,3 @@ services:
     extends:
       file: ../../containers/komodo/compose.yaml
       service: .komodo
-

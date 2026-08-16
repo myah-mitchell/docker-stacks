@@ -27,4 +27,3 @@ services:
     extends:
       file: ../../containers/redis/compose.yaml
       service: .redis-public
-

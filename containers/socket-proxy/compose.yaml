@@ -21,7 +21,7 @@ x-restart: &restart
   # Configure security
 x-security: &security
   security_opt:
-   - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+    - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
 
   # Configure User
 x-user: &user

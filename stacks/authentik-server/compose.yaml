@@ -35,6 +35,15 @@ services:
       file: ../../containers/postgres/compose.yaml
       service: .postgres
 
+  postgres-backup:
+    extends:
+      file: ../../containers/postgres-backup/compose.yaml
+      service: .postgres-backup
+    environment:
+      POSTGRES_BACKUP_DB: ${POSTGRES_DB}
+      POSTGRES_BACKUP_USER: ${POSTGRES_USER}
+      POSTGRES_BACKUP_PASSWORD: ${POSTGRES_PASSWORD}
+
   redis:
     extends:
       file: ../../containers/redis/compose.yaml

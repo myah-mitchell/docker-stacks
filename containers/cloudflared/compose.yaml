@@ -74,7 +74,7 @@ services:
   # (public hostname -> internal service) live in git as config, not clicked
   # together in the Cloudflare dashboard, matching how everything else in this repo
   # is managed. Belongs in the same stack as traefik-dmz (stacks/traefik-dmz) on
-  # vm-edge — see that container's stack-README for one-time tunnel creation.
+  # bh01 — see that container's stack-README for one-time tunnel creation.
   .cloudflared:
     <<: [*limits, *restart, *security, *user, *logging]
     image: cloudflare/cloudflared:2026.7.3

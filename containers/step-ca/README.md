@@ -9,4 +9,4 @@ services:
       service: .step-ca
 ```
 
-Deploy on its own VM (`vm-pki-stepca` / `pk01.home.myah-mitchell.com`), home-internal/mesh-only — never exposed through the public edge. No `socket-proxy` needed — step-ca never talks to Docker.
+Deploy on its own VM (`pk01.home.myah-mitchell.com`), home-internal/mesh-only — never exposed through the public edge. No `socket-proxy` needed — step-ca never talks to Docker.

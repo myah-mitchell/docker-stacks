@@ -22,7 +22,7 @@ modules:
     prober: dns
     timeout: 5s
     dns:
-      query_name: "example.com"
+      query_name: "myah-mitchell.com"
       query_type: "A"
       valid_rcodes:
         - NOERROR

@@ -4,11 +4,11 @@
 #
 # One-time setup (from an admin machine with `cloudflared` installed, logged in via
 # `cloudflared tunnel login`):
-#   cloudflared tunnel create h1-edge
+#   cloudflared tunnel create home-edge
 #     -> writes ~/.cloudflared/<tunnel-id>.json — copy that file into the
 #        secrets/ folder (not config/) as <tunnel-id>.json (matches
 #        `credentials-file:` below)
-#   cloudflared tunnel route dns h1-edge vault.example.com
+#   cloudflared tunnel route dns home-edge vault.myah-mitchell.com
 #     -> creates the public CNAME automatically; repeat per public hostname added
 
 tunnel: <tunnel-id>
@@ -20,7 +20,7 @@ ingress:
   # name is `traefik-traefik`, not `traefik-dmz-traefik` — every traefik-* stack's
   # komodo.env templates PROJECT_NAME to the literal "traefik" (safe since these
   # stacks never share a Docker host), not a folder-matching name.
-  - hostname: vault.example.com
+  - hostname: vault.myah-mitchell.com
     service: http://traefik-traefik:80
 
   # Catch-all: anything not explicitly matched above gets a 404 from cloudflared

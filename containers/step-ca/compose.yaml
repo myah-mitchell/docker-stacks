@@ -68,7 +68,7 @@ x-environment: &default_environment
 
 services:
 
-  # Internal PKI: TLS ACME server (second Traefik cert resolver, *.h1.example.internal) and,
+  # Internal PKI: TLS ACME server (second Traefik cert resolver, *.home.myah-mitchell.com) and,
   # from Phase 7 onward, the SSH CA. DOCKER_STEPCA_INIT_SSH is enabled from first
   # boot even though Phase 7 wires up the actual SSH provisioner later — step-ca's
   # SSH CA keypair is generated at `step ca init` time, and re-running init later to
@@ -86,9 +86,9 @@ services:
     container_name: "${PROJECT_NAME}-${STEPCA_HOSTNAME}"
     environment:
       <<: [*environment_tz, *environment_user]
-      DOCKER_STEPCA_INIT_NAME: ${STEPCA_CA_NAME:-h1 Internal CA}
+      DOCKER_STEPCA_INIT_NAME: ${STEPCA_CA_NAME:-Home Internal CA}
       # Every hostname/wildcard this CA needs to issue for — internal zone only,
-      # never the public example.com domain (Cloudflare/Let's Encrypt owns that).
+      # never the public myah-mitchell.com domain (Cloudflare/Let's Encrypt owns that).
       DOCKER_STEPCA_INIT_DNS_NAMES: ${STEPCA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME},${SUB_DOMAIN_NAME}${DOMAIN_NAME},*.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
       DOCKER_STEPCA_INIT_PROVISIONER_NAME: ${STEPCA_PROVISIONER_NAME:-admin}
       DOCKER_STEPCA_INIT_PASSWORD_FILE: /home/step/secrets/password

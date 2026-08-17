@@ -21,8 +21,8 @@ blackbox_exporter is a multi-target proxy — vmagent needs a scrape job with `r
     module: [http_2xx]
   static_configs:
     - targets:
-        - https://vaultwarden.example.com
-        - https://ntfy.example.com
+        - https://vault.myah-mitchell.com
+        - https://ntfy.home.myah-mitchell.com
   relabel_configs:
     - source_labels: [__address__]
       target_label: __param_target

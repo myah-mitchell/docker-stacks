@@ -32,10 +32,12 @@ its bootstrap (`komodo-bootstrap.md` — the one manual exception); named after 
 after it (`ci01-bootstrap.md`, and so on).
 
 **A shared operational tip, not repeated in every doc**: most stacks in this plan are
-gated behind `chain-authentik@file`, which doesn't work until `id01`/Authentik
-exists. Until then, reach a stack's UI directly via an SSH tunnel to its container's
-own IP on its Docker network — see `docs/ci01-bootstrap.md` step 12 for the exact
-commands, worked out there for Semaphore but the same trick for any stack.
+gated behind `chain-authentik@file` and expect a real cert resolver, neither of which
+work until `pk01`/step-ca and `id01`/Authentik exist. Until then, deploy
+[`docs/traefik-bootstrap.md`](traefik-bootstrap.md) on that VM — real Traefik
+routing, just with self-signed TLS and `chain-no-auth@file` instead — and override
+that stack's `TRAEFIK_AUTH_CHAIN` to `chain-no-auth@file`. `docs/ci01-bootstrap.md`
+step 9 works through it in full for the first real case.
 
 ## Running order and status
 
@@ -63,6 +65,8 @@ that no longer applies by the time it's used).
 - [`komodo-bootstrap.md`](komodo-bootstrap.md) — `km01`, the one manual exception.
 - [`ci01-bootstrap.md`](ci01-bootstrap.md) — `ci01`/Semaphore, the template for every
   VM after it.
+- [`traefik-bootstrap.md`](traefik-bootstrap.md) — the temporary per-VM Traefik used
+  before `pk01`/`id01` exist, referenced from every host doc that needs it.
 - [`stacks-overview.md`](stacks-overview.md) — what each individual stack does,
   independent of bootstrap order.
 - root [`README.md`](../README.md) — the plan, layout, and naming/secrets

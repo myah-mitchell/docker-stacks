@@ -1,0 +1,213 @@
+###############################################################################
+# Start of stack config
+###############################################################################
+# Project Name: "traefik"
+name: ${PROJECT_NAME}
+
+# Temporary, per-VM stack for the bootstrap window before pk01 (step-ca) and id01
+# (Authentik) exist — see docs/traefik-bootstrap.md. Self-signed TLS instead of a
+# real cert resolver, chain-no-auth@file instead of chain-authentik@file. Not meant
+# to be long-lived: once a VM's real system-agent stack is ready, tear this one down
+# rather than run both.
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
+  frontend:
+    name: ${PROJECT_NAME}_frontend
+    internal: false
+  backend:
+    name: ${PROJECT_NAME}_backend
+    internal: true
+  socket_proxy:
+    name: ${PROJECT_NAME}_socket_proxy
+    internal: true
+
+services:
+
+  traefik:
+    extends:
+      file: ../../containers/traefik/compose.yaml
+      service: .traefik
+    # Full override of command/labels, not a diff against the base service — Compose
+    # extends replaces these keys wholesale rather than merging list items. Kept as
+    # close to the base's list as possible; the only real removals are the
+    # ACME/letsencrypt-specific lines, called out below.
+    command:
+      ################################################################
+      # Global configuration
+      ################################################################
+      - --global.checknewversion=true
+      - --global.sendanonymoususage=false
+
+      ################################################################
+      # Logs
+      ################################################################
+      - --log.level=INFO
+      - --log.format=json
+      - --accesslog.format=json
+      - --accesslog.addinternals=false
+      - --accesslog.filepath=/etc/traefik/log/access.log
+      - --accesslog.fields.defaultmode=keep
+      - --accesslog.fields.headers.defaultmode=keep
+      - --accesslog.fields.headers.names.Cookie=redact
+      - --accesslog.fields.headers.names.Set-Cookie=redact
+      - --accesslog.fields.headers.names.Authorization=drop
+
+      ################################################################
+      # Metrics
+      ################################################################
+      - --metrics.prometheus.addrouterslabels=true
+      - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
+      - --metrics.prometheus.headerlabels.useragent=User-Agent
+
+      ################################################################
+      # API and Dashboard
+      ################################################################
+      - --api.dashboard=true
+
+      ################################################################
+      # Entrypoints
+      ################################################################
+      # HTTP -> HTTPS Redirect
+      - --entrypoints.http.address=:80
+      - --entrypoints.http.http.redirections.entrypoint.to=https
+      - --entrypoints.http.http.redirections.entrypoint.scheme=https
+        # Trusted IPs (Cloudflare + Local)
+      - --entrypoints.http.forwardedheaders.trustedips=
+          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+          # Middlewares — chain-no-auth@file, not chain-authentik@file: id01/Authentik
+          # doesn't exist yet during the bootstrap window this stack is for.
+      - --entrypoints.http.http.middlewares=
+          middlewares-rate-limit@file,
+          middlewares-secure-headers@file
+
+      # HTTPS
+      - --entrypoints.https.address=:443
+      - --entrypoints.https.asdefault=true
+      - --entrypoints.https.http.tls.options=tls-opts@file
+      # No certresolver here — same as the base service, already relies on the
+      # default cert store below rather than a per-entrypoint resolver.
+        # Trusted IPs (Cloudflare + Local)
+      - --entrypoints.https.forwardedheaders.trustedips=
+          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+          # Middlewares
+      - --entrypoints.https.http.middlewares=
+          middlewares-rate-limit@file,
+          middlewares-secure-headers@file,
+          middlewares-compress@file
+
+      # Dashboard — no certresolver/domains here, unlike the base service. Falls
+      # back to the same self-signed default cert as every other entrypoint instead
+      # of requesting a real one.
+      - --entrypoints.dashboard.address=:8443
+          # Trusted IPs (Local)
+      - --entrypoints.dashboard.forwardedheaders.trustedips=
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+
+      ################################################################
+      # Healthcheck / Ping
+      ################################################################
+      - --ping=true
+
+      ################################################################
+      # Transports
+      ################################################################
+      - --serversTransport.insecureSkipVerify=true
+
+      ################################################################
+      # Providers
+      ################################################################
+      - --providers.providersthrottleduration=2s
+      - --providers.file.directory=/etc/traefik/rules
+      - --providers.file.watch=true
+      - --providers.docker.watch=true
+      - --providers.docker.network=proxy
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.endpoint=tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
+
+      ################################################################
+      # Plugins
+      ################################################################
+      - --experimental.plugins.bouncer.version=v1.5.0
+
+      ################################################################
+      # Certificates Resolvers (ACME) — deliberately none. No CF_DNS_API_TOKEN, no
+      # letsencrypt resolver at all; every entrypoint falls back to the default
+      # self-signed cert Traefik generates automatically when nothing else applies.
+      ################################################################
+
+      ################################################################
+      # Extra Commands from Env Vars
+      ################################################################
+      - ${TRAEFIK_EXTRA_COMMAND:-""}
+    labels: ## Traefik Labels
+      - "traefik.enable=true"
+
+      ## Traefik Dashboard
+      - "traefik.http.routers.traefik.rule=
+        Host(`${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${TRAEFIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+      - "traefik.http.routers.traefik.entrypoints=dashboard"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+      ## Default (self-signed) cert — domain hints only, no resolver. This is the
+      ## one substantive difference from the base service's labels: that one pins
+      ## defaultGeneratedCert.resolver=letsencrypt, this one omits it entirely.
+      - "traefik.tls.stores.default.defaultGeneratedCert.domain.main=$DOMAIN_NAME"
+      - "traefik.tls.stores.default.defaultGeneratedCert.domain.sans=*.$DOMAIN_NAME,*.$SUB_DOMAIN_NAME$DOMAIN_NAME,*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## Komodo Labels
+      - "komodo.skip"
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+      error-pages:
+        condition: service_healthy
+
+  error-pages:
+    extends:
+      file: ../../containers/error-pages/compose.yaml
+      service: .error-pages
+
+  socket-proxy:
+    extends:
+      file: ../../containers/socket-proxy/compose.yaml
+      service: .socket-proxy
+    environment:
+      CONTAINERS: 1 #optional
+      EVENTS: 1 #optional
+      INFO: 1 #optional
+      LOG_LEVEL: err #optional
+      NETWORKS: 1 #optional
+      NODES: 1 #optional
+      PING: 1 #optional
+      SERVICES: 1 #optional
+      TASKS: 1 #optional
+      VERSION: 1 #optional
+
+  logrotate:
+    extends:
+      file: ../../containers/logrotate/compose.yaml
+      service: .logrotate
+    depends_on:
+      traefik:
+        condition: service_healthy
+      socket-proxy-rw:
+        condition: service_healthy
+
+  socket-proxy-rw:
+    extends:
+      file: ../../containers/socket-proxy/compose.yaml
+      service: .socket-proxy-rw
+    environment:
+      CONTAINERS: 1 #optional
+      INFO: 1 #optional
+      LOG_LEVEL: err #optional
+      PING: 1 #optional
+      POST: 1 #optional
+      VERSION: 1 #optional

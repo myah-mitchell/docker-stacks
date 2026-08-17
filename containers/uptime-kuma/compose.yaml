@@ -86,7 +86,7 @@ services:
         # Gated behind Authentik by default (decision #13/Phase 2) — swap to
         # chain-no-auth@file only if you deliberately want a public status page,
         # and route that through the Cloudflare Tunnel edge, not a new WAN path.
-      - "traefik.http.routers.$PROJECT_NAME-uptime-kuma-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.routers.$PROJECT_NAME-uptime-kuma-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
       - "traefik.http.services.$PROJECT_NAME-uptime-kuma-svc.loadbalancer.server.port=3001"
       ## Komodo Labels
       - "komodo.skip"

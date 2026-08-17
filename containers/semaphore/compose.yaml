@@ -106,7 +106,7 @@ services:
         # Gated behind Authentik + MFA — Semaphore holds fleet-wide SSH access,
         # one of the highest-blast-radius admin surfaces in the whole build
         # (see plan Risk #3). Being on the mesh isn't being authenticated.
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
       - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=3000"
       ## Komodo Labels
       - "komodo.skip"

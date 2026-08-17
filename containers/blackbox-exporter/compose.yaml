@@ -87,7 +87,7 @@ services:
       - "traefik.http.routers.$PROJECT_NAME-blackbox-rtr.rule=
         Host(`${BLACKBOX_EXPORTER_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${BLACKBOX_EXPORTER_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-      - "traefik.http.routers.$PROJECT_NAME-blackbox-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.routers.$PROJECT_NAME-blackbox-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
       - "traefik.http.services.$PROJECT_NAME-blackbox-svc.loadbalancer.server.port=9115"
       ## Komodo Labels
       - "komodo.skip"

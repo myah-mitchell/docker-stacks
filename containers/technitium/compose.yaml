@@ -106,7 +106,7 @@ services:
         Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
         ## Middlewares
       #- "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=chain-no-auth@file"
-      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
         ## HTTP Services
       - "traefik.http.services.$PROJECT_NAME-svc.loadbalancer.server.port=5380"
       ## Komodo Labels

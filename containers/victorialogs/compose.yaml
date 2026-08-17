@@ -94,7 +94,7 @@ services:
         Host(`${VICTORIALOGS_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${PROJECT_NAME}-${VICTORIALOGS_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
         ## Middlewares
-      - "traefik.http.routers.victorialogs-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.routers.victorialogs-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
         ## HTTP Services
       - "traefik.http.services.victorialogs-svc.loadbalancer.server.port=9428"
       ## Komodo Labels

@@ -92,7 +92,7 @@ services:
         Host(`${ALERTMANAGER_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${PROJECT_NAME}-${ALERTMANAGER_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
         ## Middlewares
-      - "traefik.http.routers.$PROJECT_NAME-alertmanager-rtr.middlewares=chain-authentik@file"
+      - "traefik.http.routers.$PROJECT_NAME-alertmanager-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
         ## HTTP Services
       - "traefik.http.services.$PROJECT_NAME-alertmanager-svc.loadbalancer.server.port=9093"
       ## Komodo Labels

@@ -28,7 +28,7 @@ Before starting, these must already be true:
 On the PVE host:
 
 ```bash
-qm clone <template-vmid> <km-vmid> --name h1km01 --full
+qm clone <template-vmid> <km-vmid> --name km01 --full
 ```
 
 ## 2. Size and network the VM
@@ -144,8 +144,11 @@ $EDITOR .env
 Set:
 
 - `SERVER_NAME` — `km01` (this host, not a leftover default from another stack)
-- `SUB_DOMAIN_NAME` — your internal sub-domain, **with a trailing dot** (e.g. `h1.`)
-- `DOMAIN_NAME` — your internal domain (e.g. `example.internal`)
+- `SUB_DOMAIN_NAME` — this site, **with a trailing dot** — `home.` (Komodo is
+  internal-only, so this is never blank here; see the root `README.md`'s naming
+  conventions for the full site/role table and why an empty value is safe for
+  services that don't use a sub-domain)
+- `DOMAIN_NAME` — the real domain, e.g. `myah-mitchell.com`
 - `KOMODO_DB_USERNAME` — any username you want (e.g. `komodo-admin`)
 - `KOMODO_TITLE` — whatever you want Komodo's UI to display as its title
 - `KOMODO_PASSKEY` — Komodo's own API passkey
@@ -165,7 +168,8 @@ alphanumeric — no `@`, `:`, `/`, `#`, or `?`.** `containers/ferretdb/compose.y
 builds a Postgres connection URL by directly substituting `POSTGRES_PASSWORD` into
 it, with no URL-encoding. A symbol in the password breaks that URL's parsing and
 fails as a confusing DNS-resolution error against the wrong host, not as an obvious
-auth error.
+auth error. See the root `README.md`'s secrets conventions for why this is a
+deliberate repo-wide rule, not just a FerretDB quirk.
 
 Rerun `build.py` once more so the `KOMODO_DB_USERNAME` → `POSTGRES_USER` value you
 just set actually propagates:

@@ -4,8 +4,9 @@ Compose-based container definitions for a self-hosted homelab/cloud hosting
 cluster, deployed via [Komodo](https://github.com/moghtech/komodo) GitOps. Read this
 before touching anything else in the repo — this doc covers the plan, the layout,
 and the naming/secrets conventions everything else builds on;
-[`docs/stacks-overview.md`](docs/stacks-overview.md) covers what each individual
-stack does.
+[`docs/overview.md`](docs/overview.md) covers the order VMs get bootstrapped in and
+links each host's own runbook; [`docs/stacks-overview.md`](docs/stacks-overview.md)
+covers what each individual stack does.
 
 ## What this repo is part of
 
@@ -18,10 +19,13 @@ The buildout spans three repos:
   freshly-cloned Proxmox VM into a fully-provisioned host on first boot, no manual
   SSH step required.
 
-The `komodo` vm is the one deliberate exception to "everything is GitOps" — it has to be
-provisioned and started by hand, since Komodo can't GitOps-deploy itself the first
-time. Start there: **[`docs/komodo-bootstrap.md`](docs/komodo-bootstrap.md)** is the concrete,
-step-by-step runbook for it.
+The `km01` VM is the one deliberate exception to "everything is GitOps" — it has to
+be provisioned and started by hand, since Komodo can't GitOps-deploy itself the first
+time. Start there: **[`docs/komodo-bootstrap.md`](docs/komodo-bootstrap.md)** is the
+concrete, step-by-step runbook for it. Every VM after that gets provisioned with
+Ansible, then deployed through Komodo instead — see
+**[`docs/overview.md`](docs/overview.md)** for the running order and each host's own
+runbook.
 
 ## Repo layout
 
@@ -99,7 +103,7 @@ domain, no `SUB_DOMAIN_NAME` at all:
 
 - `vault.myah-mitchell.com` — Vaultwarden, public, via `cloudflared` + `traefik-dmz`.
 
-Contrast with something that's never public, like `ntfy` on `vm-core-infra`:
+Contrast with something that's never public, like `ntfy` on `ci01`:
 `ntfy.home.myah-mitchell.com` — same domain, but only resolvable/reachable inside the
 home site, never through the tunnel.
 
@@ -155,7 +159,9 @@ home site, never through the tunnel.
 ## Where to go next
 
 - **[`docs/komodo-bootstrap.md`](docs/komodo-bootstrap.md)** — the first real step:
-  standing up `vm-komodo` by hand.
+  standing up `km01` by hand.
+- **[`docs/overview.md`](docs/overview.md)** — the running order for every VM after
+  `km01`, and a link to each one's own bootstrap runbook.
 - **`scripts/project-layout.md`** — the full mechanics of `build.py` and the
   generated-file conventions, if you're editing a container or adding a stack.
 - **[`docs/stacks-overview.md`](docs/stacks-overview.md)** — what each individual

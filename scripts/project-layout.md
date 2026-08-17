@@ -160,9 +160,9 @@ The .env file is a standard Docker Compose environment file using `KEY=VALUE` fo
    4. **Container testing defaults** - from each container's _testing.env_ file.
    5. **`_VERSION` fallback** - keys ending in `_VERSION` with no value default to `latest`.
 
-3. **Password generation**: Keys ending in `_PASSWORD` or `_PASS` whose resolved value is empty get a random 16-character alphanumeric password generated via Python's `secrets` module.
+3. **Password/secret generation**: Keys ending in `_PASSWORD` or `_PASS` whose resolved value is empty get a random 48-character alphanumeric value. Keys ending in `_PASSKEY`, `_SECRET_KEY`, or `_LAPI_KEY` get a random 96-character alphanumeric value. Both generated via Python's `secrets` module. This deliberately does **not** cover every `*_KEY`/`*_SECRET`/`*_TOKEN`-shaped name — `*_API_KEY`/`*_API_TOKEN`/`*_LICENSE_KEY` (issued by an external service; a random value would silently look filled in but not work) and `*_KEY_ENCRYPTION` (must be a base64-encoded 32-byte key, not plain alphanumeric — see `SEMAPHORE_ACCESS_KEY_ENCRYPTION`'s own stack-README.md) stay blank as documented manual steps instead. See `DB_PASSWORD_SUFFIXES`/`OTHER_SECRET_SUFFIXES` in `build.py` for the exact lists.
 
-4. **Deduplication**: The first occurrence of each key is kept. Subsequent occurrences are commented out with `# `. Duplicate `_PASSWORD`/`_PASS` keys use the same password value as the first occurrence.
+4. **Deduplication**: The first occurrence of each key is kept. Subsequent occurrences are commented out with `# `. Duplicate keys use the same generated value as the first occurrence.
 
 ---
 

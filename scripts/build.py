@@ -1034,6 +1034,28 @@ def generate_password(length=16):
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
+# Keys ending in one of these get an auto-generated 48-character alphanumeric
+# value when blank — DB users' own passwords, chosen by us, no external issuer
+# and no format/length restriction of their own.
+DB_PASSWORD_SUFFIXES = ('_PASSWORD', '_PASS')
+DB_PASSWORD_LENGTH = 48
+
+# Keys ending in one of these get an auto-generated 96-character alphanumeric
+# value when blank — other self-issued application secrets (API passkeys,
+# internal signing/session keys, inter-service shared secrets). Deliberately
+# narrow and does NOT include every *_KEY/*_SECRET/*_TOKEN-shaped name:
+#   - *_API_KEY / *_API_TOKEN / *_LICENSE_KEY are issued by an external service
+#     (Cloudflare, MaxMind, etc.) — a random value here would silently look
+#     "filled in" but not actually work, so these stay blank for a human to
+#     paste a real one in.
+#   - *_KEY_ENCRYPTION (SEMAPHORE_ACCESS_KEY_ENCRYPTION) must be a
+#     base64-encoded 32-byte key, not plain alphanumeric — see its own
+#     stack-README.md (`head -c32 /dev/urandom | base64`) — so it's excluded
+#     here and stays a documented manual step.
+OTHER_SECRET_SUFFIXES = ('_PASSKEY', '_SECRET_KEY', '_LAPI_KEY')
+OTHER_SECRET_LENGTH = 96
+
+
 def dedup_komodo_env(content):
     """Comment out duplicate KEY: VALUE lines in komodo.env content.
 
@@ -1075,9 +1097,14 @@ def dedup_env(content, ref_map=None):
 
     Three post-processing steps applied to the generated .env:
 
-    1. Password generation: For keys ending in '_PASSWORD' or '_PASS'
-       whose resolved value is empty, a random 16-character alphanumeric
-       password is generated and set as the value.
+    1. Password/secret generation: For keys ending in one of
+       DB_PASSWORD_SUFFIXES ('_PASSWORD', '_PASS') whose resolved value is
+       empty, a random 48-character alphanumeric value is generated. For
+       keys ending in one of OTHER_SECRET_SUFFIXES ('_PASSKEY',
+       '_SECRET_KEY', '_LAPI_KEY'), a random 96-character alphanumeric
+       value is generated. See those constants' definitions for why the
+       second list deliberately excludes lookalike external-API-credential
+       and fixed-format keys.
 
     2. Deduplication: The first occurrence of each key is kept. Subsequent
        occurrences are commented out with '# '. Duplicate _PASSWORD entries
@@ -1119,8 +1146,10 @@ def dedup_env(content, ref_map=None):
                 result.append(f'# {key}={seen_keys[key]}')
             else:
                 # First occurrence
-                if (key.endswith('_PASSWORD') or key.endswith('_PASS')) and value == '':
-                    value = generate_password()
+                if key.endswith(DB_PASSWORD_SUFFIXES) and value == '':
+                    value = generate_password(DB_PASSWORD_LENGTH)
+                elif key.endswith(OTHER_SECRET_SUFFIXES) and value == '':
+                    value = generate_password(OTHER_SECRET_LENGTH)
                 seen_keys[key] = value
                 key_line_idx[key] = len(result)
                 result.append(f'{key}={value}')

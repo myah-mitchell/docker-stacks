@@ -86,11 +86,17 @@ services:
       DOCKNS_NS_CLOUDFLARE_RECORD_DEFAULTS_TTL: 300
       DOCKNS_NS_CLOUDFLARE_RECORD_DEFAULTS_A_IP: ${DOCKNS_WAN_IP}
 
-      DOCKNS_NS_TECHNITIUM_SERVICE: technitium
-      DOCKNS_NS_TECHNITIUM_API_KEY: ${DOCKNS_TECHNITIUM_API_KEY}
-      DOCKNS_NS_TECHNITIUM_HOST: ${DOCKNS_TECHNITIUM_HOST}
-      DOCKNS_NS_TECHNITIUM_RECORD_DEFAULTS_TTL: 60
-      DOCKNS_NS_TECHNITIUM_RECORD_DEFAULTS_CNAME_TARGET_DOMAIN: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+      # Local connector — points at this VM's own site's UniFi console (not the
+      # api.ui.com cloud/remote connector), so internal DNS management stays on the
+      # LAN and doesn't depend on UniFi's cloud API being reachable. HOST/API_KEY
+      # differ per site (home vs cloud console), so these are filled in per-VM, not
+      # shared globally. See containers/dockns/stack-README.md.
+      DOCKNS_NS_UNIFI_SERVICE: unifi
+      DOCKNS_NS_UNIFI_HOST: ${DOCKNS_UNIFI_HOST}
+      DOCKNS_NS_UNIFI_API_KEY: ${DOCKNS_UNIFI_API_KEY}
+      #DOCKNS_NS_UNIFI_ACCOUNT_ID: #optional — site UUID/name, omit to auto-discover the default site
+      DOCKNS_NS_UNIFI_RECORD_DEFAULTS_TTL: 60
+      DOCKNS_NS_UNIFI_RECORD_DEFAULTS_CNAME_TARGET_DOMAIN: ${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
 
     volumes:
     #  - "./config:/config"

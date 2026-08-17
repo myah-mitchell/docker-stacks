@@ -84,7 +84,11 @@ services:
       KOMODO_TITLE: ${KOMODO_TITLE:-Komodo}
       KOMODO_HOST: ${PROJECT_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     volumes:
-      - ./config/core.config.toml:/config/config.toml:ro
+      # core.config.toml (git_provider tokens, core [secrets] used to resolve this
+      # repo's [[VAR]] references) holds real credentials once filled in — lives in
+      # secrets/, never config/. See containers/komodo/config/core.config.toml.example
+      # for the field reference (unmodified upstream default, safe to keep in git).
+      - ./secrets/core.config.toml:/config/config.toml:ro
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-backups:/backups
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-sync:/syncs
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-cache:/repo-cache

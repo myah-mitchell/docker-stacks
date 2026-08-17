@@ -1,10 +1,10 @@
 # Komodo bootstrap runbook
 
 Komodo GitOps-deploys every other stack in this repo — but it can't GitOps-deploy
-*itself* the first time. This is the one deliberate exception: `vm-komodo` gets
+*itself* the first time. This is the one deliberate exception: `km01` gets
 provisioned and its stack started by hand, start to finish, using this runbook.
 Follow it in order; each step assumes only the steps before it. Use it again from
-scratch if `vm-komodo` is ever lost — this doc plus the `proxmox-cloud-init`
+scratch if `km01` is ever lost — this doc plus the `proxmox-cloud-init`
 template and this repo should be everything needed to rebuild it.
 
 Everything in `<angle brackets>` is a placeholder — replace with your real values as
@@ -40,7 +40,7 @@ from the template's generic defaults (4 vCPU / 4GB):
 qm set <km-vmid> --cores 2 --memory 4096
 ```
 
-`vm-komodo` is long-lived and everything else will eventually point at it, so give it
+`km01` is long-lived and everything else will eventually point at it, so give it
 a static IP instead of the template's DHCP default:
 
 ```bash
@@ -48,7 +48,7 @@ qm set <km-vmid> --ipconfig0 ip=<km-ip>/24,gw=<gateway-ip>
 ```
 
 Confirm the template's VLAN tag is the right one for an internal-only host —
-`vm-komodo` is not DMZ.
+`km01` is not DMZ.
 
 ## 3. Start the VM
 
@@ -201,8 +201,8 @@ Every stack's `compose.yaml` — including `traefik-server`'s own — declares `
 `external: true`. No stack owns or creates it, so it must already exist on a host
 before the first stack ever starts there, or `docker compose up -d` fails with no
 network to attach to. This is a one-time step per host, not just for Komodo — every
-other VM in this plan (`vm-traefik-hub`, `vm-core-infra`, `vm-identity-authentik`,
-`vm-pki-stepca`, `vm-edge`, `vm-apps-01`) needs it too before its first stack starts.
+other VM in this plan (`tf01`, `ci01`, `id01`, `pk01`, `bh01`, `ap01`) needs it too
+before its first stack starts.
 
 Check `PROXY_NETWORK` in the `.env` from step 7 (`proxy` unless you changed it), then:
 
@@ -225,7 +225,7 @@ password characters from step 7.
 
 ## 11. First access
 
-`vm-traefik-hub` doesn't exist yet — Komodo is what will deploy it — so Komodo's UI
+`tf01` doesn't exist yet — Komodo is what will deploy it — so Komodo's UI
 isn't reachable through Traefik. Its container publishes its own port directly for
 exactly this bootstrap reason:
 
@@ -237,24 +237,82 @@ Open that and create the initial admin account when prompted.
 
 ## 12. Point Komodo at this repo for future deploys
 
-In the Komodo UI, add `docker-stacks` (`myah-mitchell/docker-stacks`, `main` branch)
-as a Stack resource's Git Repo source, with its compose file path set to the next
-stack you're bringing up — e.g. `stacks/traefik-server/compose.yaml` — and its
-Environment pointed at that stack's `komodo.env` (the committed file Komodo actually
-reads, not the gitignored local-testing `.env` from step 7). Deploy it from the UI.
+This step walks through deploying the *next* stack — e.g. `traefik-server` on
+`tf01` — through Komodo instead of by hand, which is how every stack after
+`komodo-server` gets deployed from here on.
 
-From here on, every other VM in the plan (`vm-traefik-hub`, `vm-core-infra`,
-`vm-identity-authentik`, `vm-pki-stepca`, `vm-edge`, `vm-apps-01`) gets provisioned
-for its base OS with Ansible, then has its stack deployed through Komodo — not by
-hand. `komodo-server` itself, brought up in steps 1–11 above, is the one exception.
+**Before you start:** the target VM (`tf01` in this example) needs to
+already exist and be reachable — provisioned with Ansible the same way `km01`
+was in steps 3–4, but *not* have its stack started by hand. Komodo deploys to a host
+by talking to a Periphery agent running on it, so that VM also needs Periphery
+installed and needs to be registered in Komodo as a Server resource before you can
+deploy anything to it. That's a base-OS-provisioning concern (Ansible), separate from
+this repo — if Periphery isn't already part of your Ansible provisioning role, install
+and register it manually before continuing.
+
+1. **Register the target host.** In the Komodo UI, go to **Resources → Servers** and
+   add `tf01` — however Komodo's Server resource asks for it (Periphery's
+   address/port, or an enrollment token, depending on your Komodo version). Confirm it
+   shows as connected/healthy before moving on; a Stack resource deployed to an
+   unreachable Server just fails at deploy time with a connection error.
+2. **Create the Stack resource.** Go to **Resources → Stacks** and create a new one —
+   name it after the stack, e.g. `traefik-server`. Set its target **Server** to the
+   `tf01` resource you just added.
+3. **Point it at this repo.** Under the Stack's **Source**, choose Git Repository:
+   - **Repo**: `myah-mitchell/docker-stacks` (or the full
+     `https://github.com/myah-mitchell/docker-stacks` URL, depending on what Komodo
+     asks for). No `[[git_provider]]` credential is needed in step 8's
+     `secrets/core.config.toml` for this — the repo is public.
+   - **Branch**: `main`.
+4. **Point it at the specific compose file.** Under **Files** (or wherever the Stack's
+   compose-file location is configured):
+   - **Run Directory**: `stacks/traefik-server` — not `containers/traefik/`, and not
+     the repo root.
+   - **File Path**: `compose.yaml`, relative to that run directory.
+5. **Point it at the real env file.** Under **Environment**, set the source to the
+   committed `komodo.env` in that same directory (`stacks/traefik-server/komodo.env`)
+   — not the gitignored, local-testing `.env` from step 7 of this doc, which doesn't
+   exist on `tf01` and isn't what Komodo should be reading anywhere. If any
+   variable in that `komodo.env` is still blank (a password `build.py` hasn't
+   generated yet, or a value with no default — same categories as step 7), fill it in
+   now, either by running `build.py` locally and committing the result, or as a
+   one-off override in Komodo's UI for this resource. Don't hand-type a password with
+   `@`, `:`, `/`, `#`, or `?` in it — same reasoning as step 7.
+6. **Save and deploy.** Save the Stack resource, then click **Deploy**. Watch the
+   deploy log in the UI — it clones the repo at the pinned branch, reads the compose
+   file from the run directory, and runs the Compose equivalent of `docker compose up
+   -d` on `tf01` via Periphery.
+7. **Verify.** Same check as step 10 — confirm the containers show
+   running/healthy, either via Komodo's own container view for that resource, or by
+   SSHing to `tf01` and running `docker compose ps` in
+   `stacks/traefik-server/`.
+
+Repeat steps 1–7 per stack — one Server resource per VM, one Stack resource per
+`stacks/<name>/` directory deployed to it. Every other VM in the plan (`tf01`, `ci01`,
+`id01`, `pk01`, `bh01`, `ap01`) gets its base OS provisioned with Ansible, then its
+stack deployed through Komodo this way — not by hand. `komodo-server` itself, brought
+up in steps 1–11 above, is the one exception.
 
 (The exact menu labels above are based on this repo's own conventions, not a
 walkthrough of Komodo's UI — adjust to what you actually see.)
 
 ## 13. Later — fold Komodo's own UI behind Traefik + Authentik
 
-Once `vm-traefik-hub` and `vm-identity-authentik` are both live, gate Komodo's UI
-behind `chain-authentik@file` like every other internal service, instead of the
-direct `:9120` port. Keeping the direct port reachable as a break-glass fallback (in
-case Traefik or Authentik are themselves down) is reasonable — just don't rely on it
-as the normal path once SSO is in place.
+Komodo's UI ends up behind `chain-authentik@file` like every other internal service,
+via `km01`'s own local Traefik — not `tf01`. Every VM runs its own local Traefik
+(bundled with monitoring/log/DNS agents as `stacks/system-agent`), which terminates
+TLS and runs the Authentik forward-auth chain for whatever that VM hosts directly;
+`tf01`'s central Redis is only involved if a service also needs to be reachable from
+other hosts or, via `bh01`, from the internet — Komodo's UI is neither, so it never
+needs to go through `tf01` at all.
+
+`system-agent` isn't deploy-ready yet (it's a known-unfinished pre-existing stack,
+see `PLAN.md`), and it needs live backends before it's worth deploying anywhere:
+`ci01` for monitoring, `id01` for the auth chain, `pk01` for the internal certs it'll
+use instead of Let's Encrypt (`bh01` is the one VM that keeps Let's Encrypt, since
+it's the actual internet-facing host). So the real order is: get `ci01`/`id01`/`pk01`
+all live first, fix and prove `system-agent` on one of the less-critical VMs, *then*
+retrofit it onto `km01` last and switch Komodo's UI over to it.
+
+Until then, keep the direct `:9120` port as `km01`'s only access path — not just as a
+break-glass fallback once SSO is in place, but as the actual current state.

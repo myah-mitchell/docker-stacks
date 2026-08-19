@@ -107,7 +107,7 @@ cd /tmp/ansible
 git pull
 ansible-playbook -i hosts.yml -c local provision.yml \
   -e '{"target":"ubuntu_docker","server_password":"","short_name":"<same as original run>","abbr_name":"<same>","location_abbr":"<same>","domain_name":"<same>"}' \
-  -e 'komodo_passkeys=["<real KOMODO_PASSKEY value, from km01>"]' \
+  -e '{"komodo_passkeys":"<real KOMODO_PASSKEY value, from km01>"}' \
   --tags docker
 ```
 

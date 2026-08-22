@@ -42,11 +42,28 @@ port = 9120
 ## Default: [::]
 bind_ip = "[::]"
 
-## This is the token used to authenticate core requests to periphery.
+## Default private key to use with Noise handshake to authenticate with Periphery agents.
+## If using `file:/path/to/file` and the file doesn't exist yet,
+## Core will generate and write new key to the path.
+## Env: KOMODO_PRIVATE_KEY or KOMODO_PRIVATE_KEY_FILE
+## Default: file:/config/keys/core.key
+private_key = "file:/config/keys/core.key"
+
+## Default accepted public key to allow Periphery to connect.
+## If not provided, Periphery -> Core connected Servers must
+## configure accepted public keys individually.
+## Accepts public keys files using `file:/path/to/periphery.pub`.
+## Note: If used, the public key can still be overridden on individual Servers / Builders.
+## Env: KOMODO_PERIPHERY_PUBLIC_KEY
+## Default: None
+# periphery_public_key = "file:/config/keys/periphery.pub"
+
+## Deprecated. Legacy v1 compatibility - this repo no longer uses passkeys,
+## see private_key/periphery_public_key above. Kept here only as documentation
+## of the field this repo migrated away from.
 ## Ensure this matches a passkey in the connected periphery configs.
 ## If the periphery servers don't have passkeys configured, this doesn't need to be changed.
 ## Env: KOMODO_PASSKEY or KOMODO_PASSKEY_FILE
-## Required, no default
 # passkey = "default-passkey-changeme"
 
 ## Ensure a server with this address exists on Core

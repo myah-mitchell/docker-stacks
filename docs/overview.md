@@ -20,11 +20,11 @@ From that shared starting point, each VM's *stack* gets deployed one of two ways
   hand, because Komodo can't GitOps-deploy itself the first time. See
   [`docs/komodo-bootstrap.md`](komodo-bootstrap.md).
 - **Every other VM gets registered as a Komodo Server resource and deployed through
-  Komodo's GitOps flow** instead — provision the base OS, fix that one VM's
-  Periphery passkey (until Semaphore exists to do it for you — see `ci01` below),
-  then let Komodo do the rest. [`docs/ci01-bootstrap.md`](ci01-bootstrap.md) works
-  this pattern out in full for the first real case; every doc after it follows the
-  same shape.
+  Komodo's GitOps flow** instead — provision the base OS, generate that VM's own
+  Komodo onboarding key (a permanent per-host step under Komodo's PKI auth, not
+  something Semaphore ever removes — see `ci01` below), then let Komodo do the rest.
+  [`docs/ci01-bootstrap.md`](ci01-bootstrap.md) works this pattern out in full for the
+  first real case; every doc after it follows the same shape.
 
 Docs are named after the **service** when there's something structurally unique about
 its bootstrap (`komodo-bootstrap.md` — the one manual exception); named after the
@@ -43,9 +43,9 @@ step 9 works through it in full for the first real case.
 
 | Order | VM | Role | Doc | Status |
 |---|---|---|---|---|
-| 1 | `km01` | Komodo GitOps engine | [`komodo-bootstrap.md`](komodo-bootstrap.md) | **in progress** — steps 1–11 followed against a real host; not yet confirmed fully healthy end-to-end |
+| 1 | `km01` | Komodo GitOps engine | [`komodo-bootstrap.md`](komodo-bootstrap.md) | **in progress** — steps 1–13 followed against a real host; not yet confirmed fully healthy end-to-end |
 | 2 | `ci01` | Semaphore (ansible runner) first, rest of `core-infra` later | [`ci01-bootstrap.md`](ci01-bootstrap.md) | written, not yet run against a real host |
-| 3 | `tf01` | Traefik hub (central Redis + `traefik-kop`) | not written yet | not started — blocked on `ci01`/Semaphore existing to fix its Periphery passkey without another manual step |
+| 3 | `tf01` | Traefik hub (central Redis + `traefik-kop`) | not written yet | not started — blocked on `ci01`/Semaphore existing to push its `node_exporter_password` fix; still needs its own one-time Komodo onboarding key regardless (decision #19, permanent per host) |
 | 4 | `id01` | Authentik / identity | not written yet | not started |
 | 5 | `pk01` | step-ca / internal PKI | not written yet | not started |
 | 6 | `bh01` | `cloudflared` + `traefik-dmz`, DMZ edge | not written yet | not started |
@@ -56,9 +56,10 @@ covered here — they predate this plan and aren't provisioned by these runbooks
 
 Write each new doc when you actually reach that VM, not speculatively ahead of
 time — `ci01-bootstrap.md`'s closing section explains why (the manual
-Periphery-passkey step won't even be needed anymore once Semaphore's `ansible`
-Template from its step 13 exists, so a doc written too early would describe a step
-that no longer applies by the time it's used).
+`node_exporter_password` fix won't even be needed anymore once Semaphore's `ansible`
+Template from its step 14 exists, so a doc written too early would describe a step
+that no longer applies by the time it's used. The onboarding-key step stays either
+way — it's permanent per host, not a bootstrap-phase gap).
 
 ## See also
 

@@ -80,7 +80,6 @@ services:
       KOMODO_DATABASE_ADDRESS: ${PROJECT_NAME}-${FERRETDB_HOSTNAME}:27017
       KOMODO_DATABASE_USERNAME: ${KOMODO_DB_USERNAME}
       KOMODO_DATABASE_PASSWORD: ${KOMODO_DB_PASSWORD}
-      KOMODO_PASSKEY: ${KOMODO_PASSKEY}
       KOMODO_TITLE: ${KOMODO_TITLE:-Komodo}
       KOMODO_HOST: ${PROJECT_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     volumes:
@@ -89,6 +88,10 @@ services:
       # secrets/, never config/. See containers/komodo/config/core.config.toml.example
       # for the field reference (unmodified upstream default, safe to keep in git).
       - ./secrets/core.config.toml:/config/config.toml:ro
+      # Core's own PKI keypair (v2 auth, replaces the old shared KOMODO_PASSKEY) is
+      # auto-generated on first boot and lives at /config/keys/core.key — this MUST
+      # persist across recreation, or every Periphery agent loses trust with Core.
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-keys:/config/keys
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-backups:/backups
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-sync:/syncs
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-cache:/repo-cache

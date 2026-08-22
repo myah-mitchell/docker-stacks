@@ -4,9 +4,16 @@
 the first real use of the pattern `docs/komodo-bootstrap.md` only sketched. Its first
 stack is `stacks/semaphore-server`, deliberately chosen to go first: once Semaphore
 is up and wired to the `ansible` repo, it becomes the way real secrets
-(`komodo_passkeys`, `node_exporter_password`, and anything else `ansible` needs that
-shouldn't be a plain committed default) get pushed to every other server in the plan,
-instead of fixing them by hand host-by-host the way this doc has to for `ci01` itself.
+(`node_exporter_password`, and anything else `ansible` needs that shouldn't be a
+plain committed default) get pushed to every other server in the plan, instead of
+fixing them by hand host-by-host.
+
+Komodo's own Core↔Periphery trust is a separate, already-solved problem now — it uses
+v2 PKI (Ed25519 keypairs), not a shared passkey, so there's no fleet-wide secret for
+Semaphore to push for Komodo specifically. `ci01` still needs one manual, one-time
+step (generating its own onboarding key, step 5 below) — that's just how PKI
+onboarding works for every host, permanently, not a bootstrap-phase gap Semaphore
+later closes.
 
 See [`docs/overview.md`](overview.md) for how this doc fits into the overall running
 order, and [`docs/komodo-bootstrap.md`](komodo-bootstrap.md) if `km01` itself isn't
@@ -19,12 +26,14 @@ you go. Don't commit real values back into this file.
 
 Before starting, these must already be true:
 
-- `km01` is up and reachable, through step 11 of `docs/komodo-bootstrap.md` at
-  least (its own `docker compose ps` shows all four containers healthy, and you've
-  created the initial admin account in Komodo's UI at `http://<km-ip>:9120`).
-- You know `km01`'s real `KOMODO_PASSKEY` value (from
-  `stacks/komodo-server/.env` on `km01`, or wherever you recorded it after step 7 of
-  `docs/komodo-bootstrap.md`) — needed in step 5 below.
+- `km01` is up and reachable, through step 13 of `docs/komodo-bootstrap.md` at
+  least (its own `docker compose ps` shows all four containers healthy, you've
+  created the initial admin account in Komodo's UI at `http://<km-ip>:9120`, its
+  firewall allows inbound 9120 per that doc's step 10, and you've committed its real
+  Core public key into `ansible`'s `komodo_core_public_key`).
+- You're ready to generate `ci01` a fresh onboarding key in Komodo's UI right before
+  step 5 below — it's single-use and short-lived, so there's nothing to have on hand
+  ahead of time, just the ability to open Komodo's UI when you get there.
 - The `ubuntu-server` cloud-init template exists on the target PVE host (same
   template `km01` was cloned from).
 
@@ -86,45 +95,48 @@ specifically — it runs as a `--user` systemd service under a dedicated `komodo
 account (`ansible`'s `roles/docker/tasks/komodo.yml`), not as root, so a plain
 `systemctl status periphery` from your own login won't find it.
 
-## 5. Fix this VM's Periphery passkey — the one manual step
+## 5. Give `ci01` an onboarding key — the one manual step
 
-`ansible`'s `roles/docker/defaults/main.yml` ships `komodo_passkeys: ["CHANGEME"]` as
-a placeholder. Komodo Core can't authenticate to any Periphery agent still running
-with that value, and there's deliberately no automatic override for it yet — real
-values get pushed by Semaphore once it exists, which is exactly what this whole doc
-is bootstrapping. `ci01` (and `km01` itself, provisioned before its own
-`KOMODO_PASSKEY` even existed) both need this fixed by hand, once, right now.
+`ansible`'s `roles/docker/defaults/main.yml` ships `komodo_onboarding_key: ""` —
+deliberately blank, since a real value is single-use and shouldn't ever be committed.
+Periphery needs one to make its first outbound connection to Core; after that,
+Core and `ci01` trust each other by their own PKI keypairs and the onboarding key is
+discarded.
 
-On `ci01`, re-run the same provisioning command cloud-init used
+Generate one now, in Komodo's UI on `km01` (`http://<km-ip>:9120`) — Settings →
+Servers, or wherever the current UI puts onboarding keys (**not yet verified against
+a live instance** — confirm the exact screen once `km01` is really up, and update
+this step with the real path).
+
+Then re-run the same provisioning command cloud-init used
 (`/tmp/ansible` from step 3 — if it's gone, re-clone it the same way
 `proxmox-cloud-init/cloudinit-vendor.yml` does; **don't paste that command's
-credentialed URL into this repo**, `docker-stacks` is public), adding the real
-passkey as an override and scoping the re-run to just the `docker` role tag so it
+credentialed URL into this repo**, `docker-stacks` is public), passing the onboarding
+key as a one-off override and scoping the re-run to just the `docker` role tag so it
 doesn't repeat the entire provisioning:
 
 ```bash
 cd /tmp/ansible
 git pull
 ansible-playbook -i hosts.yml -c local provision.yml \
-  -e '{"target":"ubuntu_docker","server_password":"","short_name":"<same as original run>","abbr_name":"<same>","location_abbr":"<same>","domain_name":"<same>"}' \
-  -e '{"komodo_passkeys":"<real KOMODO_PASSKEY value, from km01>"}' \
+  -e '{"target":"ubuntu_docker","server_password":"","short_name":"ci01","abbr_name":"<same as original run>","location_abbr":"<same>","domain_name":"<same>"}' \
+  -e '{"komodo_onboarding_key":"<the key you just generated>"}' \
   --tags docker
 ```
 
-Confirm it landed:
+Confirm it landed and connected — in Komodo's UI, the `ci01` Server resource (which
+the onboarding key should have created automatically) should show connected/healthy.
+On `ci01` itself:
 
 ```bash
-sudo -u komodo cat /home/komodo/.config/komodo/periphery.config.toml | grep passkeys
+sudo -u komodo cat /home/komodo/.config/komodo/periphery.config.toml | grep -A1 core_address
 ```
 
-**Do the same thing on `km01`** if you haven't already — it has the identical
-`CHANGEME` problem from its own initial provisioning, before `KOMODO_PASSKEY`
-existed. Skipping this on `km01` won't block *this* doc, but leaves Komodo unable to
-manage itself as a Server resource later.
-
-Also worth a quick check while you're in `roles/docker/defaults/main.yml`:
-`komodo_allowed_ips` should include `km01`'s real static IP — that's the address
-Periphery expects Core's authenticated requests to come from.
+This is a **permanent** part of onboarding every future host, not a bootstrap-phase
+gap that goes away once Semaphore exists — every new server gets its own fresh
+onboarding key at provision time, the same way every new host needs its own SSH host
+key accepted. What Semaphore *does* remove is the equivalent manual step for
+`node_exporter_password` and similar real shared secrets — see step 14.
 
 ## 6. Create the runtime folders
 
@@ -166,16 +178,19 @@ automatically, and every stack's `compose.yaml` declares it `external: true`:
 docker network create proxy
 ```
 
-## 8. Register `ci01` as a Komodo Server resource
+## 8. Confirm `ci01` shows as a Komodo Server resource
 
-In Komodo's UI (`http://<km-ip>:9120`, on `km01`): go to **Resources → Servers** and
-add `ci01` — however Komodo's Server resource asks for it (Periphery's address/port,
-or an enrollment token, depending on your Komodo version). Confirm it shows as
-connected/healthy before continuing; if it doesn't, re-check step 5's passkey first —
-that's the most likely reason.
+Step 5's onboarding key should already have created the `ci01` Server resource the
+moment Periphery made its first outbound connection — nothing left to add by hand
+here, unlike the old inbound/enrollment-token model. In Komodo's UI (`http://<km-ip>:9120`,
+on `km01`): check **Resources → Servers** and confirm `ci01` shows connected/healthy
+before continuing. If it doesn't show up at all, re-check step 5's onboarding key
+first — that's the most likely reason.
 
-(The exact menu labels here are based on this repo's own conventions, not a verified
-walkthrough of Komodo's UI — adjust to what you actually see.)
+(**Not yet verified against a live instance**: whether the onboarding key really
+auto-creates the Server resource, or whether current Komodo still expects you to add
+`ci01` manually first and only *then* have Periphery connect as it. Confirm once
+`km01`/`ci01` are both real, and correct this step if it's the latter.)
 
 ## 9. Deploy `stacks/traefik-bootstrap` onto `ci01`
 
@@ -271,8 +286,9 @@ in step 11.
 
 ## 14. Post-deploy: wire Semaphore to the `ansible` repo
 
-This is the actual point of bringing `ci01` up first — closing the loop back to step
-5's manual passkey fix so it doesn't have to happen by hand again.
+This is the actual point of bringing `ci01` up first — closing the loop for real
+shared secrets like `node_exporter_password`, which (unlike Komodo's own PKI trust)
+genuinely do need a fleet-wide push mechanism.
 
 1. **Bootstrap-phase SSH key**: Semaphore needs a static SSH key trusted by the
    `ansible` service user every host's `users` Ansible role creates. This is the same
@@ -286,10 +302,12 @@ This is the actual point of bringing `ci01` up first — closing the loop back t
    public.
 3. Create a **Project** wrapping the `ansible` repo + its `hosts.yml` inventory.
 4. Create a **Template** that re-runs `provision.yml`'s `docker` tag with a real
-   `komodo_passkeys` override — the Semaphore-native equivalent of step 5's manual
-   command — and use it against every VM from here on instead of hand-editing
-   `ansible` or SSHing in to re-run it manually. Also a good place to finally fix
-   `node_exporter_password`'s matching `CHANGEME` placeholder while you're at it.
+   `node_exporter_password` override, fixing its matching `CHANGEME` placeholder —
+   and use it against every VM from here on instead of hand-editing `ansible` or
+   SSHing in to re-run it manually. This template does **not** need a
+   `komodo_onboarding_key` override baked in: each host's onboarding key is single-use
+   and generated fresh right before that host's own provisioning run (step 5), never
+   stored in `ansible` or Semaphore itself.
 5. **Superseded in Phase 7**: once step-ca's SSH CA is live, switch Semaphore to a
    dedicated `semaphore` service principal using a short-lived, auto-renewed step-ca
    cert instead of the static key from step 1 — don't skip this once that phase
@@ -297,13 +315,14 @@ This is the actual point of bringing `ci01` up first — closing the loop back t
 
 ## What's next
 
-`ci01` now runs Semaphore, and Semaphore can push real secrets to the rest of the
-fleet — the actual blocker that made `tf01`/`id01`/`pk01` un-bootstrappable through
-Komodo before now is gone. `tf01` is next; see
+`ci01` now runs Semaphore, and Semaphore can push real shared secrets
+(`node_exporter_password`, anything else added later) to the rest of the fleet
+instead of hand-editing `ansible` per host. `tf01` is next; see
 [`docs/overview.md`](overview.md) for the running order. Its own bootstrap doc
 doesn't exist yet — write it when you get there, following this doc's shape (steps
-1–4 provisioning are identical for every VM; step 5's manual passkey fix is no longer
-needed once Semaphore's Template from step 14 above is in place; step 9's
+1–4 provisioning are identical for every VM; step 5's onboarding-key step is required
+for *every* future host, not just this one — Semaphore doesn't remove it, since it's
+a permanent per-host PKI-onboarding action, not a bootstrap-phase gap; step 9's
 `traefik-bootstrap` deploy is the same pattern for every VM until `system-agent`
 replaces it fleet-wide; steps 10–12 registering/deploying its specific stack will
 differ).

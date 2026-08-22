@@ -116,8 +116,15 @@ sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-*
 mkdir -p /opt/docker/volumes/$projectName/komodo-backups
 mkdir -p /opt/docker/volumes/$projectName/komodo-sync
 mkdir -p /opt/docker/volumes/$projectName/komodo-cache
+mkdir -p /opt/docker/volumes/$projectName/komodo-keys
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-*
 ```
+
+`komodo-keys` matters more than the others: Komodo's Core auto-generates its own PKI
+keypair on first boot and writes it there. If that volume is ever lost, every
+Periphery agent in the fleet loses trust with Core and has to be re-onboarded — treat
+it with the same care as the Postgres/FerretDB data directories, not like the
+disposable `komodo-cache`.
 
 ## 7. Generate and fill in the stack's `.env`
 
@@ -151,7 +158,10 @@ Set:
 - `DOMAIN_NAME` — the real domain, e.g. `myah-mitchell.com`
 - `KOMODO_DB_USERNAME` — any username you want (e.g. `komodo-admin`)
 - `KOMODO_TITLE` — whatever you want Komodo's UI to display as its title
-- `KOMODO_PASSKEY` — Komodo's own API passkey
+
+Nothing to set for Periphery auth here — Komodo v2 uses PKI (Ed25519 keypairs), not a
+shared passkey. Core generates its own keypair automatically on first boot (see step
+6's `komodo-keys` note); there's no equivalent `.env` field to fill in.
 
 Leave `POSTGRES_USER` and `POSTGRES_BACKUP_DB`/`POSTGRES_BACKUP_USER`/
 `POSTGRES_BACKUP_PASSWORD` blank — don't set these by hand:
@@ -210,7 +220,28 @@ Check `PROXY_NETWORK` in the `.env` from step 7 (`proxy` unless you changed it),
 docker network create proxy
 ```
 
-## 10. Bring the stack up
+## 10. Open the firewall for Core
+
+Every Periphery agent in the fleet dials **out** to Core (outbound mode, see decision
+#19 in `PLAN.md`) — the reverse of the old model, where Core dialed out to each
+Periphery and each Periphery's own host needed the inbound UFW rule instead. That
+means it's now `km01` itself that needs an inbound allowance, for port 9120, not
+every other VM. Nothing provisions this automatically: `km01` is a plain
+`ubuntu_docker` host as far as `ansible` is concerned (`KOMODO: true` there only
+installs the Periphery *agent*, port 8120, no longer even inbound — see
+`roles/docker/tasks/komodo.yml`), and Core itself is this hand-bootstrapped compose
+stack, not anything `ansible` manages:
+
+```bash
+sudo ufw allow 9120/tcp comment 'Komodo Core'
+sudo ufw status
+```
+
+This also covers your own browser reaching `http://<km-ip>:9120` directly in step 12
+below — that direct access was never firewalled for either, this is the first point
+in the runbook it actually matters.
+
+## 11. Bring the stack up
 
 From `stacks/komodo-server/`:
 
@@ -223,7 +254,7 @@ All four containers (`komodo`, `ferretdb`, `postgres`, `postgres-backup`) should
 as running/healthy. If `ferretdb` is stuck failing to reach Postgres, re-check the
 password characters from step 7.
 
-## 11. First access
+## 12. First access
 
 `tf01` doesn't exist yet — Komodo is what will deploy it — so Komodo's UI
 isn't reachable through Traefik. Its container publishes its own port directly for
@@ -234,6 +265,19 @@ http://<km-ip>:9120
 ```
 
 Open that and create the initial admin account when prompted.
+
+## 13. Get Core's public key for `ansible`
+
+Every other host's Periphery agent needs to trust this specific Core, via its public
+key (`ansible`'s `komodo_core_public_key`, see `roles/docker/defaults/main.yml`).
+Unlike the old passkey, this value **isn't secret** — commit the real one directly
+once you have it, no `CHANGEME` placeholder needed.
+
+**Not yet verified against a live instance**: exactly where Komodo's UI/API surfaces
+Core's own public key for copying out. Check Komodo's Settings/Servers screens (or
+`docker exec` into the container and read `/config/keys/core.key`'s public
+counterpart directly) once this stack is actually up, and update this step with the
+real answer.
 
 ## What's next
 

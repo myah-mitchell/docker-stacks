@@ -74,11 +74,9 @@ clones the `ansible` repo, and runs `provision.yml` locally against
 Periphery** all get installed without any manual step (see the note in step 5 about
 why Periphery alone isn't usable yet).
 
-Watch it finish via the VM's console:
-
-```bash
-tail -f /var/log/cloud-init-output.log
-```
+Watch it finish through the PVE console (**Datacenter → node → `ci01` → Console** in
+the web UI) — same as `km01`, there's no user account to SSH in as until cloud-init
+finishes, so `ssh`+`tail -f` isn't an option here.
 
 ## 4. Verify base provisioning
 

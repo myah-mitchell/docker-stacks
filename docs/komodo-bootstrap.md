@@ -60,11 +60,10 @@ The vendor cloud-init snippet baked into the template fires automatically on fir
 boot: it clones the `ansible` repo and runs `provision.yml` locally against
 `target: ubuntu_docker`, installing Docker, firewall, NTP, swap, node_exporter, etc.
 
-Watch it finish via the VM's console (SSH may not be reachable yet):
-
-```bash
-tail -f /var/log/cloud-init-output.log
-```
+Watch it finish through the PVE console (**Datacenter → node → `km01` → Console** in
+the web UI) — there's no user account to SSH in as yet, so `ssh`+`tail -f` won't
+work until cloud-init finishes creating one. The console shows the same
+`/var/log/cloud-init-output.log` output live as it boots.
 
 ## 4. Verify base provisioning
 

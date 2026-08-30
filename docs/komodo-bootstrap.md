@@ -4,8 +4,10 @@ Komodo GitOps-deploys every other stack in this repo — but it can't GitOps-dep
 *itself* the first time. This is the one deliberate exception: `km01` gets
 provisioned and its stack started by hand, start to finish, using this runbook.
 Follow it in order; each step assumes only the steps before it. Use it again from
-scratch if `km01` is ever lost — this doc plus the `proxmox-cloud-init`
-template and this repo should be everything needed to rebuild it.
+scratch if `km01` is ever lost — this doc plus `ansible`'s `pve` role (which builds
+the cloud-init template — the old standalone `proxmox-cloud-init` repo is
+deprecated, merged into `ansible` directly) and this repo should be everything
+needed to rebuild it.
 
 Everything in `<angle brackets>` is a placeholder — replace with your real values as
 you go. Don't commit real values back into this file.
@@ -15,8 +17,8 @@ you go. Don't commit real values back into this file.
 Before starting, these must already be true:
 
 - The `ubuntu-server` cloud-init template exists on the target PVE host, built by
-  `proxmox-cloud-init/create-cloud-init-template.sh` (installed there by `ansible`'s
-  `pve` role).
+  `ansible`'s `pve` role from its own `roles/pve/templates/create-cloud-init-template.sh.j2`
+  (installed as `/usr/local/bin/create-cloud-init-template.sh` on the PVE host).
 - The `ansible` repo's `pve-cloudinit.yml` task has run against that PVE host at
   least once, so its cloud-init vendor snippet has real
   `short_name`/`abbr_name`/`location_abbr`/`domain_name` values baked in.
@@ -57,8 +59,13 @@ qm start <km-vmid>
 ```
 
 The vendor cloud-init snippet baked into the template fires automatically on first
-boot: it clones the `ansible` repo and runs `provision.yml` locally against
-`target: ubuntu_docker`, installing Docker, firewall, NTP, swap, node_exporter, etc.
+boot: it clones the public `ansible` repo (`https://github.com/myah-mitchell/ansible`,
+no credential needed — it's public) to `/tmp/ansible`; if the template was built with
+a real `ansible_private_repo_token`, it also clones the private `ansible-private`
+overlay and copies its `hosts.yml`/`group_vars/all/private.yml` over the public
+repo's sanitized placeholders before running. Either way it then runs
+`provision.yml` locally against `target: ubuntu_docker`, installing Docker,
+firewall, NTP, swap, node_exporter, etc.
 
 Watch it finish through the PVE console (**Datacenter → node → `km01` → Console** in
 the web UI) — there's no user account to SSH in as yet, so `ssh`+`tail -f` won't

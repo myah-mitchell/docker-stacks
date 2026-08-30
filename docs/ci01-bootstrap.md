@@ -69,7 +69,9 @@ qm start <ci-vmid>
 ```
 
 Same as `km01`: the vendor cloud-init snippet fires automatically on first boot,
-clones the `ansible` repo, and runs `provision.yml` locally against
+clones the public `ansible` repo (and the private `ansible-private` overlay too, if
+the template was built with a real `ansible_private_repo_token` — see
+`docs/komodo-bootstrap.md` step 3), and runs `provision.yml` locally against
 `target: ubuntu_docker` — Docker, firewall, NTP, swap, node_exporter, **and Komodo
 Periphery** all get installed without any manual step (see the note in step 5 about
 why Periphery alone isn't usable yet).
@@ -106,21 +108,32 @@ Servers, or wherever the current UI puts onboarding keys (**not yet verified aga
 a live instance** — confirm the exact screen once `km01` is really up, and update
 this step with the real path).
 
-Then re-run the same provisioning command cloud-init used
-(`/tmp/ansible` from step 3 — if it's gone, re-clone it the same way
-`proxmox-cloud-init/cloudinit-vendor.yml` does; **don't paste that command's
-credentialed URL into this repo**, `docker-stacks` is public), passing the onboarding
-key as a one-off override and scoping the re-run to just the `docker` role tag so it
-doesn't repeat the entire provisioning:
+Then re-run the same provisioning command cloud-init used, scoping it to just the
+`docker` role tag so it doesn't repeat the entire provisioning, passing the
+onboarding key as a one-off override:
 
 ```bash
 cd /tmp/ansible
-git pull
 ansible-playbook -i hosts.yml -c local provision.yml \
   -e '{"target":"ubuntu_docker","server_password":"","short_name":"ci01","abbr_name":"<same as original run>","location_abbr":"<same>","domain_name":"<same>"}' \
   -e '{"komodo_onboarding_key":"<the key you just generated>"}' \
   --tags docker
 ```
+
+`/tmp/ansible` should still be the same checkout cloud-init made in step 3, with the
+private overlay's real `hosts.yml`/`group_vars/all/private.yml` already copied in —
+just re-run in place, no re-clone needed. **Don't `git pull` it first**: those two
+files are locally modified relative to git (the overlay copies over them, it doesn't
+commit), so pulling risks Git either refusing (local changes would be overwritten)
+or, worse, silently reverting them to the public repo's sanitized placeholders if
+upstream `ansible` ever touches those same paths.
+
+If `/tmp/ansible` really is gone, re-clone the public repo fresh (no credential
+needed, it's public: `git clone https://github.com/myah-mitchell/ansible /tmp/ansible`)
+and re-run `./scripts/bootstrap-private.sh <ansible-private-url>` to re-apply the
+overlay before provisioning — **don't paste the private repo's own credentialed
+clone URL/token into this repo**, `docker-stacks` is public; point at
+`ansible`'s own `README.md`/`scripts/bootstrap-private.sh` instead.
 
 Confirm it landed and connected — in Komodo's UI, the `ci01` Server resource (which
 the onboarding key should have created automatically) should show connected/healthy.

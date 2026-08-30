@@ -14,10 +14,15 @@ The buildout spans three repos:
 
 - **`docker-stacks`** (this one) — every container/stack definition.
 - **`ansible`** — OS-level provisioning (Docker, firewall, NTP, users, etc.) for
-  every VM before any stack lands on it.
-- **`proxmox-cloud-init`** — the cloud-init template + vendor script that turns a
-  freshly-cloned Proxmox VM into a fully-provisioned host on first boot, no manual
-  SSH step required.
+  every VM before any stack lands on it. Public repo; its `pve` role also builds and
+  installs the cloud-init template + vendor script that turns a freshly-cloned
+  Proxmox VM into a fully-provisioned host on first boot, no manual SSH step
+  required (the old standalone `proxmox-cloud-init` repo is deprecated, folded in
+  here).
+- **`ansible-private`** — a small private overlay repo (just `hosts.yml` +
+  `group_vars/all/private.yml`) holding the real inventory, keys, and other values
+  `ansible` would rather not publish. See `ansible`'s own `README.md` for how it
+  layers on.
 
 The `km01` VM is the one deliberate exception to "everything is GitOps" — it has to
 be provisioned and started by hand, since Komodo can't GitOps-deploy itself the first

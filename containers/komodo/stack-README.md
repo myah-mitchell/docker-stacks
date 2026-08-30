@@ -14,10 +14,10 @@ accounts = [
 ]
 ```
 
-Same reasoning as the `ansible`/`proxmox-cloud-init` PAT already in use elsewhere in
-this build: fine-grained, read-only, scoped to exactly the repo(s) it needs — if it
-leaks, it only grants read access to something already readable by anyone with repo
-access. Add a `[secrets]` block in the same file for any `[[VAR]]` reference used
+Same reasoning as the `PRIVATE_REPO_TOKEN` the `ansible` repo uses to pull its
+`ansible-private` overlay: fine-grained, read-only, scoped to exactly the repo(s) it
+needs — if it leaks, it only grants read access to something already readable by
+anyone with repo access. Add a `[secrets]` block in the same file for any `[[VAR]]` reference used
 across this repo's `komodo.env` files (`KOMODO_DB_PASSWORD`, `GLOBAL_PUID`, etc.) that
 you want resolved centrally by Komodo rather than set per-stack.
 

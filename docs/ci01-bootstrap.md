@@ -26,11 +26,12 @@ you go. Don't commit real values back into this file.
 
 Before starting, these must already be true:
 
-- `km01` is up and reachable, through step 13 of `docs/komodo-bootstrap.md` at
+- `km01` is up and reachable, through step 14 of `docs/komodo-bootstrap.md` at
   least (its own `docker compose ps` shows all four containers healthy, you've
   created the initial admin account in Komodo's UI at `http://<km-ip>:9120`, its
-  firewall allows inbound 9120 per that doc's step 10, and you've committed its real
-  Core public key into `ansible`'s `komodo_core_public_key`).
+  firewall allows inbound 9120 per that doc's step 10, you've committed its real
+  Core public key into `ansible`'s `komodo_core_public_key`, and you've created its
+  global Variables per that doc's step 14 — step 9 below fails without them).
 - You're ready to generate `ci01` a fresh onboarding key in Komodo's UI right before
   step 5 below — it's single-use and short-lived, so there's nothing to have on hand
   ahead of time, just the ability to open Komodo's UI when you get there.
@@ -104,9 +105,7 @@ Core and `ci01` trust each other by their own PKI keypairs and the onboarding ke
 discarded.
 
 Generate one now, in Komodo's UI on `km01` (`http://<km-ip>:9120`) — Settings →
-Servers, or wherever the current UI puts onboarding keys (**not yet verified against
-a live instance** — confirm the exact screen once `km01` is really up, and update
-this step with the real path).
+Onboarding -> New Onboarding Key.
 
 Then re-run the same provisioning command cloud-init used, scoping it to just the
 `docker` role tag so it doesn't repeat the entire provisioning, passing the
@@ -114,10 +113,7 @@ onboarding key as a one-off override:
 
 ```bash
 cd /tmp/ansible
-ansible-playbook -i hosts.yml -c local provision.yml \
-  -e '{"target":"ubuntu_docker","server_password":"","short_name":"ci01","abbr_name":"<same as original run>","location_abbr":"<same>","domain_name":"<same>"}' \
-  -e '{"komodo_onboarding_key":"<the key you just generated>"}' \
-  --tags docker
+ansible-playbook -i hosts.yml -c local provision.yml -e '{"target":"ubuntu_docker","server_password":"","short_name":"<same as originial run>","abbr_name":"<same>","location_abbr":"<same>","domain_name":"<same>"}' -e '{"komodo_onboarding_key":"<the key you just generated>"}' --tags docker
 ```
 
 `/tmp/ansible` should still be the same checkout cloud-init made in step 3, with the
@@ -140,7 +136,7 @@ the onboarding key should have created automatically) should show connected/heal
 On `ci01` itself:
 
 ```bash
-sudo -u komodo cat /home/komodo/.config/komodo/periphery.config.toml | grep -A1 core_address
+sudo -u komodo grep -A1 'core_address\|connect_as' /home/komodo/.config/komodo/periphery.config.toml
 ```
 
 This is a **permanent** part of onboarding every future host, not a bootstrap-phase
@@ -198,11 +194,6 @@ on `km01`): check **Resources → Servers** and confirm `ci01` shows connected/h
 before continuing. If it doesn't show up at all, re-check step 5's onboarding key
 first — that's the most likely reason.
 
-(**Not yet verified against a live instance**: whether the onboarding key really
-auto-creates the Server resource, or whether current Komodo still expects you to add
-`ci01` manually first and only *then* have Periphery connect as it. Confirm once
-`km01`/`ci01` are both real, and correct this step if it's the latter.)
-
 ## 9. Deploy `stacks/traefik-bootstrap` onto `ci01`
 
 `stacks/semaphore-server` has no direct published port and its Traefik labels are
@@ -213,14 +204,33 @@ just with self-signed TLS and `chain-no-auth@file` instead of a real cert resolv
 and Authentik — see [`docs/traefik-bootstrap.md`](traefik-bootstrap.md) for the full
 explanation and its eventual teardown (once `system-agent` replaces it here, later).
 
-Create the runtime folders for it (its own `mkdir`/`chown` block, generated at
-`stacks/traefik-bootstrap/README.md` once you've run `build.py`, or copy it from
-`docs/traefik-bootstrap.md`), then register it as a Stack resource in Komodo the
-same way as step 11 below — **Run Directory** `stacks/traefik-bootstrap`, **File
-Path** `compose.yaml`, **Environment** `stacks/traefik-bootstrap/komodo.env` with
-`SERVER_NAME`/`SUB_DOMAIN_NAME`/`DOMAIN_NAME` filled in the same way. Deploy it and
-confirm it's healthy before continuing — `docker compose ps` on `ci01`, or Komodo's
-own container view for the resource.
+Create the runtime folders for it:
+
+```bash
+projectName="traefik"
+
+mkdir -p /opt/docker/logs/$projectName
+sudo chmod 750 /opt/docker/logs/$projectName/
+sudo chown $USER:101000 /opt/docker/logs/$projectName
+
+mkdir -p /opt/docker/volumes/$projectName
+sudo chmod 750 /opt/docker/volumes/$projectName/
+sudo chown $USER:101000 /opt/docker/volumes/$projectName
+
+mkdir -p /opt/docker/logs/$projectName/traefik
+sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
+
+mkdir -p /opt/docker/volumes/$projectName/traefik-certs
+mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
+```
+
+Then follow [`docs/traefik-bootstrap.md`](traefik-bootstrap.md)'s "How to deploy it"
+section for the Komodo Stack-resource setup itself — target **Server** `ci01`,
+`SERVER_NAME` `ci01`, same `SUB_DOMAIN_NAME`/`DOMAIN_NAME` as step 11 below. Deploy
+it and confirm `traefik`/`error-pages`/`socket-proxy`/`socket-proxy-rw`/`logrotate`
+all show running/healthy before continuing — `docker compose ps` on `ci01`, or
+Komodo's own container view for the resource.
 
 ## 10. Generate Semaphore's secrets
 

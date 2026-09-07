@@ -252,6 +252,7 @@ in the runbook it actually matters.
 From `stacks/komodo-server/`:
 
 ```bash
+cd /opt/docker/stacks/docker-stacks/stacks/komodo
 docker compose up -d
 docker compose ps
 ```
@@ -260,30 +261,82 @@ All four containers (`komodo`, `ferretdb`, `postgres`, `postgres-backup`) should
 as running/healthy. If `ferretdb` is stuck failing to reach Postgres, re-check the
 password characters from step 7.
 
-## 12. First access
+## 12. First access 
 
-`tf01` doesn't exist yet — Komodo is what will deploy it — so Komodo's UI
-isn't reachable through Traefik. Its container publishes its own port directly for
-exactly this bootstrap reason:
+Every VM eventually gets its own local Traefik (`stacks/system-agent`, or
+`stacks/traefik-bootstrap` as the temporary stand-in before `pk01`/`id01` exist — see
+[`docs/traefik-bootstrap.md`](traefik-bootstrap.md)) — `tf01` is only the *central*
+hub for cross-host visibility, not a prerequisite for any one VM's own local Traefik.
+`km01` isn't behind one yet purely by deliberate choice: that retrofit is deferred
+until `ci01`, `id01`, and `pk01` are all live and the pattern is proven on a
+less-critical host first (see "What's next" below). Until then, Komodo's container
+publishes its own port directly:
 
 ```
 http://<km-ip>:9120
 ```
 
-Open that and create the initial admin account when prompted.
+Open that fillin your prefered admin user and password and then click
+`Sign Up`.
 
 ## 13. Get Core's public key for `ansible`
 
 Every other host's Periphery agent needs to trust this specific Core, via its public
-key (`ansible`'s `komodo_core_public_key`, see `roles/docker/defaults/main.yml`).
-Unlike the old passkey, this value **isn't secret** — commit the real one directly
-once you have it, no `CHANGEME` placeholder needed.
+key (`komodo_core_public_key`). This is real infra data tied to this specific Core
+instance, so it belongs in the **`ansible-private`** repo's
+`group_vars/all/private.yml` (next to `komodo_core_address`) — not in the public
+`ansible` repo's `roles/docker/defaults/main.yml`, which only holds the blank,
+sanitized default.
 
-**Not yet verified against a live instance**: exactly where Komodo's UI/API surfaces
-Core's own public key for copying out. Check Komodo's Settings/Servers screens (or
-`docker exec` into the container and read `/config/keys/core.key`'s public
-counterpart directly) once this stack is actually up, and update this step with the
-real answer.
+Navigate to the **Settings** tab and then at the top of the page will be the Public
+key. Commit the real value directly to `ansible-private`, no `CHANGEME` placeholder
+needed.
+
+## 14. Create Komodo's global Variables
+
+Every stack's `komodo.env` (via `scripts/base-komodo.env`) references a shared set
+of `[[GLOBAL_...]]` values for things like `PUID`/`PGID`/resource limits/health-check
+timings — the idea being you set these **once**, here, and every stack across the
+whole fleet picks them up automatically instead of repeating them per-stack. Nothing
+creates these for you: skip this step and every stack you deploy through Komodo
+fails the same way, with Compose trying to interpolate the literal, unresolved
+string `[[GLOBAL_CPUS_LIMIT]]` (etc.) into a field that expects a number, e.g.:
+
+```
+error while interpolating services..traefik.cpus: failed to cast to expected type: strconv.ParseFloat: parsing "[[GLOBAL_CPUS_LIMIT]]": invalid syntax
+```
+
+In Komodo's UI, go to **Settings → Variables** and create one Variable per row
+below (name exactly as shown, no `[[`/`]]` — Komodo adds those itself when
+interpolating). These are the same values `scripts/base-testing.env` already uses
+for local Compose testing — sane defaults, adjust to taste:
+
+| Variable | Value |
+|---|---|
+| `GLOBAL_PUID` | `1000` |
+| `GLOBAL_PGID` | `1000` |
+| `GLOBAL_TZ` | your real timezone, e.g. `America/Chicago` |
+| `GLOBAL_DOCKER_VOLUMES` | `/opt/docker/volumes` |
+| `GLOBAL_DOCKER_LOGS` | `/opt/docker/logs` |
+| `GLOBAL_PROXY_NETWORK` | `proxy` |
+| `GLOBAL_MEM_LIMIT` | `2G` |
+| `GLOBAL_MEM_SWAP_LIMIT` | `2.5G` |
+| `GLOBAL_MEM_RESERVATION` | `64M` |
+| `GLOBAL_PIDS_LIMIT` | `200` |
+| `GLOBAL_CPUS_LIMIT` | `2` |
+| `GLOBAL_RESTART_GRACE` | `1m` |
+| `GLOBAL_RESTART_MODE` | `unless-stopped` |
+| `GLOBAL_LOG_MAX_SIZE` | `10m` |
+| `GLOBAL_LOG_MAX_FILE` | `3` |
+| `GLOBAL_HEALTH_INTERVAL` | `60s` |
+| `GLOBAL_HEALTH_TIMEOUT` | `10s` |
+| `GLOBAL_HEALTH_RETRIES` | `5` |
+| `GLOBAL_HEALTH_START` | `10s` |
+
+None of these need "Is Secret" checked — they're operational defaults, not
+credentials. If a stack you already tried to deploy failed with the interpolation
+error above, no need to touch its Environment text — just create the Variables here
+and hit **Deploy** again; Komodo re-resolves `[[...]]` references at deploy time.
 
 ## What's next
 

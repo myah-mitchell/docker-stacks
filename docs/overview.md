@@ -43,7 +43,7 @@ step 9 works through it in full for the first real case.
 
 | Order | VM | Role | Doc | Status |
 |---|---|---|---|---|
-| 1 | `km01` | Komodo GitOps engine | [`komodo-bootstrap.md`](komodo-bootstrap.md) | **in progress** — steps 1–13 followed against a real host; not yet confirmed fully healthy end-to-end |
+| 1 | `km01` | Komodo GitOps engine | [`komodo-bootstrap.md`](komodo-bootstrap.md) | **in progress** — steps 1–14 followed against a real host; not yet confirmed fully healthy end-to-end |
 | 2 | `ci01` | Semaphore (ansible runner) first, rest of `core-infra` later | [`ci01-bootstrap.md`](ci01-bootstrap.md) | written, not yet run against a real host |
 | 3 | `tf01` | Traefik hub (central Redis + `traefik-kop`) | not written yet | not started — blocked on `ci01`/Semaphore existing to push its `node_exporter_password` fix; still needs its own one-time Komodo onboarding key regardless (decision #19, permanent per host) |
 | 4 | `id01` | Authentik / identity | not written yet | not started |

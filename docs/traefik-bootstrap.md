@@ -29,20 +29,82 @@ exist. `ci01` is the first case — see `docs/ci01-bootstrap.md`.
 
 ## How to deploy it
 
-Same pattern as any other Komodo-driven stack (see `docs/ci01-bootstrap.md` steps
-8–11 for the full walkthrough of registering a Server and creating a Stack
-resource) — the specifics for this stack:
+The target VM must already exist as a Komodo Server resource (its own bootstrap doc
+covers that) and already have the `proxy` Docker network created on it — every VM
+needs that once regardless of Traefik (see `docs/komodo-bootstrap.md` step 9).
 
-- **Run Directory**: `stacks/traefik-bootstrap`.
-- **File Path**: `compose.yaml`.
-- **Environment**: `stacks/traefik-bootstrap/komodo.env`. Set `SERVER_NAME` /
-  `SUB_DOMAIN_NAME` / `DOMAIN_NAME` the same way every stack needs. `CF_API_EMAIL`,
-  `CF_DNS_API_TOKEN`, `CROWDSEC_LAPI_KEY`, and `AUTHENTIK_HOST` can all stay blank —
-  they're inherited from the base `containers/traefik/` config template but this
-  stack's `compose.yaml` deliberately doesn't reference any of them (no ACME
-  resolver, no CrowdSec plugin wiring, no Authentik forward-auth).
-- Runtime folders: same as any Traefik-based stack — see the generated
-  `stacks/traefik-bootstrap/README.md` for the exact `mkdir`/`chown` block.
+1. Create the runtime folders on the target VM:
+
+   ```bash
+   projectName="traefik"
+
+   mkdir -p /opt/docker/logs/$projectName
+   sudo chmod 750 /opt/docker/logs/$projectName/
+   sudo chown $USER:101000 /opt/docker/logs/$projectName
+
+   mkdir -p /opt/docker/volumes/$projectName
+   sudo chmod 750 /opt/docker/volumes/$projectName/
+   sudo chown $USER:101000 /opt/docker/volumes/$projectName
+
+   mkdir -p /opt/docker/logs/$projectName/traefik
+   sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
+
+   mkdir -p /opt/docker/volumes/$projectName/traefik-certs
+   mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
+   sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
+   ```
+
+2. In Komodo's UI, go to **Resources → Stacks** and create a new one — name it
+   `traefik-bootstrap`. Set its target **Server** to the VM you're deploying onto.
+3. Under **Choose Mode**, choose **Git Repo**:
+   - **Repo**: `myah-mitchell/docker-stacks` — no credential needed, the repo is
+     public.
+   - **Branch**: `main`.
+4. Under **Files**:
+   - **Run Directory**: `stacks/traefik-bootstrap`.
+   - **File Path**: `compose.yaml`, relative to that run directory.
+5. Under **Environment**, there's no "point at a file" option — it's a plain text
+   editor field (`environment`), plus a separate `env_file_path` field that's just
+   where Komodo writes the resolved result on the target VM before running compose
+   (leave it at its default, `.env` — nothing to change there). Open
+   `stacks/traefik-bootstrap/komodo.env` in this repo, copy its full contents, and
+   paste them directly into that editor — Komodo's parser accepts the same
+   `KEY: value` lines this repo's `komodo.env` already uses (as well as `KEY = value`,
+   comments, and quoted values), so it pastes in as-is, no reformatting needed. Then
+   edit the pasted text in place for the handful of keys that need a real value;
+   everything else is fine left exactly as pasted. It has three kinds of values in
+   it — only the first kind needs editing here:
+   - **No default, must set**: `SERVER_NAME` / `SUB_DOMAIN_NAME` / `DOMAIN_NAME` —
+     the same way every stack needs (see the root `README.md`'s naming
+     conventions). `PROJECT_NAME` needs no edit either, even though it drives
+     every hostname/label in the stack — it's already committed as `traefik`
+     directly in `komodo.env`, not left blank like the three above.
+   - **Has a working default, leave as-is**: `TRAEFIK_HOSTNAME` (`traefik` —
+     only change it if you want the dashboard reachable under a different
+     hostname) and `ERROR_PAGES_HOSTNAME`/`SOCKET_PROXY_HOSTNAME`/
+     `LOGROTATE_HOSTNAME` (their container hostnames — no reason to touch these).
+     `TRAEFIK_EXTRA_COMMAND` is also fine left blank; it's a passthrough for
+     extra Traefik CLI flags you don't need for this stack.
+   - **`[[GLOBAL_...]]` references, resolved automatically**: `PUID`/`PGID`/`TZ`/
+     `DOCKER_VOLUMES`/`DOCKER_LOGS`/`PROXY_NETWORK` and the resource-limit/
+     logging/health-check block below them. These pull from Komodo's own global
+     Variables (set once for the whole Komodo instance, shared by every stack) —
+     don't edit them per-stack here. **These must actually exist first** — see
+     `docs/komodo-bootstrap.md` step 14. If you deploy before creating them, Compose
+     fails trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` (etc.)
+     into a numeric field; go create the Variables, then hit Deploy again.
+   - Leave `CF_API_EMAIL`, `CF_DNS_API_TOKEN`, `CROWDSEC_LAPI_KEY`, and
+     `AUTHENTIK_HOST` blank regardless of what their `[[...]]` references resolve
+     to — this stack's `compose.yaml` deliberately doesn't reference any of them
+     (no ACME resolver, no CrowdSec plugin wiring, no Authentik forward-auth), so
+     it doesn't matter whether a real value exists for them elsewhere.
+6. Save the Stack resource, then click **Deploy**. Watch the deploy log — it clones
+   the repo, reads the compose file, and runs the Compose equivalent of
+   `docker compose up -d` on the target VM via Periphery.
+
+Confirm `traefik`, `error-pages`, `socket-proxy`, `socket-proxy-rw`, and
+`logrotate` all show running/healthy — either in Komodo's own container view for
+the resource, or `docker compose ps` on the target VM.
 
 For any *other* stack you want reachable through it (Semaphore, etc.), set that
 stack's `TRAEFIK_AUTH_CHAIN` to `chain-no-auth@file` when you deploy it — see the

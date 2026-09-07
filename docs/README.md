@@ -6,7 +6,7 @@ Read [Conventions](conventions.md) first if you have not. Every runbook here ass
 
 ## The pattern every VM follows
 
-Each VM gets its base OS the same way: cloned from the shared `ubuntu-server` cloud-init template, which self-provisions on first boot by running ansible's `provision.yml` against `target: ubuntu_docker`. That installs Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery with no manual step. Periphery is gated behind `KOMODO: true`, already set for the whole `ubuntu_docker` group.
+Each VM gets its base OS the same way: cloned from the shared `ubuntu-server-2604` cloud-init template, which self-provisions on first boot by running ansible's `provision.yml` against `target: ubuntu_docker`. That installs Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery with no manual step. Periphery is gated behind `KOMODO: true`, already set on the `ubuntu_docker` inventory entry every Docker VM provisions against.
 
 From that shared starting point, a VM's stack gets deployed one of two ways.
 

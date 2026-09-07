@@ -13,7 +13,7 @@ Every stack resolves its identity from four variables, set per deployment in Kom
 | `SUB_DOMAIN_NAME` | The site this VM lives at, with a trailing dot | `home.` |
 | `DOMAIN_NAME` | The real domain | `myah-mitchell.com` |
 
-`myah-mitchell.com` is the literal example domain throughout this repo's documentation. It is safe to commit here: it is the same name as the GitHub account the repo lives under.
+`myah-mitchell.com` is the example domain throughout this repo's documentation, with `home.` or `cloud.` as the sub-domain. That is the house standard rather than a local choice: a domain is not a secret, and writing `example.com` would only make you translate every hostname back before typing it. Real addresses, keys, and tokens stay placeholders.
 
 ### The trailing dot
 
@@ -67,14 +67,25 @@ A handful of services are reached from the internet through a Cloudflare Tunnel 
 | Other application secrets | Random 96-character alphanumeric string |
 | Credentials issued by an external service | Never generated, left blank until you paste the real one in |
 
-`scripts/build.py` fills the first three automatically. Any `komodo.env` key ending in `_PASSWORD` or `_PASS` that is left blank gets a 48-character value; any key ending in `_PASSKEY`, `_SECRET_KEY`, or `_LAPI_KEY` gets a 96-character one. See `DB_PASSWORD_SUFFIXES` and `OTHER_SECRET_SUFFIXES` in that script for the exact rules.
+`scripts/build.py` generates both password rows automatically, from the key's name. You set the username row by hand.
+
+| Key ends in | Generated value |
+| --- | --- |
+| `_PASSWORD`, `_PASS` | 48-character alphanumeric |
+| `_PASSKEY`, `_SECRET_KEY`, `_LAPI_KEY` | 96-character alphanumeric |
+
+A key only gets a generated value if it resolves to blank, so a value already set survives a rebuild. See `DB_PASSWORD_SUFFIXES` and `OTHER_SECRET_SUFFIXES` in that script for the exact lists.
 
 Two categories are excluded on purpose. A credential issued by an external service, such as a Cloudflare API token or a MaxMind license key, would silently look filled in while not working, so it stays blank. A secret with a format restriction, such as `SEMAPHORE_ACCESS_KEY_ENCRYPTION` needing a base64-encoded 32-byte key, stays a documented manual step instead.
 
 ### Alphanumeric only
 
 > [!WARNING]
-> Never hand-type a password containing `@`, `:`, `/`, `#`, `?`, or any other symbol, and do not extend the generator to add them.
+> Keep every password alphanumeric. Never hand-type one containing any of these characters, or any other symbol, and never extend the generator to produce them:
+>
+> ```text
+> @ : / # ?
+> ```
 
 This is not about entropy. A 48-character alphanumeric password is about 286 bits, already past AES-256's 256-bit benchmark, and the 96-character secrets are about 571 bits. Nothing in any threat model gets meaningfully safer past that point.
 
@@ -84,4 +95,4 @@ It is about breakage that has already happened. Those five characters are all sy
 
 A container's `config/` never holds a real secret. It holds `.example` templates and non-sensitive files, and it is always safe to commit.
 
-When a container's real config would contain a credential, such as a tunnel credentials file or an API token baked into a config file, the real file goes in that container's `secrets/` folder instead. That folder is gitignored with a tracked `.gitkeep` so the folder itself exists. See cloudflared, mailrise, or `komodo` for the pattern.
+When a container's real config would contain a credential, such as a tunnel credentials file or an API token baked into a config file, the real file goes in that container's `secrets/` folder instead. That folder is gitignored with a tracked `.gitkeep` so the folder itself exists. See cloudflared, mailrise, or komodo for the pattern.

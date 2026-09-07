@@ -13,7 +13,9 @@ traefik-bootstrap is a real Traefik on the real `proxy` network, serving real ho
 | ACME or step-ca cert resolver | Traefik's own auto-generated self-signed certificate |
 | `chain-authentik@file` | `chain-no-auth@file`, which is rate-limit, secure-headers, and compress with no Authentik dependency |
 
-Its `compose.yaml` overrides the base Traefik service's `command` wholesale rather than diffing it, because Compose `extends` replaces list keys instead of merging them. The only real removals from the base list are the ACME directives.
+Its `compose.yaml` overrides the base Traefik service's `command` wholesale rather than diffing it, because Compose `extends` replaces list keys instead of merging them. The list stays as close to the base as it can. It drops the four ACME resolver directives and the three that ask for a real certificate on the dashboard entrypoint, and it makes one substitution.
+
+That substitution is the TLS options, and it is the part that makes this stack work at all. The base service uses `tls-opts@file`, which sets `sniStrict: true` and rejects any handshake whose SNI has no matching real certificate. This stack has no resolver, so its self-signed default never matches the hostname being asked for, and `sniStrict` would refuse every request. It uses `tls-opts-selfsigned@file` instead: the same options with `sniStrict` off.
 
 Every other stack picks up its auth chain from `${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}`, so deploying a stack behind this one means setting that single variable to `chain-no-auth@file`. Nothing else about that stack changes.
 
@@ -63,16 +65,18 @@ Those three are the ports `containers/traefik/compose.yaml` publishes. Base prov
 
 ### 3. Create the Stack resource
 
-In Komodo's UI, go to *Resources > Stacks* and create a Stack named traefik-bootstrap. Set its target *Server* to the VM you are deploying onto.
+In Komodo's UI, go to *Resources > Stacks* and create a Stack named `traefik-bootstrap`. Set its target *Server* to the VM you are deploying onto.
 
 Under *Choose Mode*, choose **Git Repo**.
 
 | Field | Value |
 | --- | --- |
-| *Repo* | `myah-mitchell/docker-stacks`. No credential needed, the repo is public |
+| *Repo* | `myah-mitchell/docker-stacks` |
 | *Branch* | `main` |
 | *Run Directory* | `stacks/traefik-bootstrap` |
 | *File Path* | `compose.yaml`, relative to the run directory |
+
+The repo is public, so Komodo needs no credential to clone it.
 
 ### 4. Paste the environment
 
@@ -88,21 +92,42 @@ Three keys need a real value:
 | --- | --- |
 | `SERVER_NAME` | The VM's hostname, for example `ci01` |
 | `SUB_DOMAIN_NAME` | This site, with the trailing dot, so `home.` |
-| `DOMAIN_NAME` | The real domain, for example `myah-mitchell.com` |
+| `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
 
 `PROJECT_NAME` drives every hostname and label in the stack, but it is already committed as `traefik` rather than left blank, so it needs no edit.
 
-Leave the four hostname keys alone. `TRAEFIK_HOSTNAME` defaults to `traefik` and only matters if you want the dashboard under a different name. `ERROR_PAGES_HOSTNAME`, `SOCKET_PROXY_HOSTNAME`, and `LOGROTATE_HOSTNAME` are container hostnames with no reason to change.
+Leave the four hostname keys alone. `TRAEFIK_HOSTNAME` defaults to `traefik` and only matters if you want the dashboard under a different name. The other three are container hostnames with no reason to change.
 
-Leave every `[[GLOBAL_...]]` reference as pasted. Komodo resolves them from the instance-wide Variables created in [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook. Deploying before those exist fails with Compose trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` into a numeric field. Create the Variables and click **Deploy** again.
+Leave the `[[GLOBAL_...]]` references as pasted, with the two exceptions below. Komodo resolves them from the instance-wide Variables created in [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook. Deploying before those exist fails with Compose trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` into a numeric field. Create the Variables and click **Deploy** again.
 
-Six keys in the pasted text are unused by this stack's `compose.yaml`: `CF_API_EMAIL`, `CF_DNS_API_TOKEN`, `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST`, `AUTHENTIK_HOST`, and `TRAEFIK_EXTRA_COMMAND`. There is no ACME resolver, no CrowdSec wiring, and no Authentik forward-auth here. Clear them to blank or leave them; either way they go nowhere.
+### Keys to clear
+
+Six keys come across in the paste that this stack has no working use for. Clear each one to blank.
+
+| Keys | Why they do nothing here |
+| --- | --- |
+| `CF_API_EMAIL`, `CF_DNS_API_TOKEN` | They reach the Traefik container, but there is no ACME resolver to use them |
+| `AUTHENTIK_HOST` | Also reaches the container, but nothing here forwards auth to Authentik |
+| `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec lines commented out |
+| `TRAEFIK_EXTRA_COMMAND` | Sits at the end of the command list and expands to nothing unless you set it |
+
+The first three are worth clearing rather than ignoring. This stack overrides the base service's `command` and `labels` but not its `environment`, so all three are still passed into the container.
+
+`AUTHENTIK_HOST` and `CROWDSEC_LAPI_HOST` are the two exceptions to leaving `[[GLOBAL_...]]` alone. They arrive as references that step 14 does not create, so clearing them is what keeps an unresolved `[[...]]` string out of the container's environment.
 
 ### 5. Deploy
 
 Save the Stack resource, then click **Deploy**. Watch the deploy log.
 
-Confirm `traefik`, `error-pages`, `socket-proxy`, `socket-proxy-rw`, and `logrotate` all show running and healthy, either in Komodo's container view or with `docker compose ps` on the target VM.
+Confirm all five services show running and healthy, either in Komodo's container view or with `docker compose ps` on the target VM:
+
+```text
+traefik
+error-pages
+socket-proxy
+socket-proxy-rw
+logrotate
+```
 
 > [!NOTE]
 > Omitting the cert-resolver directives entirely, rather than setting them blank, is expected to make Traefik fall back to its own self-signed certificate. That follows Traefik's documented behaviour, but this stack has not been run against a live Traefik yet. Check it first if the stack does not come up cleanly.

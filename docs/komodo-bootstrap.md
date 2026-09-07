@@ -6,9 +6,29 @@ Follow the steps in order. Each one assumes only the steps before it. Use this d
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
+## Contents
+
+- [Prerequisites](#prerequisites)
+- [Placeholders](#placeholders)
+- [1. Clone the template into a VM](#1-clone-the-template-into-a-vm)
+- [2. Size and network the VM](#2-size-and-network-the-vm)
+- [3. Start the VM](#3-start-the-vm)
+- [4. Verify base provisioning](#4-verify-base-provisioning)
+- [5. Clone this repo onto the VM](#5-clone-this-repo-onto-the-vm)
+- [6. Create the runtime folders](#6-create-the-runtime-folders)
+- [7. Generate and fill in the stack's .env](#7-generate-and-fill-in-the-stacks-env)
+- [8. Create Komodo's own secrets file](#8-create-komodos-own-secrets-file)
+- [9. Create the proxy Docker network](#9-create-the-proxy-docker-network)
+- [10. Open the firewall for Core](#10-open-the-firewall-for-core)
+- [11. Bring the stack up](#11-bring-the-stack-up)
+- [12. Create the admin account](#12-create-the-admin-account)
+- [13. Give ansible Core's address and public key](#13-give-ansible-cores-address-and-public-key)
+- [14. Create Komodo's global Variables](#14-create-komodos-global-variables)
+- [What's next](#whats-next)
+
 ## Prerequisites
 
-- The `ubuntu-server` cloud-init template exists on the target PVE host. The ansible repo's pve role builds it.
+- The `ubuntu-server-2604` cloud-init template exists on the target PVE host. The ansible repo's pve role builds it.
 - That host's cloud-init vendor snippet has been installed at least once, so it carries real identity values rather than blanks. The pve role's cloud-init task installs it.
 - You can reach the PVE web UI and get a shell on the host.
 
@@ -18,7 +38,7 @@ Replace these as you go. Never commit a real value back into this file.
 
 | Placeholder | Value |
 | --- | --- |
-| `<template-vmid>` | VMID of the `ubuntu-server` template. The build script names it `${VERSION/./}001`, so `26.04` becomes `2604001` |
+| `<template-vmid>` | VMID of the cloud-init template. The pve role derives both it and the template's name from the Ubuntu version, so 26.04 gives VMID `2604001` and name `ubuntu-server-2604` |
 | `<km-vmid>` | VMID to give the new VM |
 | `<km-ip>` | Static address for km01 |
 | `<gateway-ip>` | Gateway for that subnet |
@@ -55,7 +75,7 @@ qm start <km-vmid>
 
 Cloud-init provisions the host on first boot with no input from you. It installs Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery.
 
-Watch it finish in *Datacenter > node > km01 > Console*. No account exists to SSH in as until cloud-init creates one, so the console is the only view of the boot.
+In the PVE web UI, expand *Datacenter* to km01 and open its *Console*. Watch cloud-init finish there. No account exists to SSH in as until cloud-init creates one, so the console is the only view of the boot.
 
 ### What the vendor snippet does
 
@@ -141,7 +161,7 @@ python3 scripts/build.py
 
 Any key ending in `_PASSWORD` or `_PASS` that was blank now holds a random 48-character value. Leave `KOMODO_DB_PASSWORD` and `POSTGRES_PASSWORD` exactly as generated.
 
-Now edit the four values that have no default:
+Now edit these five keys:
 
 ```bash
 $EDITOR stacks/komodo-server/.env
@@ -153,14 +173,14 @@ $EDITOR stacks/komodo-server/.env
 | `SUB_DOMAIN_NAME` | This site, with the trailing dot, so `home.`. Komodo is internal only, so it is never blank here |
 | `DOMAIN_NAME` | The real domain, for example `myah-mitchell.com` |
 | `KOMODO_DB_USERNAME` | Any username, for example `komodo-admin` |
-| `KOMODO_TITLE` | Whatever you want Komodo's UI to display as its title |
+| `KOMODO_TITLE` | What Komodo's UI displays as its title. Falls back to `Komodo` if you leave it blank |
 
 Leave `POSTGRES_USER` and the three `POSTGRES_BACKUP_*` keys blank. `POSTGRES_USER` mirrors `KOMODO_DB_USERNAME` automatically, and this stack's `compose.yaml` wires the backup credentials to the same Postgres user and password FerretDB already uses.
 
 Periphery auth needs nothing here. Komodo v2 uses per-host Ed25519 keypairs, not a shared passkey, and Core generates its own on first boot into the `komodo-keys` volume from step 6.
 
 > [!WARNING]
-> If you replace a generated password by hand, keep it alphanumeric. `containers/ferretdb/compose.yaml` substitutes `POSTGRES_PASSWORD` straight into a connection URL with no encoding, so `@`, `:`, `/`, `#`, or `?` breaks the URL and surfaces as a DNS resolution failure against the wrong hostname rather than an auth error. See [Conventions](conventions.md#alphanumeric-only).
+> If you replace a generated password by hand, keep it alphanumeric. `containers/ferretdb/compose.yaml` substitutes `POSTGRES_PASSWORD` straight into a connection URL with no encoding, so a URL-reserved symbol breaks that URL and surfaces as a DNS resolution failure against the wrong hostname rather than an auth error. See [Conventions](conventions.md#alphanumeric-only).
 
 Run the build again so the username you just set propagates into `POSTGRES_USER`:
 
@@ -187,7 +207,7 @@ Leave it as it is. The repo is public, so Komodo needs no `[[git_provider]]` cre
 docker network create proxy
 ```
 
-Every stack's `compose.yaml`, including traefik-server's, declares `proxy` as `external: true`. No stack creates it, so it has to exist on a host before that host's first stack starts, or `docker compose up -d` fails with nothing to attach to.
+Every deployable stack's `compose.yaml` declares `proxy` as `external: true`. No stack creates it, so it has to exist on a host before that host's first stack starts, or `docker compose up -d` fails with nothing to attach to.
 
 This is a one-time step on every VM in the plan, not just km01.
 
@@ -210,7 +230,16 @@ docker compose up -d
 docker compose ps
 ```
 
-All four services (`komodo`, `ferretdb`, `postgres`, `postgres-backup`) should show as running and healthy. If `ferretdb` cannot reach Postgres, re-check the password characters from step 7.
+All four services should show as running and healthy:
+
+```text
+komodo
+ferretdb
+postgres
+postgres-backup
+```
+
+If ferretdb cannot reach Postgres, re-check the password characters from step 7.
 
 ## 12. Create the admin account
 
@@ -236,11 +265,11 @@ komodo_core_public_key: "<the key from Settings>"
 Neither is secret. The public key is a public key, and the address is an internal one, so both get committed for real with no `CHANGEME` placeholder.
 
 > [!IMPORTANT]
-> Do this before provisioning any other VM. Cloud-init runs `provision.yml` on first boot, and a host that boots while `komodo_core_address` is still blank writes an empty `core_address` into its `periphery.config.toml` and never reaches Core.
+> Do this before provisioning any other VM. Cloud-init runs `provision.yml` on first boot. A host that boots while `komodo_core_address` is still blank writes an empty `core_address` into its `periphery.config.toml` and never reaches Core.
 
 ## 14. Create Komodo's global Variables
 
-Every stack's `komodo.env` references a shared set of `[[GLOBAL_...]]` values for `PUID`, `PGID`, resource limits, and health-check timings. You set them once here and every stack across the fleet picks them up.
+Every stack's `komodo.env` references a shared set of `[[GLOBAL_...]]` values for the container user and group, resource limits, and health-check timings. You set them once here and every stack across the fleet picks them up.
 
 Nothing creates them for you. Skip this step and every stack deployed through Komodo fails the same way, with Compose trying to interpolate a literal unresolved string into a numeric field:
 

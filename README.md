@@ -2,7 +2,7 @@
 
 Compose-based container definitions for a self-hosted homelab and colo cluster, deployed through [Komodo](https://github.com/moghtech/komodo) GitOps. Every service in the fleet is defined here; nothing here provisions an operating system.
 
-Read [Conventions](docs/conventions.md) before adding or changing anything. The naming and secrets rules there are assumed by every other page and by `scripts/build.py`.
+Read [Conventions](docs/conventions.md) before adding or changing anything. Every other page assumes its naming rules, and `scripts/build.py` assumes its secrets rules.
 
 ## What this repo is part of
 
@@ -11,7 +11,7 @@ The buildout spans three repos.
 | Repo | Holds | Visibility |
 | --- | --- | --- |
 | docker-stacks (this one) | Every container and stack definition | Public |
-| [ansible](https://github.com/myah-mitchell/ansible) | OS-level provisioning for every VM before a stack lands on it, plus the pve role that builds the cloud-init template | Public |
+| [ansible](https://github.com/myah-mitchell/ansible) | OS-level provisioning for every VM, plus the pve role that builds the cloud-init template | Public |
 | ansible-private | The real inventory and secrets: `hosts.yml` and `group_vars/all/private.yml`, layered over ansible's sanitised placeholders | Private |
 
 The pve role's cloud-init template turns a freshly cloned Proxmox VM into a fully provisioned Docker host on first boot, with no manual SSH step.
@@ -30,11 +30,13 @@ km01 is the one deliberate exception to "everything is GitOps": Komodo cannot Gi
 
 | Path | Contents |
 | --- | --- |
-| `containers/<name>/` | One container definition: `compose.yaml`, `komodo.env`, `testing.env`, `README.md`, `stack-README.md`, and optionally `config/` and `secrets/` |
+| `containers/<name>/` | One container definition: `compose.yaml`, `komodo.env`, `testing.env`, `README.md`, and `stack-README.md`, plus `config/`, `secrets/`, or `rules/` where needed |
 | `stacks/<name>/` | A deployable composition of containers via Compose `extends` and `include`. Only `compose.yaml` is hand-written |
 | `scripts/build.py` | Regenerates every stack's `komodo.env`, `.env`, and `README.md` from the base templates plus each container's fragments |
 | `scripts/project-layout.md` | The full mechanics of `build.py` and the generated-file conventions |
 
-A container's `config/` is always safe to commit and never holds a real credential. Its `secrets/` holds the real ones and is gitignored, with a tracked `.gitkeep` so the folder exists. See cloudflared, mailrise, or `komodo` for the pattern.
+A container's `config/` is always safe to commit and never holds a real credential. Its `secrets/` holds the real ones and is gitignored, with a tracked `.gitkeep` so the folder exists. See cloudflared, mailrise, or komodo for the pattern.
 
-Run `scripts/build.py` after editing any container's `komodo.env`, `stack-README.md`, or `testing.env`, and after adding a container to a stack. Never hand-edit a stack's `komodo.env`, `.env`, or `README.md`: the next run overwrites them.
+Run `scripts/build.py` after adding a container to a stack, or after editing one of a container's own fragments. Those are its `komodo.env`, `stack-README.md`, and `testing.env`.
+
+Never hand-edit a stack's generated `komodo.env`, `.env`, or `README.md`. The next run overwrites them.

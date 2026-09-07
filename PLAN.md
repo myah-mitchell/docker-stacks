@@ -330,7 +330,7 @@ Getting Semaphore up hits its own chicken-and-egg (deploying it *through* Komodo
 whole point of standing Semaphore up) — resolved by fixing `ci01`'s passkey by hand,
 once, the same way `km01`'s needs fixing too, rather than building vault
 infrastructure just to avoid that one manual step. Wrote
-[`docs/ci01-bootstrap.md`](../docs/ci01-bootstrap.md) covering the whole thing for
+[`docs/ci01-bootstrap.md`](docs/ci01-bootstrap.md) covering the whole thing for
 real: provisioning, the manual passkey fix, registering `ci01` as a Komodo Server,
 deploying `stacks/semaphore-server` (including its own not-auto-generatable secrets —
 `SEMAPHORE_COOKIE_HASH`/`_ENCRYPTION`/`_ACCESS_KEY_ENCRYPTION`, base64 32-byte keys,
@@ -347,7 +347,7 @@ own steps 1–11 — its old step 12 (the generic "register a Server, deploy a S
 walkthrough, written in the abstract for a `tf01` that doesn't exist yet) and step 13
 (folding `km01`'s own UI behind Traefik+Authentik, still genuinely future work) were
 replaced with a short closing section pointing forward instead. Added
-[`docs/overview.md`](../docs/overview.md) as the index — running order, one row per
+[`docs/README.md`](docs/README.md) as the index — running order, one row per
 VM, links to each host's doc as it gets written — linked from both
 `docs/komodo-bootstrap.md`'s new closing section and the root `README.md`.
 
@@ -849,7 +849,7 @@ token), not just new ones.
    and healthy end-to-end — confirm that, then point Komodo at this repo.
 2. **Provision `ci01` with just `stacks/semaphore-server`** (not the full
    `core-infra` bundle yet), following the now-written
-   [`docs/ci01-bootstrap.md`](../docs/ci01-bootstrap.md) — priority right after `km01`,
+   [`docs/ci01-bootstrap.md`](docs/ci01-bootstrap.md) — priority right after `km01`,
    specifically to unblock secret distribution: Semaphore becomes the way real values
    (`node_exporter_password`, anything else `ansible` needs that shouldn't be a plain
    committed default) get pushed to every server going forward, instead of
@@ -888,8 +888,8 @@ token), not just new ones.
 now covers only `km01`'s steps (plus steps 10 and 13, opening the firewall for Core
 and getting its public key, added by decision #19); its old, since-removed step 12
 became
-[`docs/ci01-bootstrap.md`](../docs/ci01-bootstrap.md), a real worked example instead
-of an abstract walkthrough; [`docs/overview.md`](../docs/overview.md) indexes every
+[`docs/ci01-bootstrap.md`](docs/ci01-bootstrap.md), a real worked example instead
+of an abstract walkthrough; [`docs/README.md`](docs/README.md) indexes every
 VM's doc and status. `tf01`'s own doc still isn't written — deliberately deferred
 until that VM is actually being provisioned, following `docs/ci01-bootstrap.md`'s
 shape (its closing section spells out what carries over and what doesn't: `tf01` no

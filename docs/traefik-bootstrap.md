@@ -54,16 +54,29 @@ needs that once regardless of Traefik (see `docs/komodo-bootstrap.md` step 9).
    sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
    ```
 
-2. In Komodo's UI, go to **Resources → Stacks** and create a new one — name it
+2. Open the firewall for Traefik's published ports (`80`, `443`, `8443` — see
+   `containers/traefik/compose.yaml`). `ansible`'s base provisioning enables UFW with
+   a default-deny inbound policy and only opens what each host's own role needs
+   (SSH, node_exporter, etc.) — nothing opens these for you, since Traefik isn't part
+   of base provisioning:
+
+   ```bash
+   sudo ufw allow 80/tcp comment 'Traefik HTTP'
+   sudo ufw allow 443/tcp comment 'Traefik HTTPS'
+   sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
+   sudo ufw status
+   ```
+
+3. In Komodo's UI, go to **Resources → Stacks** and create a new one — name it
    `traefik-bootstrap`. Set its target **Server** to the VM you're deploying onto.
-3. Under **Choose Mode**, choose **Git Repo**:
+4. Under **Choose Mode**, choose **Git Repo**:
    - **Repo**: `myah-mitchell/docker-stacks` — no credential needed, the repo is
      public.
    - **Branch**: `main`.
-4. Under **Files**:
+5. Under **Files**:
    - **Run Directory**: `stacks/traefik-bootstrap`.
    - **File Path**: `compose.yaml`, relative to that run directory.
-5. Under **Environment**, there's no "point at a file" option — it's a plain text
+6. Under **Environment**, there's no "point at a file" option — it's a plain text
    editor field (`environment`), plus a separate `env_file_path` field that's just
    where Komodo writes the resolved result on the target VM before running compose
    (leave it at its default, `.env` — nothing to change there). Open
@@ -98,7 +111,7 @@ needs that once regardless of Traefik (see `docs/komodo-bootstrap.md` step 9).
      to — this stack's `compose.yaml` deliberately doesn't reference any of them
      (no ACME resolver, no CrowdSec plugin wiring, no Authentik forward-auth), so
      it doesn't matter whether a real value exists for them elsewhere.
-6. Save the Stack resource, then click **Deploy**. Watch the deploy log — it clones
+7. Save the Stack resource, then click **Deploy**. Watch the deploy log — it clones
    the repo, reads the compose file, and runs the Compose equivalent of
    `docker compose up -d` on the target VM via Periphery.
 

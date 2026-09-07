@@ -87,9 +87,13 @@ services:
       # HTTPS
       - --entrypoints.https.address=:443
       - --entrypoints.https.asdefault=true
-      - --entrypoints.https.http.tls.options=tls-opts@file
+      - --entrypoints.https.http.tls.options=tls-opts-selfsigned@file
       # No certresolver here — same as the base service, already relies on the
-      # default cert store below rather than a per-entrypoint resolver.
+      # default cert store below rather than a per-entrypoint resolver. Uses
+      # tls-opts-selfsigned, not the base service's tls-opts, because sniStrict
+      # (on in tls-opts) rejects any SNI without a matching real cert — this stack
+      # has no resolver, so its default cert never matches, and sniStrict would
+      # reject every real hostname.
         # Trusted IPs (Cloudflare + Local)
       - --entrypoints.https.forwardedheaders.trustedips=
           173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
@@ -155,11 +159,12 @@ services:
       - "traefik.http.routers.traefik.entrypoints=dashboard"
       - "traefik.http.routers.traefik.service=api@internal"
 
-      ## Default (self-signed) cert — domain hints only, no resolver. This is the
-      ## one substantive difference from the base service's labels: that one pins
-      ## defaultGeneratedCert.resolver=letsencrypt, this one omits it entirely.
-      - "traefik.tls.stores.default.defaultGeneratedCert.domain.main=$DOMAIN_NAME"
-      - "traefik.tls.stores.default.defaultGeneratedCert.domain.sans=*.$DOMAIN_NAME,*.$SUB_DOMAIN_NAME$DOMAIN_NAME,*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+      ## No defaultGeneratedCert labels here, unlike the base service. Without a
+      ## resolver, domain.main/domain.sans hints don't make Traefik mint a cert for
+      ## those domains — it still falls back to its generic built-in self-signed
+      ## cert, the hints just made Traefik log a confusing "unable to find
+      ## certificate" error on top of it. Plain fallback, no hints, is what actually
+      ## happens either way.
 
       ## Komodo Labels
       - "komodo.skip"

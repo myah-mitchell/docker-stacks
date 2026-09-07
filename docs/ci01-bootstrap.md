@@ -70,7 +70,7 @@ The last command needs that exact shape. Periphery runs as a `--user` systemd se
 
 ## 5. Give ci01 an onboarding key
 
-This is the one manual step, and it is permanent. Every future host needs its own fresh onboarding key at provision time, the same way every new host needs its own SSH host key accepted. Semaphore does not remove it later.
+This is the one manual step, and it is permanent. Every future host needs its own fresh onboarding key at provision time, the same way every new host needs its own SSH host key accepted.
 
 `ansible`'s `roles/docker/defaults/main.yml` ships `komodo_onboarding_key: ""`, deliberately blank, because a real value is single-use and must never be committed. Periphery needs one to make its first outbound connection to Core. After that, Core and `ci01` trust each other by their own Ed25519 keypairs and the onboarding key is discarded.
 

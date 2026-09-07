@@ -14,8 +14,6 @@ That password is the HTTP basic-auth credential guarding each host's node_export
 
 The real value belongs in `ansible-private`'s `group_vars/all/private.yml`, which is where all real values live. But committing it there only fixes hosts provisioned later. Existing hosts need a re-run, and that is what Semaphore is for.
 
-Komodo's own Core and Periphery trust is not part of this. It uses per-host Ed25519 keypairs, so there is no fleet-wide Komodo secret to push. The onboarding key in step 5 of the `ci01` runbook stays a manual per-host action permanently.
-
 ## Prerequisites
 
 - Semaphore's UI loads and you can log in, through step 13 of [`ci01-bootstrap.md`](ci01-bootstrap.md).
@@ -45,7 +43,7 @@ ansible-playbook -i hosts.yml -c local provision.yml \
 
 Use the same argument-recovery trick from [step 5](ci01-bootstrap.md#recover-the-original-provisioning-arguments) if you do not know the four values for that host.
 
-Do this on `km01` and `ci01` at minimum. This static key is the same necessary-bootstrap-exception as Komodo's own manual first start, and [step 9](#9-superseded-in-phase-7) replaces it later.
+Do this on `km01` and `ci01` at minimum. This static key is the same necessary-bootstrap-exception as Komodo's own manual first start, and [step 9](#9-replace-this-key-once-step-ca-is-live) replaces it later.
 
 ## 2. Create the Project
 
@@ -148,7 +146,7 @@ Paste the full contents of `ansible-private`'s `hosts.yml`, including the group 
 
 ## 6. Create the ansible-private Variable Group
 
-Go to *Variable Groups > New Group* and name it `ansible-private`. Older Semaphore versions label this resource *Environment* in the sidebar. It is the same thing, renamed.
+Go to *Variable Groups > New Group* and name it `ansible-private`.
 
 ### Which of the four fields to use
 
@@ -274,11 +272,11 @@ Then run the Template against them.
 
 Hosts built once `node_exporter_password` is committed to `ansible-private` never hit this. They get the real password on their first cloud-init run, and `config.yml` never exists with the wrong hash to begin with.
 
-## 9. Superseded in Phase 7
+## 9. Replace this key once step-ca is live
 
-Once step-ca's SSH CA is live, replace the static key from step 1 with a dedicated `semaphore` service principal using a short-lived, auto-renewed step-ca certificate.
+Once step-ca's SSH CA is running on `pk01`, replace the static key from step 1 with a dedicated `semaphore` service principal using a short-lived, auto-renewed step-ca certificate.
 
-Do not skip this once that phase lands. A static private key stored in Semaphore that grants passwordless root on every host in the fleet is exactly what step-ca exists to remove.
+Do not skip this. A static private key stored in Semaphore that grants passwordless root on every host in the fleet is exactly what step-ca exists to remove.
 
 ## What's next
 

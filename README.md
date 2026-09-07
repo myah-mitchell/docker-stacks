@@ -14,7 +14,7 @@ The buildout spans three repos.
 | [`ansible`](https://github.com/myah-mitchell/ansible) | OS-level provisioning for every VM before a stack lands on it, plus the `pve` role that builds the cloud-init template | Public |
 | `ansible-private` | The real inventory and secrets: `hosts.yml` and `group_vars/all/private.yml`, layered over `ansible`'s sanitised placeholders | Private |
 
-The cloud-init template `ansible`'s `pve` role builds turns a freshly cloned Proxmox VM into a fully provisioned Docker host on first boot, with no manual SSH step. The old standalone `proxmox-cloud-init` repo is deprecated and folded into that role.
+The cloud-init template `ansible`'s `pve` role builds turns a freshly cloned Proxmox VM into a fully provisioned Docker host on first boot, with no manual SSH step.
 
 ## Where to start
 

@@ -14,7 +14,7 @@ From that shared starting point, a VM's stack gets deployed one of two ways.
 
 Every other VM is registered as a Komodo Server resource and deployed through Komodo's GitOps flow. Provision the base OS, generate that VM's own Komodo onboarding key, then let Komodo do the rest. [`ci01-bootstrap.md`](ci01-bootstrap.md) works the pattern out in full for the first real case, and every doc after it follows the same shape.
 
-The onboarding key is a permanent per-host step, not a bootstrap-phase gap. Under Komodo v2's PKI auth, each host proves itself to Core once with a single-use key, the same way a new SSH host key gets accepted once. Semaphore never removes it.
+The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each host proves itself to Core once with a single-use key, the same way a new SSH host key gets accepted once, and Core and that host trust each other by their own keypairs from then on.
 
 ## Running order
 

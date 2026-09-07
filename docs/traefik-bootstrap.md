@@ -6,8 +6,6 @@
 
 Most stacks in this plan are reachable only through a real Traefik, gated behind `chain-authentik@file` for forward-auth and with TLS issued by step-ca. `pk01` runs step-ca and `id01` runs Authentik, and until both exist neither half works.
 
-The alternative was an SSH tunnel straight to a container IP, bypassing Traefik entirely. That is what the `ci01` runbook originally did to reach Semaphore, and it tests nothing about the routing that will actually be used later.
-
 `traefik-bootstrap` is a real Traefik on the real `proxy` network, serving real hostnames, with two substitutions:
 
 | Real stack | Bootstrap stack |
@@ -107,7 +105,7 @@ Save the Stack resource, then click **Deploy**. Watch the deploy log.
 Confirm `traefik`, `error-pages`, `socket-proxy`, `socket-proxy-rw`, and `logrotate` all show running and healthy, either in Komodo's container view or with `docker compose ps` on the target VM.
 
 > [!NOTE]
-> Omitting the cert-resolver directives entirely, rather than setting them blank, is expected to make Traefik fall back to its own self-signed certificate. That follows Traefik's documented behaviour but has never been run: no Docker daemon existed anywhere this stack was written. Check it first if the stack does not come up cleanly.
+> Omitting the cert-resolver directives entirely, rather than setting them blank, is expected to make Traefik fall back to its own self-signed certificate. That follows Traefik's documented behaviour, but this stack has not been run against a live Traefik yet. Check it first if the stack does not come up cleanly.
 
 ## Putting a stack behind it
 
@@ -117,7 +115,7 @@ Then browse to the stack's normal hostname over HTTPS, for example `https://sema
 
 Your browser will warn about the certificate. That is expected: it is self-signed, not issued by a CA your browser trusts. Accept it and continue.
 
-This is real routing through real Traefik, at the hostname the stack will keep using once the real setup lands.
+The hostname does not change when `system-agent` replaces this stack later. Only the certificate and the auth chain do.
 
 ## Tearing it down
 

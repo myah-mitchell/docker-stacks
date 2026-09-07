@@ -1,12 +1,12 @@
 # traefik-bootstrap
 
-`stacks/traefik-bootstrap` is a temporary, per-VM Traefik for the window before `pk01` and `id01` exist. Deploy it on a VM, use it, and tear it down once that VM's real `system-agent` stack is ready. It is not meant to be long-lived.
+`stacks/traefik-bootstrap` is a temporary, per-VM Traefik for the window before pk01 and id01 exist. Deploy it on a VM, use it, and tear it down once that VM's real system-agent stack is ready. It is not meant to be long-lived.
 
 ## Why it exists
 
-Most stacks in this plan are reachable only through a real Traefik, gated behind `chain-authentik@file` for forward-auth and with TLS issued by step-ca. `pk01` runs step-ca and `id01` runs Authentik, and until both exist neither half works.
+Most stacks in this plan are reachable only through a real Traefik, gated behind `chain-authentik@file` for forward-auth and with TLS issued by step-ca. pk01 runs step-ca and id01 runs Authentik, and until both exist neither half works.
 
-`traefik-bootstrap` is a real Traefik on the real `proxy` network, serving real hostnames, with two substitutions:
+traefik-bootstrap is a real Traefik on the real `proxy` network, serving real hostnames, with two substitutions:
 
 | Real stack | Bootstrap stack |
 | --- | --- |
@@ -19,7 +19,7 @@ Every other stack picks up its auth chain from `${TRAEFIK_AUTH_CHAIN:-chain-auth
 
 ## When to deploy it
 
-On any VM that needs to serve stacks through real Traefik routing before `pk01` and `id01` exist. `ci01` is the first case, in [ci01 bootstrap](ci01-bootstrap.md).
+On any VM that needs to serve stacks through real Traefik routing before pk01 and id01 exist. ci01 is the first case, in [ci01 bootstrap](ci01-bootstrap.md).
 
 ## How to deploy it
 
@@ -63,7 +63,7 @@ Those three are the ports `containers/traefik/compose.yaml` publishes. Base prov
 
 ### 3. Create the Stack resource
 
-In Komodo's UI, go to *Resources > Stacks* and create a Stack named `traefik-bootstrap`. Set its target *Server* to the VM you are deploying onto.
+In Komodo's UI, go to *Resources > Stacks* and create a Stack named traefik-bootstrap. Set its target *Server* to the VM you are deploying onto.
 
 Under *Choose Mode*, choose **Git Repo**.
 
@@ -94,7 +94,7 @@ Three keys need a real value:
 
 Leave the four hostname keys alone. `TRAEFIK_HOSTNAME` defaults to `traefik` and only matters if you want the dashboard under a different name. `ERROR_PAGES_HOSTNAME`, `SOCKET_PROXY_HOSTNAME`, and `LOGROTATE_HOSTNAME` are container hostnames with no reason to change.
 
-Leave every `[[GLOBAL_...]]` reference as pasted. Komodo resolves them from the instance-wide Variables created in [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the `km01` runbook. Deploying before those exist fails with Compose trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` into a numeric field. Create the Variables and click **Deploy** again.
+Leave every `[[GLOBAL_...]]` reference as pasted. Komodo resolves them from the instance-wide Variables created in [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook. Deploying before those exist fails with Compose trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` into a numeric field. Create the Variables and click **Deploy** again.
 
 Six keys in the pasted text are unused by this stack's `compose.yaml`: `CF_API_EMAIL`, `CF_DNS_API_TOKEN`, `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST`, `AUTHENTIK_HOST`, and `TRAEFIK_EXTRA_COMMAND`. There is no ACME resolver, no CrowdSec wiring, and no Authentik forward-auth here. Clear them to blank or leave them; either way they go nowhere.
 
@@ -115,13 +115,13 @@ Then browse to the stack's normal hostname over HTTPS, for example `https://sema
 
 Your browser will warn about the certificate. That is expected: it is self-signed, not issued by a CA your browser trusts. Accept it and continue.
 
-The hostname does not change when `system-agent` replaces this stack later. Only the certificate and the auth chain do.
+The hostname does not change when system-agent replaces this stack later. Only the certificate and the auth chain do.
 
 ## Tearing it down
 
-Do this per VM, once that VM's `system-agent` stack is deployable for real.
+Do this per VM, once that VM's system-agent stack is deployable for real.
 
-Delete the `traefik-bootstrap` Stack resource in Komodo, or `docker compose down` it directly on the VM. Then clear the `TRAEFIK_AUTH_CHAIN` override on every stack that was set to `chain-no-auth@file`, so each falls back to `chain-authentik@file` on its next deploy.
+Delete the traefik-bootstrap Stack resource in Komodo, or `docker compose down` it directly on the VM. Then clear the `TRAEFIK_AUTH_CHAIN` override on every stack that was set to `chain-no-auth@file`, so each falls back to `chain-authentik@file` on its next deploy.
 
 > [!WARNING]
-> Do not run `traefik-bootstrap` and `system-agent` on the same VM at once. Both publish `:80`, `:443`, and `:8443` on the host and will fight over them.
+> Do not run traefik-bootstrap and system-agent on the same VM at once. Both publish `:80`, `:443`, and `:8443` on the host and will fight over them.

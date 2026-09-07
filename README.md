@@ -18,11 +18,11 @@ The pve role's cloud-init template turns a freshly cloned Proxmox VM into a full
 
 ## Where to start
 
-`km01` is the one deliberate exception to "everything is GitOps": Komodo cannot GitOps-deploy itself the first time, so it gets provisioned and started by hand. Every VM after it is provisioned by cloud-init and deployed through Komodo.
+km01 is the one deliberate exception to "everything is GitOps": Komodo cannot GitOps-deploy itself the first time, so it gets provisioned and started by hand. Every VM after it is provisioned by cloud-init and deployed through Komodo.
 
 1. [Conventions](docs/conventions.md) for naming and secrets.
 2. [Bootstrap runbooks](docs/README.md) for the order VMs come up in and the doc for each one.
-3. [km01 bootstrap](docs/komodo-bootstrap.md) to stand up `km01`, the first host.
+3. [km01 bootstrap](docs/komodo-bootstrap.md) to stand up km01, the first host.
 4. [Stacks](docs/stacks.md) for what each stack in this repo actually deploys.
 5. [Project layout](scripts/project-layout.md) if you are editing a container or adding a stack.
 
@@ -35,6 +35,6 @@ The pve role's cloud-init template turns a freshly cloned Proxmox VM into a full
 | `scripts/build.py` | Regenerates every stack's `komodo.env`, `.env`, and `README.md` from the base templates plus each container's fragments |
 | `scripts/project-layout.md` | The full mechanics of `build.py` and the generated-file conventions |
 
-A container's `config/` is always safe to commit and never holds a real credential. Its `secrets/` holds the real ones and is gitignored, with a tracked `.gitkeep` so the folder exists. See `cloudflared`, `mailrise`, or `komodo` for the pattern.
+A container's `config/` is always safe to commit and never holds a real credential. Its `secrets/` holds the real ones and is gitignored, with a tracked `.gitkeep` so the folder exists. See cloudflared, mailrise, or `komodo` for the pattern.
 
 Run `scripts/build.py` after editing any container's `komodo.env`, `stack-README.md`, or `testing.env`, and after adding a container to a stack. Never hand-edit a stack's `komodo.env`, `.env`, or `README.md`: the next run overwrites them.

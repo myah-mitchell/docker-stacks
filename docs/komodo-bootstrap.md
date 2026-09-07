@@ -1,8 +1,8 @@
 # km01 bootstrap runbook
 
-`km01` runs Komodo Core, which GitOps-deploys every other stack in the fleet. It cannot GitOps-deploy itself, so it is the one host built by hand, start to finish.
+km01 runs Komodo Core, which GitOps-deploys every other stack in the fleet. It cannot GitOps-deploy itself, so it is the one host built by hand, start to finish.
 
-Follow the steps in order. Each one assumes only the steps before it. Use this doc again from scratch if `km01` is ever lost: this page, the ansible repo's pve role, and this repo are everything needed to rebuild it.
+Follow the steps in order. Each one assumes only the steps before it. Use this doc again from scratch if km01 is ever lost: this page, the ansible repo's pve role, and this repo are everything needed to rebuild it.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
@@ -20,7 +20,7 @@ Replace these as you go. Never commit a real value back into this file.
 | --- | --- |
 | `<template-vmid>` | VMID of the `ubuntu-server` template. The build script names it `${VERSION/./}001`, so `26.04` becomes `2604001` |
 | `<km-vmid>` | VMID to give the new VM |
-| `<km-ip>` | Static address for `km01` |
+| `<km-ip>` | Static address for km01 |
 | `<gateway-ip>` | Gateway for that subnet |
 
 ## 1. Clone the template into a VM
@@ -39,13 +39,13 @@ Resize down from the template's generic 4 vCPU and 4 GB defaults. Komodo Core, F
 qm set <km-vmid> --cores 2 --memory 4096
 ```
 
-Give it a static address rather than the template's DHCP default. `km01` is long-lived and every other host will eventually point at it:
+Give it a static address rather than the template's DHCP default. km01 is long-lived and every other host will eventually point at it:
 
 ```bash
 qm set <km-vmid> --ipconfig0 ip=<km-ip>/24,gw=<gateway-ip>
 ```
 
-Confirm the template's VLAN tag is the internal-only one. `km01` is not in the DMZ.
+Confirm the template's VLAN tag is the internal-only one. km01 is not in the DMZ.
 
 ## 3. Start the VM
 
@@ -76,7 +76,7 @@ systemctl status ufw
 
 Both should be up and running. Stop here and fix it if not: everything below assumes Docker works.
 
-Periphery is installed on this host too, but `km01` runs Core, so it is not doing anything useful yet. Ignore it for now.
+Periphery is installed on this host too, but km01 runs Core, so it is not doing anything useful yet. Ignore it for now.
 
 ## 5. Clone this repo onto the VM
 
@@ -187,9 +187,9 @@ Leave it as it is. The repo is public, so Komodo needs no `[[git_provider]]` cre
 docker network create proxy
 ```
 
-Every stack's `compose.yaml`, including `traefik-server`'s, declares `proxy` as `external: true`. No stack creates it, so it has to exist on a host before that host's first stack starts, or `docker compose up -d` fails with nothing to attach to.
+Every stack's `compose.yaml`, including traefik-server's, declares `proxy` as `external: true`. No stack creates it, so it has to exist on a host before that host's first stack starts, or `docker compose up -d` fails with nothing to attach to.
 
-This is a one-time step on every VM in the plan, not just `km01`.
+This is a one-time step on every VM in the plan, not just km01.
 
 ## 10. Open the firewall for Core
 
@@ -198,7 +198,7 @@ sudo ufw allow 9120/tcp comment 'Komodo Core'
 sudo ufw status
 ```
 
-Every Periphery agent in the fleet dials out to Core, so `km01` is the only host that needs an inbound allowance. Nothing provisions it: `km01` is a plain `ubuntu_docker` host as far as ansible is concerned, and Core is this hand-built Compose stack rather than anything ansible manages.
+Every Periphery agent in the fleet dials out to Core, so km01 is the only host that needs an inbound allowance. Nothing provisions it: km01 is a plain `ubuntu_docker` host as far as ansible is concerned, and Core is this hand-built Compose stack rather than anything ansible manages.
 
 This also covers reaching `http://<km-ip>:9120` from your own browser in step 12.
 
@@ -218,7 +218,7 @@ Open `http://<km-ip>:9120` in a browser.
 
 Enter a username and password, then click **Sign Up**. This is the first account on the instance, so it becomes the admin.
 
-`km01` is not behind Traefik yet, so this direct port is its real access path rather than a fallback. See [What's next](#whats-next).
+km01 is not behind Traefik yet, so this direct port is its real access path rather than a fallback. See [What's next](#whats-next).
 
 ## 13. Give ansible Core's address and public key
 
@@ -280,12 +280,12 @@ If a stack already failed with the interpolation error above, there is no need t
 
 ## What's next
 
-`km01` is up and alone. Nothing else exists for it to deploy yet, and its UI still sits on the direct `:9120` port.
+km01 is up and alone. Nothing else exists for it to deploy yet, and its UI still sits on the direct `:9120` port.
 
-`ci01` is next, running Semaphore. See [ci01 bootstrap](ci01-bootstrap.md), which is also the template every VM after it follows.
+ci01 is next, running Semaphore. See [ci01 bootstrap](ci01-bootstrap.md), which is also the template every VM after it follows.
 
-Two things about `km01` itself to come back to later:
+Two things about km01 itself to come back to later:
 
-Registering other hosts and deploying stacks to them through Komodo is worked out for real against `ci01`'s first stack in [ci01 bootstrap](ci01-bootstrap.md). That is the reference to follow for every VM after it too.
+Registering other hosts and deploying stacks to them through Komodo is worked out for real against ci01's first stack in [ci01 bootstrap](ci01-bootstrap.md). That is the reference to follow for every VM after it too.
 
-Folding `km01`'s own UI behind Traefik and Authentik needs `ci01`, `id01`, and `pk01` all live first, plus `system-agent` fixed and proven on a less critical host. `km01` gets that retrofit last, not first.
+Folding km01's own UI behind Traefik and Authentik needs ci01, id01, and pk01 all live first, plus system-agent fixed and proven on a less critical host. km01 gets that retrofit last, not first.

@@ -53,10 +53,10 @@ The two-letter prefix in `SERVER_NAME`.
 | `km01.home.myah-mitchell.com` | Komodo, home site, internal only |
 | `pk01.home.myah-mitchell.com` | step-ca, home site, internal only |
 | `bk01.cloud.myah-mitchell.com` | Offsite backup target at the colo site |
-| `ntfy.home.myah-mitchell.com` | A service on `ci01`, resolvable only inside the home site |
+| `ntfy.home.myah-mitchell.com` | A service on ci01, resolvable only inside the home site |
 | `vault.myah-mitchell.com` | Vaultwarden, public, no `SUB_DOMAIN_NAME` at all |
 
-A handful of services are reached from the internet through a Cloudflare Tunnel rather than a site sub-domain. Those use the bare domain, with `SUB_DOMAIN_NAME` empty, and they reach the internet through `cloudflared` plus `traefik-dmz` on `bh01`. Vaultwarden is the only one today.
+A handful of services are reached from the internet through a Cloudflare Tunnel rather than a site sub-domain. Those use the bare domain, with `SUB_DOMAIN_NAME` empty, and they reach the internet through cloudflared plus traefik-dmz on bh01. Vaultwarden is the only one today.
 
 ## Secrets
 
@@ -84,4 +84,4 @@ It is about breakage that has already happened. Those five characters are all sy
 
 A container's `config/` never holds a real secret. It holds `.example` templates and non-sensitive files, and it is always safe to commit.
 
-When a container's real config would contain a credential, such as a tunnel credentials file or an API token baked into a config file, the real file goes in that container's `secrets/` folder instead. That folder is gitignored with a tracked `.gitkeep` so the folder itself exists. See `cloudflared`, `mailrise`, or `komodo` for the pattern.
+When a container's real config would contain a credential, such as a tunnel credentials file or an API token baked into a config file, the real file goes in that container's `secrets/` folder instead. That folder is gitignored with a tracked `.gitkeep` so the folder itself exists. See cloudflared, mailrise, or `komodo` for the pattern.

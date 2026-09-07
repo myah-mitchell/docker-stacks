@@ -2,7 +2,7 @@
 
 Semaphore is running after [ci01 bootstrap](ci01-bootstrap.md), but it is not connected to anything. This doc connects it: a Project, an SSH credential, the ansible repo, a real inventory, the private variables, and a Template that runs against the fleet.
 
-This is the point of building `ci01` before anything else. Until Semaphore can reach the fleet, every shared secret in ansible has to be fixed by hand, host by host, over SSH.
+This is the point of building ci01 before anything else. Until Semaphore can reach the fleet, every shared secret in ansible has to be fixed by hand, host by host, over SSH.
 
 ## The problem this solves
 
@@ -43,7 +43,7 @@ ansible-playbook -i hosts.yml -c local provision.yml \
 
 Use the same argument-recovery trick from [step 5](ci01-bootstrap.md#recover-the-original-provisioning-arguments) if you do not know the four values for that host.
 
-Do this on `km01` and `ci01` at minimum. This static key is the same necessary-bootstrap-exception as Komodo's own manual first start, and [step 9](#9-replace-this-key-once-step-ca-is-live) replaces it later.
+Do this on km01 and ci01 at minimum. This static key is the same necessary-bootstrap-exception as Komodo's own manual first start, and [step 9](#9-replace-this-key-once-step-ca-is-live) replaces it later.
 
 ## 2. Create the Project
 
@@ -85,7 +85,7 @@ The dotfiles repo needs no Repository entry at all. Its own Ansible role clones 
 
 This is the step with real work in it. The `hosts.yml` in both ansible and ansible-private is built for local runs: its `localhosts` group points `ubuntu`, `ubuntu_docker`, and `wsl` at `127.0.0.1`, because every Docker VM so far was provisioned by cloud-init with `-c local`.
 
-Semaphore connects over SSH from `ci01`. Pointed at `ubuntu_docker`, it would run against `127.0.0.1`, which is `ci01` itself, every time. There is no group in the shipped inventory that names a real remote Docker host.
+Semaphore connects over SSH from ci01. Pointed at `ubuntu_docker`, it would run against `127.0.0.1`, which is ci01 itself, every time. There is no group in the shipped inventory that names a real remote Docker host.
 
 So the fleet's real Docker hosts have to be added as new entries. They do not exist yet in any file.
 
@@ -125,7 +125,7 @@ Those uppercase flags are what gate each role in `provision.yml`. They are copie
 
 Do not set `ansible_user` here. Step 3's Key Store entry supplies it.
 
-Add each new VM to this group as you build it. `tf01`, `id01`, `pk01`, and the rest all belong here.
+Add each new VM to this group as you build it. tf01, id01, pk01, and the rest all belong here.
 
 Commit and push ansible-private.
 
@@ -253,7 +253,7 @@ Open the Template's *Survey Variables* tab and add one entry:
 
 Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the `target` prompt the same way step 6 suppresses the other five. It is a separate field because `target` changes per run and the other five never do.
 
-Answer it with a host or group name from the inventory: `ci01` for one host, `docker_host_h` for every Docker VM at once.
+Answer it with a host or group name from the inventory: ci01 for one host, `docker_host_h` for every Docker VM at once.
 
 ## 8. Fix existing hosts before running
 
@@ -274,7 +274,7 @@ Hosts built once `node_exporter_password` is committed to ansible-private never 
 
 ## 9. Replace this key once step-ca is live
 
-Once step-ca's SSH CA is running on `pk01`, replace the static key from step 1 with a dedicated `semaphore` service principal using a short-lived, auto-renewed step-ca certificate.
+Once step-ca's SSH CA is running on pk01, replace the static key from step 1 with a dedicated semaphore service principal using a short-lived, auto-renewed step-ca certificate.
 
 Do not skip this. A static private key stored in Semaphore that grants passwordless root on every host in the fleet is exactly what step-ca exists to remove.
 
@@ -282,4 +282,4 @@ Do not skip this. A static private key stored in Semaphore that grants passwordl
 
 Semaphore can now reach the fleet, and shared secrets stop being a per-host chore.
 
-`tf01` is the next VM. See [Running order](README.md#running-order).
+tf01 is the next VM. See [Running order](README.md#running-order).

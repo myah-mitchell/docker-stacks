@@ -10,28 +10,28 @@ These are the stacks that define what a specific VM is for.
 
 | Stack | Deploys | Host | Status |
 | --- | --- | --- | --- |
-| `komodo-server` | `komodo`, `ferretdb`, `postgres` (DocumentDB), `postgres-backup` | `km01` | Deployed |
-| `semaphore-server` | `semaphore`, `postgres`, `postgres-backup` | `ci01` | In progress |
-| `traefik-server` | `traefik-agent` plus a password-protected `redis` every `traefik-kop` writes to | `tf01` | Not deployed |
-| `authentik-server` | `authentik-server`, `authentik-worker`, `postgres`, `postgres-backup`, `redis`, `geoipupdate`, `socket-proxy` | `id01` | Not deployed |
-| `step-ca-server` | `step-ca` | `pk01` | Not deployed |
-| `traefik-dmz` | `traefik-agent` plus `redis` (replicating from `traefik-server`) and `cloudflared` | `bh01` | Not deployed |
-| `victoriametrics-server` | `victoriametrics-agent` plus `victoriametrics`, `victorialogs`, `victoriatraces`, `vmauth`, `vmalert`, `grafana`, `alertmanager` | `ci01`, later | Not deployed |
+| komodo-server | komodo, ferretdb, postgres (DocumentDB), postgres-backup | km01 | Deployed |
+| semaphore-server | semaphore, postgres, postgres-backup | ci01 | In progress |
+| traefik-server | traefik-agent plus a password-protected redis every traefik-kop writes to | tf01 | Not deployed |
+| authentik-server | authentik-server, authentik-worker, postgres, postgres-backup, redis, geoipupdate, socket-proxy | id01 | Not deployed |
+| step-ca-server | step-ca | pk01 | Not deployed |
+| traefik-dmz | traefik-agent plus redis (replicating from traefik-server) and cloudflared | bh01 | Not deployed |
+| victoriametrics-server | victoriametrics-agent plus victoriametrics, victorialogs, victoriatraces, vmauth, vmalert, grafana, alertmanager | ci01, later | Not deployed |
 
-`traefik-dmz` is the public edge. Only port 443 outbound to the internal Traefik hosts and 6379 outbound to `traefik-server`'s Redis need to leave the DMZ.
+traefik-dmz is the public edge. Only port 443 outbound to the internal Traefik hosts and 6379 outbound to traefik-server's Redis need to leave the DMZ.
 
-The rest of the core-infra bundle (`ntfy`, `mailrise`, `blackbox-exporter`, `uptime-kuma`) exists as containers but has not been assembled into a stack yet. It joins `ci01` alongside `semaphore-server` when it is.
+The rest of the core-infra bundle (ntfy, mailrise, blackbox-exporter, uptime-kuma) exists as containers but has not been assembled into a stack yet. It joins ci01 alongside semaphore-server when it is.
 
 ## One stack per VM
 
 | Stack | Deploys | Status |
 | --- | --- | --- |
-| `system-agent` | `traefik`, `error-pages`, `logrotate`, `traefik-kop`, `vmagent`, `vlagent`, `vector`, `dozzle-agent`, `dockns`, `socket-proxy`, `socket-proxy-rw` | Known unfinished, not deployed anywhere |
-| `traefik-bootstrap` | `traefik`, `error-pages`, `socket-proxy`, `socket-proxy-rw`, `logrotate` | The temporary stand-in for `system-agent` |
+| system-agent | traefik, error-pages, logrotate, traefik-kop, vmagent, vlagent, vector, dozzle-agent, dockns, socket-proxy, socket-proxy-rw | Known unfinished, not deployed anywhere |
+| traefik-bootstrap | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | The temporary stand-in for system-agent |
 
-`system-agent` is the standard per-VM bundle. Every VM's own local Traefik terminates TLS and runs the `chain-authentik@file` auth chain for that VM's services directly, without needing `tf01`. `traefik-kop` publishes a router into `tf01`'s shared Redis only when a service also carries a `kop-public.traefik.*` label, so reaching the internet is a per-service opt-in rather than a per-VM setting.
+system-agent is the standard per-VM bundle. Every VM's own local Traefik terminates TLS and runs the `chain-authentik@file` auth chain for that VM's services directly, without needing tf01. traefik-kop publishes a router into tf01's shared Redis only when a service also carries a `kop-public.traefik.*` label, so reaching the internet is a per-service opt-in rather than a per-VM setting.
 
-It needs live backends for monitoring (`ci01`), the auth chain (`id01`), and internal certs (`pk01`), so there is no point deploying it before those exist. Until then, [Traefik bootstrap](traefik-bootstrap.md) covers the temporary replacement. Do not run both on one VM: they fight over ports 80, 443, and 8443.
+It needs live backends for monitoring (ci01), the auth chain (id01), and internal certs (pk01), so there is no point deploying it before those exist. Until then, [Traefik bootstrap](traefik-bootstrap.md) covers the temporary replacement. Do not run both on one VM: they fight over ports 80, 443, and 8443.
 
 ## Composition layers
 
@@ -39,21 +39,21 @@ These exist so the stacks above can build on each other through Compose `include
 
 | Stack | Deploys | Included by |
 | --- | --- | --- |
-| `traefik-basic` | `traefik`, `error-pages`, `socket-proxy`, `socket-proxy-rw`, `logrotate` | `traefik-monitored` |
-| `traefik-monitored` | `traefik-basic` plus `vmagent`, `vlagent`, `vector` | `traefik-agent` |
-| `traefik-agent` | `traefik-monitored` plus `traefik-kop` | `traefik-server`, `traefik-dmz` |
-| `victoriametrics-agent` | `vlagent`, `vmagent`, `vector`, `cadvisor`, `socket-proxy` | `victoriametrics-server` |
-| `dozzle-agent` | `dozzle-agent`, `socket-proxy` | `dozzle-server` |
+| traefik-basic | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | traefik-monitored |
+| traefik-monitored | traefik-basic plus vmagent, vlagent, vector | traefik-agent |
+| traefik-agent | traefik-monitored plus traefik-kop | traefik-server, traefik-dmz |
+| victoriametrics-agent | vlagent, vmagent, vector, cadvisor, socket-proxy | victoriametrics-server |
+| dozzle-agent | dozzle-agent, socket-proxy | dozzle-server |
 
-The chain runs `traefik-basic` to `traefik-monitored` to `traefik-agent` to `traefik-server` or `traefik-dmz`, each adding one layer. `traefik-bootstrap` is deliberately outside that chain: it is a standalone copy with the ACME directives removed, so bootstrap-phase config cannot leak into the real per-VM Traefik.
+The chain runs traefik-basic to traefik-monitored to traefik-agent to traefik-server or traefik-dmz, each adding one layer. traefik-bootstrap is deliberately outside that chain: it is a standalone copy with the ACME directives removed, so bootstrap-phase config cannot leak into the real per-VM Traefik.
 
-`system-agent` supersedes `traefik-agent`, `victoriametrics-agent`, and `dozzle-agent` for the per-VM role. It bundles the same agents plus `dockns`.
+system-agent supersedes traefik-agent, victoriametrics-agent, and dozzle-agent for the per-VM role. It bundles the same agents plus dockns.
 
 ## No host assigned yet
 
 | Stack | Deploys | Note |
 | --- | --- | --- |
-| `dozzle-server` | `dozzle-agent` plus `dozzle-server` | Connects to every VM's `dozzle-agent` on port 7007. Likely lands on `ci01`, not decided |
+| dozzle-server | dozzle-agent plus dozzle-server | Connects to every VM's dozzle-agent on port 7007. Likely lands on ci01, not decided |
 
 ## Cut from the plan
 
@@ -61,8 +61,8 @@ These stack folders still exist but nothing in the plan deploys them. They are k
 
 | Stack | Why it was cut |
 | --- | --- |
-| `crowdsec-server`, `crowdsec-agent` | Cloudflare handles edge WAF, DDoS, and rate limiting for the one public hostname, and UniFi CyberSecure covers network-level IDS and IPS. Targeted `vmalert` rules against existing VictoriaMetrics data cover the rest without a new always-on service |
-| `technitium-server` | `dockns` drives UniFi's own DNS directly through its `unifi` provider. Running Technitium alongside it gave hosts two upstream resolvers that disagreed |
+| crowdsec-server, crowdsec-agent | Cloudflare handles edge WAF, DDoS, and rate limiting for the one public hostname, and UniFi CyberSecure covers network-level IDS and IPS. Targeted vmalert rules against existing VictoriaMetrics data cover the rest without a new always-on service |
+| technitium-server | dockns drives UniFi's own DNS directly through its `unifi` provider. Running Technitium alongside it gave hosts two upstream resolvers that disagreed |
 
 ## Scaffolding
 

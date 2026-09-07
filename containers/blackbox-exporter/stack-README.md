@@ -12,7 +12,7 @@ Copy `config/blackbox.yml.example` to `config/blackbox.yml` (or edit in place) t
 
 ## vmagent scrape config
 
-blackbox_exporter is a multi-target proxy — vmagent needs a scrape job with `relabel_configs` rewriting the target into a `/probe` query param. Example addition to `vmagent`'s `prometheus.yml`:
+blackbox_exporter is a multi-target proxy, so vmagent needs a scrape job with `relabel_configs` rewriting the target into a `/probe` query param. Example addition to `vmagent`'s `prometheus.yml`:
 
 ```yaml
 - job_name: 'blackbox-http'
@@ -32,4 +32,4 @@ blackbox_exporter is a multi-target proxy — vmagent needs a scrape job with `r
       replacement: blackbox-exporter:9115
 ```
 
-Pair with a `vmalert` rule (`probe_success == 0`) notifying through `ntfy` (Phase 2) — this is the "is it actually up" signal Icinga used to provide.
+Pair with a `vmalert` rule (`probe_success == 0`) notifying through `ntfy` (Phase 2). That is the "is it actually up" signal Icinga used to provide.

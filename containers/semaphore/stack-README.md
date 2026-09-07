@@ -19,11 +19,14 @@ head -c32 /dev/urandom | base64  # SEMAPHORE_COOKIE_ENCRYPTION
 head -c32 /dev/urandom | base64  # SEMAPHORE_ACCESS_KEY_ENCRYPTION
 ```
 
-Set as Komodo variables; keep stable across restarts — rotating any of these invalidates every stored SSH key/vault secret and active session.
+Set these as Komodo Secrets, and keep them stable across restarts. Rotating any of them invalidates every stored SSH key, every stored vault secret, and every active session.
 
-## Post-deploy: register the `ansible` repo
+## Wiring it to the ansible repo after deploy
 
-1. Bootstrap-phase SSH key: Semaphore is provisioned in Phase 2 (docker-stacks Phase 2 / "Home core platform bootstrap") with a static SSH key trusted by the `ansible` service user every host's `users` Ansible role creates — this is the same necessary-bootstrap-exception category as Komodo's manual `docker compose up -d` start (nothing better exists yet at this point in the sequence).
-2. **Superseded in Phase 7**: once step-ca's SSH CA is live, switch Semaphore to a dedicated `semaphore` service principal using a short-lived, auto-renewed step-ca cert instead of the static key — closes the "if that one key ever leaks, it's valid forever" exposure down to hours. Don't skip this step once Phase 7 lands.
-3. In the Semaphore UI: add a **Key Store** entry for that SSH identity, then one **Repository** (`ansible`) using a read-only GitHub **deploy key** (not a personal access token — see plan Risk #1, a deploy key's blast radius is scoped to that one repo). `dotfiles` doesn't need a Repository entry of its own — the `dotfiles` Ansible role clones it directly (plain HTTPS, no credential; `myah-mitchell/dotfiles` is public) as part of its own tasks, not through Semaphore's checkout.
-4. Create a **Project** wrapping the `ansible` repo + its `hosts.yml` inventory, and **Templates** for the common playbook runs (full `provision.yml` re-run, and later the Phase 8 dotfiles-sync task).
+Full walkthrough in [docs/semaphore-setup.md](../../docs/semaphore-setup.md): the Project, the SSH credential, the repo, a real inventory, the private variables, and a Template that runs against the fleet.
+
+Two points worth knowing before you start.
+
+The ansible repo is public, so its Repository entry needs no credential. Set *Access Key* to **None** rather than creating a deploy key. The dotfiles repo needs no Repository entry at all, because its own Ansible role clones it directly over plain HTTPS.
+
+Semaphore reaches every host with a static SSH key trusted by the `ansible` service account. That is the same kind of bootstrap exception as Komodo's own manual first start. Once step-ca's SSH CA is live on pk01, replace it with a dedicated service principal on a short-lived, auto-renewed certificate.

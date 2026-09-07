@@ -25,6 +25,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - [11. Create the Stack resource for semaphore-server](#11-create-the-stack-resource-for-semaphore-server)
 - [12. Verify](#12-verify)
 - [13. First access](#13-first-access)
+- [What still lands on ci01](#what-still-lands-on-ci01)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -306,8 +307,38 @@ Log in with the `SEMAPHORE_ADMIN_USER` and `SEMAPHORE_ADMIN_PASSWORD` you set in
 
 If the page does not load at all, the likeliest causes are step 9 not actually healthy, or `TRAEFIK_AUTH_CHAIN` not overridden in step 11. See [Traefik bootstrap](traefik-bootstrap.md).
 
+## What still lands on ci01
+
+Semaphore is the first stack on ci01, not the only one. The plan puts the rest of core-infra here alongside it, and that is a real dependency for every other VM rather than a nice-to-have.
+
+### victoriametrics-server, ready now
+
+`stacks/victoriametrics-server` is already assembled and deployable. It is the fleet's metrics, logs, and traces backend, and every other VM is already trying to write to it: vmagent, vlagent, and vector run as sidecars in each traefik stack, buffer to their own data folders, and retry.
+
+That is why every runbook after this one tells you to clear three keys. Deploying this stack is what makes them real.
+
+Create them in Komodo when you do, `GLOBAL_VMAUTH_PASS` on *Settings > Secrets* and the other two on *Settings > Variables*:
+
+| Name | Value |
+| --- | --- |
+| `GLOBAL_VMAUTH_USER` | Your choice |
+| `GLOBAL_VMAUTH_PASS` | Your choice, alphanumeric only |
+| `GLOBAL_VMAUTH_HOST` | `vmauth.ci01.home.myah-mitchell.com` |
+
+`GLOBAL_VMAUTH_HOST` is a hostname with no scheme. Each agent builds its own URL around it, so vmagent posts to `/api/v1/write` and vlagent to `/insert/native`, both over HTTPS.
+
+Then go back through every stack that had those three cleared and let them resolve instead. Each one starts shipping on its next deploy.
+
+Size ci01 for this before you deploy it. Step 2 gave the VM two cores and 4 GB for Semaphore alone, and this stack adds twelve more services including Grafana and three VictoriaMetrics databases.
+
+### The four with no stack yet
+
+ntfy, mailrise, blackbox-exporter, and uptime-kuma each have a container directory in this repo and no stack. Assembling them is a repo change rather than a runbook step, and there is nothing to deploy until someone does it.
+
+They are worth knowing about because two of them are referenced elsewhere. mailrise is the plausible SMTP relay behind Authentik's email settings, and ntfy is where vmalert's alerts are meant to land. See [step 4 of id01 bootstrap](id01-bootstrap.md#4-create-the-komodo-secrets-and-variables).
+
 ## What's next
 
 Semaphore is running but not yet connected to anything. Wire it to the ansible repo next, in [Semaphore setup](semaphore-setup.md). That is where the fleet's real shared secrets stop being hand-edited per host.
 
-After that, tf01 is the next VM. See [Running order](README.md#running-order), and [Writing the next host's doc](README.md#writing-the-next-hosts-doc) for which parts of this runbook to copy.
+After that, tf01 is the next VM. See [Running order](README.md#running-order), and [How the host runbooks are shaped](README.md#how-the-host-runbooks-are-shaped) for which parts of this runbook the later ones reuse.

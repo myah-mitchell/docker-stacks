@@ -22,11 +22,17 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | --- | --- | --- | --- | --- |
 | 1 | km01 | Komodo GitOps engine | [km01 bootstrap](komodo-bootstrap.md) | Up and healthy |
 | 2 | ci01 | Semaphore first, rest of core-infra later | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
-| 3 | tf01 | Traefik hub, central Redis and traefik-kop | Not written | Blocked on Semaphore pushing `node_exporter_password` |
-| 4 | id01 | Authentik, identity | Not written | Not started |
-| 5 | pk01 | step-ca, internal PKI | Not written | Not started |
-| 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | Not written | Not started |
-| 7 | ap01 | Vaultwarden and future replacements | Not written | Not started |
+| 3 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
+| 4 | id01 | Authentik, identity | [id01 bootstrap](id01-bootstrap.md) | Written, not yet run |
+| 5 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |
+| 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | [bh01 bootstrap](bh01-bootstrap.md) | Written, not yet run |
+| 7 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
+
+"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those four as needing confirmation on the first real run, and correct the page as you go.
+
+ap01 is the exception in more than status. Vaultwarden has no directory under `containers/`, so there is no stack to point a runbook at. Building the container comes first.
+
+tf01 and bh01 carry one more caveat. Both depend on two directives that are commented out in `containers/traefik/compose.yaml` today, and neither can be enabled from Komodo's UI. See [What has to change in the repo first](tf01-bootstrap.md#what-has-to-change-in-the-repo-first).
 
 Pre-existing hosts (bk01, mx01, vh01, and the PVE hosts themselves) are not covered here. They predate this plan and are not provisioned by these runbooks.
 
@@ -38,21 +44,25 @@ Until then, deploy [Traefik bootstrap](traefik-bootstrap.md) on that VM. It is r
 
 This applies to every VM in the list above, which is why it lives here rather than being repeated in each runbook.
 
-## Writing the next host's doc
+## How the host runbooks are shaped
 
-Write a host's runbook when you actually reach that VM, not ahead of time. A doc written early describes steps that no longer apply by the time anyone follows it.
+[ci01 bootstrap](ci01-bootstrap.md) is the one that works the shared pattern out in full. Its steps 1 to 8 are identical for every VM in the fleet, so the four runbooks after it compress those into a single step that points back here rather than repeating them.
 
-Name it after the host once a VM is just "provision, then deploy via Komodo" (`ci01-bootstrap.md`). Name it after the service only when something is structurally unique about that bootstrap, which so far means `komodo-bootstrap.md` alone.
+That is the rule to keep when writing the next one. Point at ci01 for anything shared, and spend the page on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
 
-Steps 1 to 4 of [ci01 bootstrap](ci01-bootstrap.md) are identical for every VM. Step 5's onboarding key is required for every future host. Step 9's traefik-bootstrap deploy applies until system-agent replaces it fleet-wide. Only the stack-specific steps after that differ.
+Step 5's onboarding key is required for every future host, permanently. Step 9's traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
+
+Name a runbook after the host once a VM is just "provision, then deploy via Komodo" (`ci01-bootstrap.md`). Name it after the service only when something is structurally unique about that bootstrap, which so far means `komodo-bootstrap.md` alone.
+
+A page written before its VM exists is a draft, however carefully it was checked against the repo. Correct it while you follow it, and move its status out of "Written, not yet run" when you are done.
 
 ## The rest of the docs
+
+The per-host runbooks are in [Running order](#running-order) above. These are the pages that are not tied to one VM.
 
 | Page | What it covers |
 | --- | --- |
 | [Conventions](conventions.md) | Naming and secrets rules every other page assumes |
-| [km01 bootstrap](komodo-bootstrap.md) | km01, the one host built by hand |
-| [ci01 bootstrap](ci01-bootstrap.md) | ci01 and Semaphore, the template for every VM after it |
 | [Semaphore setup](semaphore-setup.md) | Wiring Semaphore to the ansible repo and pushing the first real secret |
 | [Traefik bootstrap](traefik-bootstrap.md) | The temporary per-VM Traefik used before pk01 and id01 exist |
 | [Stacks](stacks.md) | What every stack in this repo deploys, independent of bootstrap order |

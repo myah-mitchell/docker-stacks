@@ -16,19 +16,24 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/step-ca-data
-sudo chown 1000:1000 /opt/docker/volumes/$projectName/step-ca-data
-
-mkdir -p /opt/docker/stacks/$projectName/step-ca/secrets
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-data
 ```
+
+The service runs as `user: ${PUID:-1000}`, and Docker here is configured with `userns-remap: default`, so the container's UID 1000 is host UID 101000. Owning this folder as `1000:1000` gives it to your own login account instead, and step-ca cannot then write to `/home/step`.
 
 ## Generate the CA password once
 
+The compose file mounts this password as `./secrets/password`, and that path is relative to `containers/step-ca/` rather than to the stack directory, because Compose resolves a relative bind mount against the file that declares it. So it belongs in this container's own `secrets/` folder, inside whichever checkout of this repo the stack runs from:
+
 ```bash
-head -c32 /dev/urandom | base64 > /opt/docker/stacks/$projectName/step-ca/secrets/password
-chmod 600 /opt/docker/stacks/$projectName/step-ca/secrets/password
+head -c32 /dev/urandom | base64 | sudo tee containers/step-ca/secrets/password > /dev/null
+sudo chmod 600 containers/step-ca/secrets/password
+sudo chown 101000:101000 containers/step-ca/secrets/password
 ```
 
-This password protects both the root and intermediate private keys at rest (step-ca's own encryption, independent of the extra age/GPG layer applied to the extracted root key below). Store a copy of it in Vaultwarden **and** in the same offline/outside-Vaultwarden location as the root key backups. Losing this password after the root key is already offline means losing the ability to ever unlock it again, defeating the whole point of keeping a backup.
+Create it before the first start. Docker creates an empty directory in place of a missing bind-mount file, which makes step-ca fail at startup with nothing obvious to point at.
+
+This password protects both the root and intermediate private keys at rest (step-ca's own encryption, independent of the extra age/GPG layer applied to the extracted root key below). Store a copy of it in Vaultwarden, and a second copy in the same offline location as the root key backups, outside Vaultwarden. Losing this password after the root key is already offline means losing the ability to ever unlock it again, defeating the whole point of keeping a backup.
 
 ## First boot: generate root + intermediate, then verify
 
@@ -57,7 +62,7 @@ This is the one part of Phase 5 that cannot be templated. It is a real runbook, 
    age -p -o root_ca_key.age root_ca_key
    ```
 
-3. Copy `root_ca_key.age` + `root_ca.crt` to **two physically separate durable locations** (e.g. an encrypted USB key in a home safe, plus a second copy off-site, such as a bank box, a trusted person, or anywhere not co-located with the first). Either copy alone is sufficient to recover; no reconstruction ceremony.
+3. Copy `root_ca_key.age` + `root_ca.crt` to two physically separate durable locations (e.g. an encrypted USB key in a home safe, plus a second copy off-site, such as a bank box, a trusted person, or anywhere not co-located with the first). Either copy alone is sufficient to recover; no reconstruction ceremony.
 
 4. Wipe every plaintext/working copy from this machine and from the container:
 
@@ -96,7 +101,7 @@ shred -u root_ca_key intermediate.crt intermediate.key
 
 ## Traefik internal cert resolver (wiring, unverified)
 
-`containers/traefik/compose.yaml` has a commented-out `internalca` certificatesresolvers block pointed at this CA's ACME directory endpoint. The **DNS-01 challenge specifics are not yet confirmed**. step-ca's ACME server can issue without external domain-ownership proof since it's a private CA you already control, but the exact Traefik-side resolver flags (challenge type, whether a dnschallenge provider is even needed for an internal-only zone) need real testing against a running step-ca instance before uncommenting. Don't copy the letsencrypt resolver's DNS-01/Cloudflare config verbatim without checking it actually applies here.
+`containers/traefik/compose.yaml` has a commented-out `internalca` certificatesresolvers block pointed at this CA's ACME directory endpoint. The DNS-01 challenge specifics are not yet confirmed. step-ca's ACME server can issue without external domain-ownership proof since it's a private CA you already control, but the exact Traefik-side resolver flags (challenge type, whether a dnschallenge provider is even needed for an internal-only zone) need real testing against a running step-ca instance before uncommenting. Don't copy the letsencrypt resolver's DNS-01/Cloudflare config verbatim without checking it actually applies here.
 
 ## Root/intermediate trust distribution
 

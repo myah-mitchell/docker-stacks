@@ -1,29 +1,27 @@
-# Komodo bootstrap runbook
+# km01 bootstrap runbook
 
-Komodo GitOps-deploys every other stack in this repo — but it can't GitOps-deploy
-*itself* the first time. This is the one deliberate exception: `km01` gets
-provisioned and its stack started by hand, start to finish, using this runbook.
-Follow it in order; each step assumes only the steps before it. Use it again from
-scratch if `km01` is ever lost — this doc plus `ansible`'s `pve` role (which builds
-the cloud-init template — the old standalone `proxmox-cloud-init` repo is
-deprecated, merged into `ansible` directly) and this repo should be everything
-needed to rebuild it.
+`km01` runs Komodo Core, which GitOps-deploys every other stack in the fleet. It cannot GitOps-deploy itself, so it is the one host built by hand, start to finish.
 
-Everything in `<angle brackets>` is a placeholder — replace with your real values as
-you go. Don't commit real values back into this file.
+Follow the steps in order. Each one assumes only the steps before it. Use this doc again from scratch if `km01` is ever lost: this page, `ansible`'s `pve` role, and this repo are everything needed to rebuild it.
+
+Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
 ## Prerequisites
 
-Before starting, these must already be true:
+- The `ubuntu-server` cloud-init template exists on the target PVE host, built by `ansible`'s `pve` role from `roles/pve/templates/create-cloud-init-template.sh.j2` and installed as `/usr/local/bin/create-cloud-init-template.sh`.
+- `ansible`'s `pve-cloudinit.yml` task has run against that PVE host at least once, so the cloud-init vendor snippet has real `short_name`, `abbr_name`, `location_abbr`, and `domain_name` values baked in.
+- You can reach the PVE web UI and shell.
 
-- The `ubuntu-server` cloud-init template exists on the target PVE host, built by
-  `ansible`'s `pve` role from its own `roles/pve/templates/create-cloud-init-template.sh.j2`
-  (installed as `/usr/local/bin/create-cloud-init-template.sh` on the PVE host).
-- The `ansible` repo's `pve-cloudinit.yml` task has run against that PVE host at
-  least once, so its cloud-init vendor snippet has real
-  `short_name`/`abbr_name`/`location_abbr`/`domain_name` values baked in.
-- You know the template's VMID: `${VERSION/./}001` from the script — e.g. `26.04` →
-  `2604001`.
+## Placeholders
+
+Replace these as you go. Never commit a real value back into this file.
+
+| Placeholder | Value |
+| --- | --- |
+| `<template-vmid>` | VMID of the `ubuntu-server` template. The build script names it `${VERSION/./}001`, so `26.04` becomes `2604001` |
+| `<km-vmid>` | VMID to give the new VM |
+| `<km-ip>` | Static address for `km01` |
+| `<gateway-ip>` | Gateway for that subnet |
 
 ## 1. Clone the template into a VM
 
@@ -35,22 +33,19 @@ qm clone <template-vmid> <km-vmid> --name km01 --full
 
 ## 2. Size and network the VM
 
-Komodo core (Komodo + FerretDB + Postgres + postgres-backup) is light — resize down
-from the template's generic defaults (4 vCPU / 4GB):
+Resize down from the template's generic 4 vCPU and 4 GB defaults. Komodo Core, FerretDB, Postgres, and postgres-backup together are light:
 
 ```bash
 qm set <km-vmid> --cores 2 --memory 4096
 ```
 
-`km01` is long-lived and everything else will eventually point at it, so give it
-a static IP instead of the template's DHCP default:
+Give it a static address rather than the template's DHCP default. `km01` is long-lived and every other host will eventually point at it:
 
 ```bash
 qm set <km-vmid> --ipconfig0 ip=<km-ip>/24,gw=<gateway-ip>
 ```
 
-Confirm the template's VLAN tag is the right one for an internal-only host —
-`km01` is not DMZ.
+Confirm the template's VLAN tag is the internal-only one. `km01` is not in the DMZ.
 
 ## 3. Start the VM
 
@@ -58,19 +53,9 @@ Confirm the template's VLAN tag is the right one for an internal-only host —
 qm start <km-vmid>
 ```
 
-The vendor cloud-init snippet baked into the template fires automatically on first
-boot: it clones the public `ansible` repo (`https://github.com/myah-mitchell/ansible`,
-no credential needed — it's public) to `/tmp/ansible`; if the template was built with
-a real `ansible_private_repo_token`, it also clones the private `ansible-private`
-overlay and copies its `hosts.yml`/`group_vars/all/private.yml` over the public
-repo's sanitized placeholders before running. Either way it then runs
-`provision.yml` locally against `target: ubuntu_docker`, installing Docker,
-firewall, NTP, swap, node_exporter, etc.
+The vendor cloud-init snippet fires automatically on first boot. It clones the public `ansible` repo to `/tmp/ansible`, and if the template was built with a real `ansible_private_repo_token`, also clones the `ansible-private` overlay and copies its `hosts.yml` and `group_vars/all/private.yml` over the public repo's sanitised placeholders. It then runs `provision.yml` locally against `target: ubuntu_docker`, installing Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery.
 
-Watch it finish through the PVE console (**Datacenter → node → `km01` → Console** in
-the web UI) — there's no user account to SSH in as yet, so `ssh`+`tail -f` won't
-work until cloud-init finishes creating one. The console shows the same
-`/var/log/cloud-init-output.log` output live as it boots.
+Watch it finish in *Datacenter > node > km01 > Console*. There is no user account to SSH in as until cloud-init creates one, so the console is the only way to see `/var/log/cloud-init-output.log` as it boots.
 
 ## 4. Verify base provisioning
 
@@ -81,22 +66,19 @@ docker version
 systemctl status ufw
 ```
 
-Both should show up and running. If not, stop here and fix it before continuing —
-everything below assumes Docker is already working.
+Both should be up and running. Stop here and fix it if not: everything below assumes Docker works.
+
+Periphery is installed on this host too, but `km01` runs Core, so it is not doing anything useful yet. Ignore it for now.
 
 ## 5. Clone this repo onto the VM
 
-`docker-stacks` is public, so no credential is needed for this clone:
+`docker-stacks` is public, so no credential is needed:
 
 ```bash
 sudo mkdir -p /opt/docker/stacks
 sudo chown $USER /opt/docker/stacks
 git clone https://github.com/myah-mitchell/docker-stacks /opt/docker/stacks/docker-stacks
-cd /opt/docker/stacks/docker-stacks/stacks/komodo-server
 ```
-
-Stay in `stacks/komodo-server/` for the rest of this runbook unless a step says
-otherwise.
 
 ## 6. Create the runtime folders
 
@@ -112,12 +94,11 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 mkdir -p /opt/docker/volumes/$projectName/ferretdb-data
-mkdir -p /opt/docker/volumes/$projectName/postgres-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/ferretdb-*
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 
+mkdir -p /opt/docker/volumes/$projectName/postgres-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-*
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 
 mkdir -p /opt/docker/volumes/$projectName/komodo-backups
 mkdir -p /opt/docker/volumes/$projectName/komodo-sync
@@ -126,196 +107,146 @@ mkdir -p /opt/docker/volumes/$projectName/komodo-keys
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-*
 ```
 
-`komodo-keys` matters more than the others: Komodo's Core auto-generates its own PKI
-keypair on first boot and writes it there. If that volume is ever lost, every
-Periphery agent in the fleet loses trust with Core and has to be re-onboarded — treat
-it with the same care as the Postgres/FerretDB data directories, not like the
-disposable `komodo-cache`.
+Periphery does not create host bind-mount directories, and neither does Compose, so these have to exist with the right ownership before the first deploy.
 
-## 7. Generate and fill in the stack's `.env`
+This list mirrors `stacks/komodo-server/README.md`, which `scripts/build.py` regenerates from the container fragments. If the two ever disagree, that file is correct and this one is stale.
 
-`stacks/komodo-server/.env` doesn't exist yet — it's generated by `scripts/build.py`
-(the same script that generates `komodo.env`/`README.md` in every stack). From the
-repo root:
+### Why 100000 and 101000
+
+`ansible` sets `"userns-remap": "default"` in `/etc/docker/daemon.json`, so container UIDs are offset by 100000 on the host. Container UID 0 becomes host UID 100000, and container UID 1000 becomes 101000.
+
+A directory written by a container running as root takes `100000`. One written by a container running as its own `PUID` takes `101000`. Run `cat /etc/subuid` on the host if the offset ever looks wrong.
+
+> [!IMPORTANT]
+> `komodo-keys` holds the Ed25519 keypair Core generates on first boot. Losing that volume breaks trust with every Periphery agent in the fleet, and each one has to be re-onboarded by hand. Treat it like the Postgres and FerretDB data directories, not like the disposable `komodo-cache`.
+
+## 7. Generate and fill in the stack's .env
+
+`stacks/komodo-server/.env` does not exist yet. `scripts/build.py` generates it, along with every other stack's, and it is gitignored so it never reaches the repo.
+
+From the repo root:
 
 ```bash
 cd /opt/docker/stacks/docker-stacks
 python3 scripts/build.py
 ```
 
-This creates `.env` for every stack, including `komodo-server`. Any key ending in
-`_PASSWORD`/`_PASS` that's still blank (`KOMODO_DB_PASSWORD`, `POSTGRES_PASSWORD`)
-gets a random alphanumeric value automatically — leave those as generated.
+Any key ending in `_PASSWORD` or `_PASS` that was blank now holds a random 48-character value. Leave `KOMODO_DB_PASSWORD` and `POSTGRES_PASSWORD` exactly as generated.
 
-Now edit `stacks/komodo-server/.env` by hand for the fields that have no default:
+Now edit the four values that have no default:
 
 ```bash
-cd stacks/komodo-server
-$EDITOR .env
+$EDITOR stacks/komodo-server/.env
 ```
 
-Set:
+| Key | Value |
+| --- | --- |
+| `SERVER_NAME` | `km01` |
+| `SUB_DOMAIN_NAME` | This site, with the trailing dot, so `home.`. Komodo is internal only, so it is never blank here |
+| `DOMAIN_NAME` | The real domain, for example `myah-mitchell.com` |
+| `KOMODO_DB_USERNAME` | Any username, for example `komodo-admin` |
+| `KOMODO_TITLE` | Whatever you want Komodo's UI to display as its title |
 
-- `SERVER_NAME` — `km01` (this host, not a leftover default from another stack)
-- `SUB_DOMAIN_NAME` — this site, **with a trailing dot** — `home.` (Komodo is
-  internal-only, so this is never blank here; see the root `README.md`'s naming
-  conventions for the full site/role table and why an empty value is safe for
-  services that don't use a sub-domain)
-- `DOMAIN_NAME` — the real domain, e.g. `myah-mitchell.com`
-- `KOMODO_DB_USERNAME` — any username you want (e.g. `komodo-admin`)
-- `KOMODO_TITLE` — whatever you want Komodo's UI to display as its title
+Leave `POSTGRES_USER` and the three `POSTGRES_BACKUP_*` keys blank. `POSTGRES_USER` mirrors `KOMODO_DB_USERNAME` automatically, and this stack's `compose.yaml` wires the backup credentials to the same Postgres user and password FerretDB already uses.
 
-Nothing to set for Periphery auth here — Komodo v2 uses PKI (Ed25519 keypairs), not a
-shared passkey. Core generates its own keypair automatically on first boot (see step
-6's `komodo-keys` note); there's no equivalent `.env` field to fill in.
+Periphery auth needs nothing here. Komodo v2 uses per-host Ed25519 keypairs, not a shared passkey, and Core generates its own on first boot into the `komodo-keys` volume from step 6.
 
-Leave `POSTGRES_USER` and `POSTGRES_BACKUP_DB`/`POSTGRES_BACKUP_USER`/
-`POSTGRES_BACKUP_PASSWORD` blank — don't set these by hand:
+> [!WARNING]
+> If you replace a generated password by hand, keep it alphanumeric. `containers/ferretdb/compose.yaml` substitutes `POSTGRES_PASSWORD` straight into a connection URL with no encoding, so `@`, `:`, `/`, `#`, or `?` breaks the URL and surfaces as a DNS resolution failure against the wrong hostname rather than an auth error. See [Conventions](conventions.md#alphanumeric-only).
 
-- `POSTGRES_USER` mirrors `KOMODO_DB_USERNAME` automatically (`komodo.env` defines it
-  as a reference to that key) — the next `build.py` run in this step fills it in to
-  match.
-- The `POSTGRES_BACKUP_*` three are meant to stay blank in `.env`; this stack's
-  `compose.yaml` wires them at the Compose level to the same
-  `POSTGRES_USER`/`POSTGRES_PASSWORD` FerretDB's own Postgres already uses.
-
-**If you type any password by hand instead of using the auto-generated one, keep it
-alphanumeric — no `@`, `:`, `/`, `#`, or `?`.** `containers/ferretdb/compose.yaml`
-builds a Postgres connection URL by directly substituting `POSTGRES_PASSWORD` into
-it, with no URL-encoding. A symbol in the password breaks that URL's parsing and
-fails as a confusing DNS-resolution error against the wrong host, not as an obvious
-auth error. See the root `README.md`'s secrets conventions for why this is a
-deliberate repo-wide rule, not just a FerretDB quirk.
-
-Rerun `build.py` once more so the `KOMODO_DB_USERNAME` → `POSTGRES_USER` value you
-just set actually propagates:
+Run the build again so the username you just set propagates into `POSTGRES_USER`:
 
 ```bash
-cd /opt/docker/stacks/docker-stacks && python3 scripts/build.py
+python3 scripts/build.py
 ```
 
 ## 8. Create Komodo's own secrets file
 
-`containers/komodo/compose.yaml` mounts `secrets/core.config.toml` into the Komodo
-container. That file doesn't exist yet — if you skip this step, Docker will silently
-create an empty *directory* at that path instead of failing, and Komodo will error on
-startup. Create it now from the committed template:
+`containers/komodo/compose.yaml` mounts `secrets/core.config.toml` into the container. Docker silently creates an empty directory at that path if the file is missing, and Komodo then fails at startup.
+
+Create it from the committed template:
 
 ```bash
 cd /opt/docker/stacks/docker-stacks/containers/komodo
 cp config/core.config.toml.example secrets/core.config.toml
 ```
 
-Leave it as-is for now — `docker-stacks` is public, so Komodo doesn't need a
-`[[git_provider]]` credential to clone it. Only come back and add one (see the
-commented-out example already in the file) if you later point Komodo at a private
-repo.
+Leave it as it is. `docker-stacks` is public, so Komodo needs no `[[git_provider]]` credential to clone it. Add one, using the commented-out example already in the file, only if you later point Komodo at a private repo.
 
-## 9. Create the `proxy` Docker network
-
-Every stack's `compose.yaml` — including `traefik-server`'s own — declares `proxy` as
-`external: true`. No stack owns or creates it, so it must already exist on a host
-before the first stack ever starts there, or `docker compose up -d` fails with no
-network to attach to. This is a one-time step per host, not just for Komodo — every
-other VM in this plan (`tf01`, `ci01`, `id01`, `pk01`, `bh01`, `ap01`) needs it too
-before its first stack starts.
-
-Check `PROXY_NETWORK` in the `.env` from step 7 (`proxy` unless you changed it), then:
+## 9. Create the proxy Docker network
 
 ```bash
 docker network create proxy
 ```
 
-## 10. Open the firewall for Core
+Every stack's `compose.yaml`, including `traefik-server`'s, declares `proxy` as `external: true`. No stack creates it, so it has to exist on a host before that host's first stack starts, or `docker compose up -d` fails with nothing to attach to.
 
-Every Periphery agent in the fleet dials **out** to Core (outbound mode, see decision
-#19 in `PLAN.md`) — the reverse of the old model, where Core dialed out to each
-Periphery and each Periphery's own host needed the inbound UFW rule instead. That
-means it's now `km01` itself that needs an inbound allowance, for port 9120, not
-every other VM. Nothing provisions this automatically: `km01` is a plain
-`ubuntu_docker` host as far as `ansible` is concerned (`KOMODO: true` there only
-installs the Periphery *agent*, port 8120, no longer even inbound — see
-`roles/docker/tasks/komodo.yml`), and Core itself is this hand-bootstrapped compose
-stack, not anything `ansible` manages:
+This is a one-time step on every VM in the plan, not just `km01`.
+
+## 10. Open the firewall for Core
 
 ```bash
 sudo ufw allow 9120/tcp comment 'Komodo Core'
 sudo ufw status
 ```
 
-This also covers your own browser reaching `http://<km-ip>:9120` directly in step 12
-below — that direct access was never firewalled for either, this is the first point
-in the runbook it actually matters.
+Every Periphery agent in the fleet dials out to Core, so `km01` is the only host that needs an inbound allowance. Nothing provisions it: `km01` is a plain `ubuntu_docker` host as far as `ansible` is concerned, and Core is this hand-built Compose stack rather than anything `ansible` manages.
+
+This also covers reaching `http://<km-ip>:9120` from your own browser in step 12.
 
 ## 11. Bring the stack up
 
-From `stacks/komodo-server/`:
-
 ```bash
-cd /opt/docker/stacks/docker-stacks/stacks/komodo
+cd /opt/docker/stacks/docker-stacks/stacks/komodo-server
 docker compose up -d
 docker compose ps
 ```
 
-All four containers (`komodo`, `ferretdb`, `postgres`, `postgres-backup`) should show
-as running/healthy. If `ferretdb` is stuck failing to reach Postgres, re-check the
-password characters from step 7.
+All four services (`komodo`, `ferretdb`, `postgres`, `postgres-backup`) should show as running and healthy. If `ferretdb` cannot reach Postgres, re-check the password characters from step 7.
 
-## 12. First access 
+## 12. Create the admin account
 
-Every VM eventually gets its own local Traefik (`stacks/system-agent`, or
-`stacks/traefik-bootstrap` as the temporary stand-in before `pk01`/`id01` exist — see
-[`docs/traefik-bootstrap.md`](traefik-bootstrap.md)) — `tf01` is only the *central*
-hub for cross-host visibility, not a prerequisite for any one VM's own local Traefik.
-`km01` isn't behind one yet purely by deliberate choice: that retrofit is deferred
-until `ci01`, `id01`, and `pk01` are all live and the pattern is proven on a
-less-critical host first (see "What's next" below). Until then, Komodo's container
-publishes its own port directly:
+Open `http://<km-ip>:9120` in a browser.
 
+Enter a username and password, then click **Sign Up**. This is the first account on the instance, so it becomes the admin.
+
+`km01` is not behind Traefik yet, so this direct port is its real access path rather than a fallback. See [What's next](#whats-next).
+
+## 13. Give ansible Core's address and public key
+
+Every other host's Periphery agent needs to know where Core is and which Core to trust. Both values live in `ansible-private`'s `group_vars/all/private.yml`, not in the public `ansible` repo, whose `roles/docker/defaults/main.yml` only holds blank defaults.
+
+In Komodo's UI, go to *Settings*. Core's public key is at the top of the page.
+
+Set both keys in `ansible-private`, then commit and push:
+
+```yaml
+komodo_core_address: "http://<km-ip>:9120"
+komodo_core_public_key: "<the key from Settings>"
 ```
-http://<km-ip>:9120
-```
 
-Open that fillin your prefered admin user and password and then click
-`Sign Up`.
+Neither is secret. The public key is a public key, and the address is an internal one, so both get committed for real with no `CHANGEME` placeholder.
 
-## 13. Get Core's public key for `ansible`
-
-Every other host's Periphery agent needs to trust this specific Core, via its public
-key (`komodo_core_public_key`). This is real infra data tied to this specific Core
-instance, so it belongs in the **`ansible-private`** repo's
-`group_vars/all/private.yml` (next to `komodo_core_address`) — not in the public
-`ansible` repo's `roles/docker/defaults/main.yml`, which only holds the blank,
-sanitized default.
-
-Navigate to the **Settings** tab and then at the top of the page will be the Public
-key. Commit the real value directly to `ansible-private`, no `CHANGEME` placeholder
-needed.
+> [!IMPORTANT]
+> Do this before provisioning any other VM. Cloud-init runs `provision.yml` on first boot, and a host that boots while `komodo_core_address` is still blank writes an empty `core_address` into its `periphery.config.toml` and never reaches Core.
 
 ## 14. Create Komodo's global Variables
 
-Every stack's `komodo.env` (via `scripts/base-komodo.env`) references a shared set
-of `[[GLOBAL_...]]` values for things like `PUID`/`PGID`/resource limits/health-check
-timings — the idea being you set these **once**, here, and every stack across the
-whole fleet picks them up automatically instead of repeating them per-stack. Nothing
-creates these for you: skip this step and every stack you deploy through Komodo
-fails the same way, with Compose trying to interpolate the literal, unresolved
-string `[[GLOBAL_CPUS_LIMIT]]` (etc.) into a field that expects a number, e.g.:
+Every stack's `komodo.env` references a shared set of `[[GLOBAL_...]]` values for `PUID`, `PGID`, resource limits, and health-check timings. You set them once here and every stack across the fleet picks them up.
 
-```
+Nothing creates them for you. Skip this step and every stack deployed through Komodo fails the same way, with Compose trying to interpolate a literal unresolved string into a numeric field:
+
+```text
 error while interpolating services..traefik.cpus: failed to cast to expected type: strconv.ParseFloat: parsing "[[GLOBAL_CPUS_LIMIT]]": invalid syntax
 ```
 
-In Komodo's UI, go to **Settings → Variables** and create one Variable per row
-below (name exactly as shown, no `[[`/`]]` — Komodo adds those itself when
-interpolating). These are the same values `scripts/base-testing.env` already uses
-for local Compose testing — sane defaults, adjust to taste:
+In Komodo's UI, go to *Settings > Variables* and create one Variable per row. Name each one exactly as shown, with no `[[` or `]]`: Komodo adds those itself when it interpolates.
 
 | Variable | Value |
-|---|---|
+| --- | --- |
 | `GLOBAL_PUID` | `1000` |
 | `GLOBAL_PGID` | `1000` |
-| `GLOBAL_TZ` | your real timezone, e.g. `America/Chicago` |
+| `GLOBAL_TZ` | Your real timezone, for example `America/Chicago` |
 | `GLOBAL_DOCKER_VOLUMES` | `/opt/docker/volumes` |
 | `GLOBAL_DOCKER_LOGS` | `/opt/docker/logs` |
 | `GLOBAL_PROXY_NETWORK` | `proxy` |
@@ -333,30 +264,20 @@ for local Compose testing — sane defaults, adjust to taste:
 | `GLOBAL_HEALTH_RETRIES` | `5` |
 | `GLOBAL_HEALTH_START` | `10s` |
 
-None of these need "Is Secret" checked — they're operational defaults, not
-credentials. If a stack you already tried to deploy failed with the interpolation
-error above, no need to touch its Environment text — just create the Variables here
-and hit **Deploy** again; Komodo re-resolves `[[...]]` references at deploy time.
+These are the same values `scripts/base-testing.env` uses for local Compose testing. Adjust to taste.
+
+Leave **Is Secret** unticked on all of them. They are operational defaults, not credentials.
+
+If a stack already failed with the interpolation error above, there is no need to touch its Environment text. Create the Variables and click **Deploy** again: Komodo re-resolves `[[...]]` references at deploy time.
 
 ## What's next
 
-`km01` is up, but still alone — no other VM exists yet, so there's nothing for it to
-GitOps-deploy, and its own UI still sits on the direct `:9120` port rather than
-behind Traefik+Authentik. The rest of the fleet gets bootstrapped one host at a time
-from here, starting with `ci01` (Semaphore) — see
-[`docs/overview.md`](overview.md) for the running order and links to each host's own
-bootstrap doc as they get written.
+`km01` is up and alone. Nothing else exists for it to deploy yet, and its UI still sits on the direct `:9120` port.
 
-Two things about `km01` itself to come back to later, not now:
+`ci01` is next, running Semaphore. See [`ci01-bootstrap.md`](ci01-bootstrap.md), which is also the template every VM after it follows.
 
-- **Registering other hosts and deploying stacks to them through Komodo** — the
-  general "add a Server resource, add a Stack resource, deploy" pattern isn't
-  described here in the abstract. It's worked out for real, against `ci01`'s first
-  stack, in [`docs/ci01-bootstrap.md`](ci01-bootstrap.md) — that's the reference to
-  follow for every VM after it too.
-- **Folding `km01`'s own UI behind Traefik + Authentik.** Needs `ci01`
-  (monitoring), `id01` (the auth chain), and `pk01` (internal certs) all live first,
-  plus `stacks/system-agent` — every VM's own local Traefik — fixed and proven on a
-  less-critical host before it's retrofitted onto `km01` last. Until then, the direct
-  `:9120` port is `km01`'s real, current access path, not just a documented
-  fallback.
+Two things about `km01` itself to come back to later:
+
+Registering other hosts and deploying stacks to them through Komodo is worked out for real against `ci01`'s first stack in [`ci01-bootstrap.md`](ci01-bootstrap.md). That is the reference to follow for every VM after it too.
+
+Folding `km01`'s own UI behind Traefik and Authentik needs `ci01`, `id01`, and `pk01` all live first, plus `system-agent` fixed and proven on a less critical host. `km01` gets that retrofit last, not first.

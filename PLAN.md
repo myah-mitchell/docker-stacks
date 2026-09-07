@@ -449,8 +449,8 @@ Role abbreviations: `km` Komodo · `tf` Traefik hub · `ci` core-infra · `id` A
 
 ### Planned VM placement
 
-Bootstrap docs live in `docs/` — see `docs/overview.md` for the index and running
-order. This table is the status summary; that doc is the authoritative running order.
+Bootstrap docs live in `docs/` (see `docs/README.md` for the index and running
+order). This table is the status summary; that doc is the authoritative running order.
 
 | Hostname | Purpose | Doc | Status |
 |---|---|---|---|
@@ -751,7 +751,7 @@ order. This table is the status summary; that doc is the authoritative running o
 | Internal PKI | `containers/step-ca/`, `stacks/step-ca-server/` | root-key custody runbook + sandbox recovery test fully documented in `stack-README.md` |
 | CI | `.github/workflows/lint.yml` | yamllint + `scripts/build.py` regen + `docker compose config` + drift check |
 | Dependency bumps | `renovate.json` | `config:recommended` + custom regex manager for future `_VERSION` keys + major-version dashboard gate |
-| Docs | root `README.md` (Start Here — plan/layout/naming/secrets conventions), `docs/overview.md` (bootstrap-doc index + running order), `docs/stacks-overview.md` (per-stack "what does each compose file do", the old root README), `docs/komodo-bootstrap.md` (`km01`'s manual-bootstrap runbook, steps 1–13 only now), `docs/ci01-bootstrap.md` (`ci01`/Semaphore — the template every VM after it follows), `docs/traefik-bootstrap.md` (the temporary per-VM bootstrap Traefik, decision #18) | `docs/build-guide/00-overview.md` (an earlier, narrower companion doc) was deleted in the domain-scrub session — had real domain names baked in |
+| Docs | root `README.md` (start here: repo layout and reading path), `docs/README.md` (bootstrap-doc index and running order, renamed from `docs/overview.md`), `docs/conventions.md` (naming and secrets rules, split out of the root README), `docs/stacks.md` (per-stack "what does each compose file do", renamed from `docs/stacks-overview.md`), `docs/komodo-bootstrap.md` (`km01`'s manual-bootstrap runbook), `docs/ci01-bootstrap.md` (`ci01`/Semaphore, the template every VM after it follows), `docs/semaphore-setup.md` (wiring Semaphore to the `ansible` repo, split out of the `ci01` runbook), `docs/traefik-bootstrap.md` (the temporary per-VM bootstrap Traefik, decision #18) | all six rewritten to the house markdown standard; `docs/build-guide/00-overview.md` (an earlier, narrower companion doc) was deleted in the domain-scrub session, since it had real domain names baked in |
 | Bootstrap Traefik | `stacks/traefik-bootstrap/` (new), `TRAEFIK_AUTH_CHAIN` variable added to 10 containers' `compose.yaml`/`komodo.env` | decision #18 — self-signed TLS + `chain-no-auth@file`, real Traefik routing before `pk01`/`id01` exist, replaces the SSH-tunnel workaround `docs/ci01-bootstrap.md` briefly used |
 | Dotfiles sync | `ansible/roles/dotfiles/` (defaults/tasks/main.yml/tasks/sync.yml), wired into `ansible/provision.yml` | targets `client_account`, not the `ansible` service account; runs `install.sh --no-windows` remotely |
 | cargo-binstall | `dotfiles/install.sh`, `dotfiles/CLAUDE.md` | `cargo_install()` tries `cargo binstall <crate>@<version>` via `CARGO_INSTALL_ROOT` before falling back to `cargo install` |

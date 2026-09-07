@@ -58,8 +58,6 @@ The two-letter prefix in `SERVER_NAME`.
 
 A handful of services are reached from the internet through a Cloudflare Tunnel rather than a site sub-domain. Those use the bare domain, with `SUB_DOMAIN_NAME` empty, and they reach the internet through `cloudflared` plus `traefik-dmz` on `bh01`. Vaultwarden is the only one today.
 
-Some pre-existing hosts still use an older dashed pattern (`h1-bk01`, `h1-mx01`, `h1-vh01`, `d1-vh01`). Those are stale and deliberately left alone: renaming a live host is real-infrastructure work, out of scope for this repo.
-
 ## Secrets
 
 | Kind of value | Rule |

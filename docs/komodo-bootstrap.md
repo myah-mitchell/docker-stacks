@@ -2,15 +2,15 @@
 
 `km01` runs Komodo Core, which GitOps-deploys every other stack in the fleet. It cannot GitOps-deploy itself, so it is the one host built by hand, start to finish.
 
-Follow the steps in order. Each one assumes only the steps before it. Use this doc again from scratch if `km01` is ever lost: this page, `ansible`'s `pve` role, and this repo are everything needed to rebuild it.
+Follow the steps in order. Each one assumes only the steps before it. Use this doc again from scratch if `km01` is ever lost: this page, the ansible repo's pve role, and this repo are everything needed to rebuild it.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
 ## Prerequisites
 
-- The `ubuntu-server` cloud-init template exists on the target PVE host, built by `ansible`'s `pve` role from `roles/pve/templates/create-cloud-init-template.sh.j2` and installed as `/usr/local/bin/create-cloud-init-template.sh`.
-- `ansible`'s `pve-cloudinit.yml` task has run against that PVE host at least once, so the cloud-init vendor snippet has real `short_name`, `abbr_name`, `location_abbr`, and `domain_name` values baked in.
-- You can reach the PVE web UI and shell.
+- The `ubuntu-server` cloud-init template exists on the target PVE host. The ansible repo's pve role builds it.
+- That host's cloud-init vendor snippet has been installed at least once, so it carries real identity values rather than blanks. The pve role's cloud-init task installs it.
+- You can reach the PVE web UI and get a shell on the host.
 
 ## Placeholders
 
@@ -53,9 +53,17 @@ Confirm the template's VLAN tag is the internal-only one. `km01` is not in the D
 qm start <km-vmid>
 ```
 
-The vendor cloud-init snippet fires automatically on first boot. It clones the public `ansible` repo to `/tmp/ansible`, and if the template was built with a real `ansible_private_repo_token`, also clones the `ansible-private` overlay and copies its `hosts.yml` and `group_vars/all/private.yml` over the public repo's sanitised placeholders. It then runs `provision.yml` locally against `target: ubuntu_docker`, installing Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery.
+Cloud-init provisions the host on first boot with no input from you. It installs Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery.
 
-Watch it finish in *Datacenter > node > km01 > Console*. There is no user account to SSH in as until cloud-init creates one, so the console is the only way to see `/var/log/cloud-init-output.log` as it boots.
+Watch it finish in *Datacenter > node > km01 > Console*. No account exists to SSH in as until cloud-init creates one, so the console is the only view of the boot.
+
+### What the vendor snippet does
+
+Skip this unless something goes wrong.
+
+The snippet clones the public ansible repo to `/tmp/ansible`. If the template was built with a real private-repo token, it also clones the ansible-private overlay and copies its `hosts.yml` and `group_vars/all/private.yml` over the public repo's placeholders. It then runs `provision.yml` locally against `target: ubuntu_docker`.
+
+Without that token the host still comes up provisioned, but with placeholder identity and secret values rather than the real ones.
 
 ## 4. Verify base provisioning
 
@@ -72,7 +80,7 @@ Periphery is installed on this host too, but `km01` runs Core, so it is not doin
 
 ## 5. Clone this repo onto the VM
 
-`docker-stacks` is public, so no credential is needed:
+The docker-stacks repo is public, so no credential is needed:
 
 ```bash
 sudo mkdir -p /opt/docker/stacks
@@ -109,11 +117,11 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-*
 
 Periphery does not create host bind-mount directories, and neither does Compose, so these have to exist with the right ownership before the first deploy.
 
-This list mirrors `stacks/komodo-server/README.md`, which `scripts/build.py` regenerates from the container fragments. If the two ever disagree, that file is correct and this one is stale.
+This list mirrors the [generated README for komodo-server](../stacks/komodo-server/README.md), which `scripts/build.py` rebuilds from the container fragments. If the two ever disagree, that file is correct and this one is stale.
 
 ### Why 100000 and 101000
 
-`ansible` sets `"userns-remap": "default"` in `/etc/docker/daemon.json`, so container UIDs are offset by 100000 on the host. Container UID 0 becomes host UID 100000, and container UID 1000 becomes 101000.
+Base provisioning sets `"userns-remap": "default"` in `/etc/docker/daemon.json`, so container UIDs are offset by 100000 on the host. Container UID 0 becomes host UID 100000, and container UID 1000 becomes 101000.
 
 A directory written by a container running as root takes `100000`. One written by a container running as its own `PUID` takes `101000`. Run `cat /etc/subuid` on the host if the offset ever looks wrong.
 
@@ -171,7 +179,7 @@ cd /opt/docker/stacks/docker-stacks/containers/komodo
 cp config/core.config.toml.example secrets/core.config.toml
 ```
 
-Leave it as it is. `docker-stacks` is public, so Komodo needs no `[[git_provider]]` credential to clone it. Add one, using the commented-out example already in the file, only if you later point Komodo at a private repo.
+Leave it as it is. The repo is public, so Komodo needs no `[[git_provider]]` credential to clone it. Add one, using the commented-out example already in the file, only if you later point Komodo at a private repo.
 
 ## 9. Create the proxy Docker network
 
@@ -190,7 +198,7 @@ sudo ufw allow 9120/tcp comment 'Komodo Core'
 sudo ufw status
 ```
 
-Every Periphery agent in the fleet dials out to Core, so `km01` is the only host that needs an inbound allowance. Nothing provisions it: `km01` is a plain `ubuntu_docker` host as far as `ansible` is concerned, and Core is this hand-built Compose stack rather than anything `ansible` manages.
+Every Periphery agent in the fleet dials out to Core, so `km01` is the only host that needs an inbound allowance. Nothing provisions it: `km01` is a plain `ubuntu_docker` host as far as ansible is concerned, and Core is this hand-built Compose stack rather than anything ansible manages.
 
 This also covers reaching `http://<km-ip>:9120` from your own browser in step 12.
 
@@ -214,11 +222,11 @@ Enter a username and password, then click **Sign Up**. This is the first account
 
 ## 13. Give ansible Core's address and public key
 
-Every other host's Periphery agent needs to know where Core is and which Core to trust. Both values live in `ansible-private`'s `group_vars/all/private.yml`, not in the public `ansible` repo, whose `roles/docker/defaults/main.yml` only holds blank defaults.
+Every other host's Periphery agent needs to know where Core is and which Core to trust. Both values live in ansible-private's `group_vars/all/private.yml`, not in the public ansible repo, whose `roles/docker/defaults/main.yml` only holds blank defaults.
 
 In Komodo's UI, go to *Settings*. Core's public key is at the top of the page.
 
-Set both keys in `ansible-private`, then commit and push:
+Set both keys in ansible-private, then commit and push:
 
 ```yaml
 komodo_core_address: "http://<km-ip>:9120"
@@ -274,10 +282,10 @@ If a stack already failed with the interpolation error above, there is no need t
 
 `km01` is up and alone. Nothing else exists for it to deploy yet, and its UI still sits on the direct `:9120` port.
 
-`ci01` is next, running Semaphore. See [`ci01-bootstrap.md`](ci01-bootstrap.md), which is also the template every VM after it follows.
+`ci01` is next, running Semaphore. See [ci01 bootstrap](ci01-bootstrap.md), which is also the template every VM after it follows.
 
 Two things about `km01` itself to come back to later:
 
-Registering other hosts and deploying stacks to them through Komodo is worked out for real against `ci01`'s first stack in [`ci01-bootstrap.md`](ci01-bootstrap.md). That is the reference to follow for every VM after it too.
+Registering other hosts and deploying stacks to them through Komodo is worked out for real against `ci01`'s first stack in [ci01 bootstrap](ci01-bootstrap.md). That is the reference to follow for every VM after it too.
 
 Folding `km01`'s own UI behind Traefik and Authentik needs `ci01`, `id01`, and `pk01` all live first, plus `system-agent` fixed and proven on a less critical host. `km01` gets that retrofit last, not first.

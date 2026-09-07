@@ -2,16 +2,16 @@
 
 `ci01` is the first VM deployed by Komodo rather than built by hand. It is the first real use of the pattern every host after it follows, so read it as a template even when the host you are building is not `ci01`.
 
-Its first stack is `stacks/semaphore-server`. Semaphore goes first on purpose: once it is up and wired to the `ansible` repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
+Its first stack is `stacks/semaphore-server`. Semaphore goes first on purpose: once it is up and wired to the ansible repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
 
-This runbook ends when Semaphore's UI loads. Wiring Semaphore to `ansible` is a separate job, in [`semaphore-setup.md`](semaphore-setup.md).
+This runbook ends when Semaphore's UI loads. Wiring Semaphore to ansible is a separate job, in [Semaphore setup](semaphore-setup.md).
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
 ## Prerequisites
 
-- `km01` is finished, through step 14 of [`komodo-bootstrap.md`](komodo-bootstrap.md). Its four containers are healthy, its admin account exists, its firewall allows inbound 9120, and its global `[[GLOBAL_...]]` Variables are created. Step 11 below fails without those Variables.
-- `ansible-private`'s `group_vars/all/private.yml` holds `km01`'s real `komodo_core_address` and `komodo_core_public_key`, committed and pushed. That is step 13 of the `km01` runbook. `ci01` reads them at first boot.
+- `km01` is finished, through step 14 of [km01 bootstrap](komodo-bootstrap.md). Its four containers are healthy, its admin account exists, its firewall allows inbound 9120, and its global `[[GLOBAL_...]]` Variables are created. Step 11 below fails without those Variables.
+- The real Komodo Core address and public key are committed and pushed in ansible-private's `group_vars/all/private.yml`. That is step 13 of the `km01` runbook, and `ci01` reads both at first boot.
 - The `ubuntu-server` cloud-init template exists on the target PVE host, the same one `km01` was cloned from.
 - You can open Komodo's UI when you reach step 5. The onboarding key is single-use and short-lived, so there is nothing to prepare ahead of time.
 
@@ -50,7 +50,7 @@ Confirm the template's VLAN tag is the internal-only one. `ci01` is not in the D
 qm start <ci-vmid>
 ```
 
-The vendor cloud-init snippet fires automatically on first boot and runs `provision.yml` locally against `target: ubuntu_docker`. Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery all install with no manual step. See step 3 of [`komodo-bootstrap.md`](komodo-bootstrap.md) for what the snippet does in detail.
+Cloud-init provisions the host on first boot the same way `km01` was, installing Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery with no manual step. See [what the vendor snippet does](komodo-bootstrap.md#what-the-vendor-snippet-does) if you need the internals.
 
 Watch it finish in *Datacenter > node > ci01 > Console*. There is no account to SSH in as until cloud-init creates one.
 
@@ -66,13 +66,13 @@ sudo -u komodo XDG_RUNTIME_DIR=/run/user/$(id -u komodo) systemctl --user status
 
 All three should be up and running.
 
-The last command needs that exact shape. Periphery runs as a `--user` systemd service under a dedicated `komodo` OS account, created by `ansible`'s `roles/docker/tasks/komodo.yml`, so a plain `systemctl status periphery` from your own login finds nothing.
+The last command needs that exact shape. Periphery runs as a `--user` systemd service under a dedicated `komodo` OS account, created by ansible's `roles/docker/tasks/komodo.yml`, so a plain `systemctl status periphery` from your own login finds nothing.
 
 ## 5. Give ci01 an onboarding key
 
 This is the one manual step, and it is permanent. Every future host needs its own fresh onboarding key at provision time, the same way every new host needs its own SSH host key accepted.
 
-`ansible`'s `roles/docker/defaults/main.yml` ships `komodo_onboarding_key: ""`, deliberately blank, because a real value is single-use and must never be committed. Periphery needs one to make its first outbound connection to Core. After that, Core and `ci01` trust each other by their own Ed25519 keypairs and the onboarding key is discarded.
+The ansible repo ships `komodo_onboarding_key` blank in the docker role's defaults, because a real value is single-use and must never be committed. Periphery needs one to make its first outbound connection to Core. After that, Core and `ci01` trust each other by their own Ed25519 keypairs and the onboarding key is discarded.
 
 Generate one in Komodo's UI on `km01`, at `http://<km-ip>:9120`, under *Settings > Onboarding > New Onboarding Key*.
 
@@ -110,7 +110,7 @@ git clone https://github.com/myah-mitchell/ansible /tmp/ansible
 cd /tmp/ansible && ./scripts/bootstrap-private.sh <ansible-private-url>
 ```
 
-Get that URL from `ansible`'s own `README.md`. Never paste a credentialed clone URL into `docker-stacks`, which is public.
+Get that URL from the [ansible repo's README](https://github.com/myah-mitchell/ansible). Never paste a credentialed clone URL into docker-stacks, which is public.
 
 ### Confirm it connected
 
@@ -145,9 +145,9 @@ sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-Unlike `km01`, you do not clone `docker-stacks` onto `ci01` yourself. Periphery clones it into `/opt/docker/repos/` once you point a Stack resource at it in step 11. The folders above still have to exist with the right ownership before that first deploy, because neither Periphery nor Compose creates host bind-mount directories.
+Unlike `km01`, you do not clone docker-stacks onto `ci01` yourself. Periphery clones it into `/opt/docker/repos/` once you point a Stack resource at it in step 11. The folders above still have to exist with the right ownership before that first deploy, because neither Periphery nor Compose creates host bind-mount directories.
 
-This list mirrors `stacks/semaphore-server/README.md`, which `scripts/build.py` regenerates. That file wins if the two disagree.
+This list mirrors the [generated README for semaphore-server](../stacks/semaphore-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
 
 ## 7. Create the proxy Docker network
 
@@ -167,7 +167,7 @@ In Komodo's UI on `km01`, check *Resources > Servers* and confirm `ci01` shows c
 
 `stacks/semaphore-server` publishes no port directly, and its Traefik labels are gated behind `chain-authentik@file`. Neither Traefik nor Authentik exists anywhere in the plan yet, so without this step there is no way to reach Semaphore's UI once it deploys.
 
-`stacks/traefik-bootstrap` is a real Traefik with self-signed TLS and `chain-no-auth@file` in place of a cert resolver and Authentik. See [`traefik-bootstrap.md`](traefik-bootstrap.md) for what it does and when it gets torn down.
+`stacks/traefik-bootstrap` is a real Traefik with self-signed TLS and `chain-no-auth@file` in place of a cert resolver and Authentik. See [Traefik bootstrap](traefik-bootstrap.md) for what it does and when it gets torn down.
 
 Create its runtime folders first:
 
@@ -211,7 +211,7 @@ They go into Komodo Secrets in step 11, not into any file in this repo.
 
 ## 11. Create the Stack resource for semaphore-server
 
-In Komodo's UI, go to *Resources > Stacks* and create a new Stack named `semaphore-server`. Set its target *Server* to the `ci01` resource from step 8.
+In Komodo's UI, go to *Resources > Stacks* and create a new Stack named `semaphore-server`. Set its target *Server* to **ci01**, the resource from step 8.
 
 ### Point it at the repo
 
@@ -281,10 +281,10 @@ Your browser will warn about the certificate. That is expected: it is self-signe
 
 Log in with the `SEMAPHORE_ADMIN_USER` and `SEMAPHORE_ADMIN_PASSWORD` you set in step 11.
 
-If the page does not load at all, the likeliest causes are step 9 not actually healthy, or `TRAEFIK_AUTH_CHAIN` not overridden in step 11. See [`traefik-bootstrap.md`](traefik-bootstrap.md).
+If the page does not load at all, the likeliest causes are step 9 not actually healthy, or `TRAEFIK_AUTH_CHAIN` not overridden in step 11. See [Traefik bootstrap](traefik-bootstrap.md).
 
 ## What's next
 
-Semaphore is running but not yet connected to anything. Wire it to the `ansible` repo next, in [`semaphore-setup.md`](semaphore-setup.md). That is where the fleet's real shared secrets stop being hand-edited per host.
+Semaphore is running but not yet connected to anything. Wire it to the ansible repo next, in [Semaphore setup](semaphore-setup.md). That is where the fleet's real shared secrets stop being hand-edited per host.
 
 After that, `tf01` is the next VM. See [Running order](README.md#running-order), and [Writing the next host's doc](README.md#writing-the-next-hosts-doc) for which parts of this runbook to copy.

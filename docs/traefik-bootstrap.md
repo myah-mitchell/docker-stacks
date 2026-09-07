@@ -19,7 +19,7 @@ Every other stack picks up its auth chain from `${TRAEFIK_AUTH_CHAIN:-chain-auth
 
 ## When to deploy it
 
-On any VM that needs to serve stacks through real Traefik routing before `pk01` and `id01` exist. `ci01` is the first case, in [`ci01-bootstrap.md`](ci01-bootstrap.md).
+On any VM that needs to serve stacks through real Traefik routing before `pk01` and `id01` exist. `ci01` is the first case, in [ci01 bootstrap](ci01-bootstrap.md).
 
 ## How to deploy it
 
@@ -59,7 +59,7 @@ sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 sudo ufw status
 ```
 
-Those three are the ports `containers/traefik/compose.yaml` publishes. `ansible`'s base provisioning enables UFW with a default-deny inbound policy and opens only what each host's own roles need. Traefik is not part of base provisioning, so nothing opens these for you.
+Those three are the ports `containers/traefik/compose.yaml` publishes. Base provisioning enables UFW with a default-deny inbound policy and opens only what each host's own roles need. Traefik is not part of base provisioning, so nothing opens these for you.
 
 ### 3. Create the Stack resource
 

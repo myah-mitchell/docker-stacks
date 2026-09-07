@@ -10,11 +10,11 @@ The buildout spans three repos.
 
 | Repo | Holds | Visibility |
 | --- | --- | --- |
-| `docker-stacks` (this one) | Every container and stack definition | Public |
-| [`ansible`](https://github.com/myah-mitchell/ansible) | OS-level provisioning for every VM before a stack lands on it, plus the `pve` role that builds the cloud-init template | Public |
-| `ansible-private` | The real inventory and secrets: `hosts.yml` and `group_vars/all/private.yml`, layered over `ansible`'s sanitised placeholders | Private |
+| docker-stacks (this one) | Every container and stack definition | Public |
+| [ansible](https://github.com/myah-mitchell/ansible) | OS-level provisioning for every VM before a stack lands on it, plus the pve role that builds the cloud-init template | Public |
+| ansible-private | The real inventory and secrets: `hosts.yml` and `group_vars/all/private.yml`, layered over ansible's sanitised placeholders | Private |
 
-The cloud-init template `ansible`'s `pve` role builds turns a freshly cloned Proxmox VM into a fully provisioned Docker host on first boot, with no manual SSH step.
+The pve role's cloud-init template turns a freshly cloned Proxmox VM into a fully provisioned Docker host on first boot, with no manual SSH step.
 
 ## Where to start
 
@@ -22,9 +22,9 @@ The cloud-init template `ansible`'s `pve` role builds turns a freshly cloned Pro
 
 1. [Conventions](docs/conventions.md) for naming and secrets.
 2. [Bootstrap runbooks](docs/README.md) for the order VMs come up in and the doc for each one.
-3. [`komodo-bootstrap.md`](docs/komodo-bootstrap.md) to stand up `km01`, the first host.
+3. [km01 bootstrap](docs/komodo-bootstrap.md) to stand up `km01`, the first host.
 4. [Stacks](docs/stacks.md) for what each stack in this repo actually deploys.
-5. [`scripts/project-layout.md`](scripts/project-layout.md) if you are editing a container or adding a stack.
+5. [Project layout](scripts/project-layout.md) if you are editing a container or adding a stack.
 
 ## Repo layout
 

@@ -1,28 +1,28 @@
 # Wiring Semaphore to the ansible repo
 
-Semaphore is running after [`ci01-bootstrap.md`](ci01-bootstrap.md), but it is not connected to anything. This doc connects it: a Project, an SSH credential, the `ansible` repo, a real inventory, the private variables, and a Template that runs against the fleet.
+Semaphore is running after [ci01 bootstrap](ci01-bootstrap.md), but it is not connected to anything. This doc connects it: a Project, an SSH credential, the ansible repo, a real inventory, the private variables, and a Template that runs against the fleet.
 
-This is the point of building `ci01` before anything else. Until Semaphore can reach the fleet, every shared secret in `ansible` has to be fixed by hand, host by host, over SSH.
+This is the point of building `ci01` before anything else. Until Semaphore can reach the fleet, every shared secret in ansible has to be fixed by hand, host by host, over SSH.
 
 ## The problem this solves
 
-`ansible`'s `roles/monitoring/defaults/main.yml` ships `node_exporter_password: "CHANGEME"`.
+The ansible repo ships `node_exporter_password: "CHANGEME"` in the monitoring role's defaults.
 
 That password is the HTTP basic-auth credential guarding each host's node_exporter metrics endpoint. `roles/monitoring/tasks/node-exporter.yml` bcrypt-hashes it into `/etc/node-exporter/config.yml` as the password for the user `node-exporter-user`, alongside a self-signed TLS cert. Prometheus later scrapes each host with those credentials.
 
 `CHANGEME` is a placeholder committed to a public repo. Every host provisioned so far is running with it. It has to become a real value, everywhere, and stay that way for every host built afterwards.
 
-The real value belongs in `ansible-private`'s `group_vars/all/private.yml`, which is where all real values live. But committing it there only fixes hosts provisioned later. Existing hosts need a re-run, and that is what Semaphore is for.
+The real value belongs in ansible-private's `group_vars/all/private.yml`, which is where all real values live. But committing it there only fixes hosts provisioned later. Existing hosts need a re-run, and that is what Semaphore is for.
 
 ## Prerequisites
 
-- Semaphore's UI loads and you can log in, through step 13 of [`ci01-bootstrap.md`](ci01-bootstrap.md).
-- You have `ansible-private` checked out somewhere you can commit and push from.
+- Semaphore's UI loads and you can log in, through step 13 of [ci01 bootstrap](ci01-bootstrap.md).
+- You have ansible-private checked out somewhere you can commit and push from.
 - You know the four identity values used to provision the fleet: `short_name`, `abbr_name`, `location_abbr`, and `domain_name`.
 
 ## 1. Create the bootstrap SSH key
 
-Semaphore reaches every host as the `ansible` service account, which `ansible`'s `users` role creates with `NOPASSWD: ALL` sudo and an `authorized_keys` file built from `ansible_ssh_public_keys`.
+Semaphore reaches every host as the `ansible` service account. The users role creates it with `NOPASSWD: ALL` sudo and an `authorized_keys` file built from `ansible_ssh_public_keys`.
 
 Generate the keypair:
 
@@ -30,7 +30,7 @@ Generate the keypair:
 ssh-keygen -t ed25519 -C "semaphore-bootstrap" -f ./semaphore-bootstrap -N ""
 ```
 
-Add the public half, `semaphore-bootstrap.pub`, to `ansible-private`'s `group_vars/all/private.yml` under `ansible_ssh_public_keys`. That is a list, so append rather than replace. Commit and push.
+Add the public half, `semaphore-bootstrap.pub`, to ansible-private's `group_vars/all/private.yml` under `ansible_ssh_public_keys`. That is a list, so append rather than replace. Commit and push.
 
 Hosts provisioned after this point pick the key up automatically on first boot. Hosts that already exist do not, and Semaphore cannot fix that yet because it has no way in. Break the loop by hand, once per existing host, over SSH:
 
@@ -60,7 +60,7 @@ Go to *Key Store > New Key*.
 | Field | Value |
 | --- | --- |
 | *Name* | `ansible-bootstrap-key` |
-| *Type* | `SSH Key` |
+| *Type* | **SSH Key** |
 | *Username* | `ansible` |
 | *Private Key* | The contents of `semaphore-bootstrap`, the private half from step 1 |
 
@@ -75,15 +75,15 @@ Go to *Repository > New Repository*.
 | *Name* | `ansible` |
 | *URL* | `https://github.com/myah-mitchell/ansible` |
 | *Branch* | `main` |
-| *Access Key* | `None` |
+| *Access Key* | **None** |
 
-`ansible` is public, so no deploy key is needed, the same as `docker-stacks`'s own Stack resource in Komodo.
+The ansible repo is public, so no deploy key is needed, the same as the docker-stacks Stack resource in Komodo.
 
-`dotfiles` needs no Repository entry at all. Its own Ansible role clones it directly over plain HTTPS.
+The dotfiles repo needs no Repository entry at all. Its own Ansible role clones it directly over plain HTTPS.
 
 ## 5. Create the inventory
 
-This is the step with real work in it. The `hosts.yml` in both `ansible` and `ansible-private` is built for local runs: its `localhosts` group points `ubuntu`, `ubuntu_docker`, and `wsl` at `127.0.0.1`, because every Docker VM so far was provisioned by cloud-init with `-c local`.
+This is the step with real work in it. The `hosts.yml` in both ansible and ansible-private is built for local runs: its `localhosts` group points `ubuntu`, `ubuntu_docker`, and `wsl` at `127.0.0.1`, because every Docker VM so far was provisioned by cloud-init with `-c local`.
 
 Semaphore connects over SSH from `ci01`. Pointed at `ubuntu_docker`, it would run against `127.0.0.1`, which is `ci01` itself, every time. There is no group in the shipped inventory that names a real remote Docker host.
 
@@ -91,7 +91,7 @@ So the fleet's real Docker hosts have to be added as new entries. They do not ex
 
 ### Add a real host group to ansible-private
 
-Open `ansible-private`'s `hosts.yml` and add a group alongside the existing `pve_host_h` and `pbs_host_h` ones. The `_h` suffix is the `location_abbr`, so keep the same shape:
+Open ansible-private's `hosts.yml` and add a group alongside the existing `pve_host_h` and `pbs_host_h` ones. The `_h` suffix is the `location_abbr`, so keep the same shape:
 
 ```yaml
 docker_host_h:
@@ -127,7 +127,7 @@ Do not set `ansible_user` here. Step 3's Key Store entry supplies it.
 
 Add each new VM to this group as you build it. `tf01`, `id01`, `pk01`, and the rest all belong here.
 
-Commit and push `ansible-private`.
+Commit and push ansible-private.
 
 ### Load it into Semaphore
 
@@ -136,13 +136,13 @@ Go to *Inventory > New Inventory*.
 | Field | Value |
 | --- | --- |
 | *Name* | `ansible-fleet` |
-| *Type* | `Static YAML` |
-| *User Credentials* | `ansible-bootstrap-key` from step 3 |
+| *Type* | **Static YAML** |
+| *User Credentials* | **ansible-bootstrap-key** from step 3 |
 
-Paste the full contents of `ansible-private`'s `hosts.yml`, including the group you just added. Semaphore stores inventory inline rather than cloning it from a repo, so this is a copy, not a reference.
+Paste the full contents of ansible-private's `hosts.yml`, including the group you just added. Semaphore stores inventory inline rather than cloning it from a repo, so this is a copy, not a reference.
 
 > [!IMPORTANT]
-> That copy does not update itself. Every time you add a host to `ansible-private`'s `hosts.yml`, paste the new content into this Inventory too, or Semaphore keeps running against the old list.
+> That copy does not update itself. Every time you add a host to ansible-private's `hosts.yml`, paste the new content into this Inventory too, or Semaphore keeps running against the old list.
 
 ## 6. Create the ansible-private Variable Group
 
@@ -173,11 +173,11 @@ Add these as name and value pairs:
 | `node_exporter_password` | A real password, alphanumeric only. Pick it now |
 | `server_password` | The fleet's admin password |
 
-Commit that same real `node_exporter_password` to `ansible-private`'s `group_vars/all/private.yml` as well, replacing the `CHANGEME` default. Semaphore's copy fixes existing hosts; the committed one is what fresh hosts get on their very first cloud-init boot, before Semaphore ever touches them. Both need it.
+Commit that same real `node_exporter_password` to ansible-private's `group_vars/all/private.yml` as well, replacing the `CHANGEME` default. Semaphore's copy fixes existing hosts; the committed one is what fresh hosts get on their very first cloud-init boot, before Semaphore ever touches them. Both need it.
 
 ### Variables tab, Extra Variables
 
-Everything else from `private.yml` that is not a credential goes here: `admin_ssh_public_keys`, `ansible_ssh_public_keys`, `client_ssh_public_keys`, `komodo_core_address`, `komodo_core_public_key`, `ca_certificates`, `client_account`, and so on.
+Everything else from `private.yml` that is not a credential goes here: the SSH public-key lists, the Komodo Core address and public key, the CA certificates, and the client account name. You do not have to transcribe them, since the command below builds the whole object for you.
 
 Use the *JSON* toggle at the top of the field rather than entering every field as a table row. Generate the object from the file itself, dropping the three keys that belong on the *Secrets* tab:
 
@@ -232,9 +232,9 @@ Go to *Task Templates > New Template* and choose the **Ansible Playbook** app.
 | --- | --- |
 | *Name* | `provision-monitoring` |
 | *Playbook Filename* | `provision.yml` |
-| *Repository* | `ansible` from step 4 |
-| *Inventory* | `ansible-fleet` from step 5 |
-| *Variable Groups* | `ansible-private` from step 6 |
+| *Repository* | **ansible** from step 4 |
+| *Inventory* | **ansible-fleet** from step 5 |
+| *Variable Groups* | **ansible-private** from step 6 |
 | *Tags* | `monitoring` |
 
 The tag is `monitoring`, not `docker`. `node_exporter_password` is consumed by `roles/monitoring/tasks/node-exporter.yml`, which `provision.yml` tags `monitoring`.
@@ -248,8 +248,8 @@ Open the Template's *Survey Variables* tab and add one entry:
 | Field | Value |
 | --- | --- |
 | *Variable* | `target` |
-| *Type* | `String` |
-| *Required* | Yes |
+| *Type* | **String** |
+| *Required* | **Yes** |
 
 Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the `target` prompt the same way step 6 suppresses the other five. It is a separate field because `target` changes per run and the other five never do.
 
@@ -270,7 +270,7 @@ sudo systemctl restart node_exporter
 
 Then run the Template against them.
 
-Hosts built once `node_exporter_password` is committed to `ansible-private` never hit this. They get the real password on their first cloud-init run, and `config.yml` never exists with the wrong hash to begin with.
+Hosts built once `node_exporter_password` is committed to ansible-private never hit this. They get the real password on their first cloud-init run, and `config.yml` never exists with the wrong hash to begin with.
 
 ## 9. Replace this key once step-ca is live
 

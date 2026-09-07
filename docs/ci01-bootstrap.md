@@ -329,25 +329,185 @@ This is the actual point of bringing `ci01` up first — closing the loop for re
 shared secrets like `node_exporter_password`, which (unlike Komodo's own PKI trust)
 genuinely do need a fleet-wide push mechanism.
 
-1. **Bootstrap-phase SSH key**: Semaphore needs a static SSH key trusted by the
-   `ansible` service user every host's `users` Ansible role creates. This is the same
-   necessary-bootstrap-exception category as Komodo's own manual first start — nothing
-   better exists yet at this point in the sequence.
-2. In the Semaphore UI: add a **Key Store** entry for that SSH identity, then one
-   **Repository** (`ansible`) using a read-only GitHub **deploy key** — not a
-   personal access token (a deploy key's blast radius is scoped to just that one
-   repo). `dotfiles` doesn't need a Repository entry — its own Ansible role clones it
-   directly over plain HTTPS, no credential needed, since `myah-mitchell/dotfiles` is
-   public.
-3. Create a **Project** wrapping the `ansible` repo + its `hosts.yml` inventory.
-4. Create a **Template** that re-runs `provision.yml`'s `docker` tag with a real
-   `node_exporter_password` override, fixing its matching `CHANGEME` placeholder —
-   and use it against every VM from here on instead of hand-editing `ansible` or
-   SSHing in to re-run it manually. This template does **not** need a
-   `komodo_onboarding_key` override baked in: each host's onboarding key is single-use
-   and generated fresh right before that host's own provisioning run (step 5), never
-   stored in `ansible` or Semaphore itself.
-5. **Superseded in Phase 7**: once step-ca's SSH CA is live, switch Semaphore to a
+1. **Bootstrap-phase SSH key**: generate a keypair Semaphore will use to reach every
+   host's `ansible` service account (created by `ansible`'s `users` role — see
+   `roles/users/defaults/main.yml`, `ansible_account: "ansible"`):
+
+   ```bash
+   ssh-keygen -t ed25519 -C "semaphore-bootstrap" -f ./semaphore-bootstrap -N ""
+   ```
+
+   Add the **public** half to `ansible-private`'s `group_vars/all/private.yml` under
+   `ansible_ssh_public_keys` (a list — append to it, don't replace an existing key),
+   commit, and push. Every host that's *already* been provisioned (`ci01` itself, at
+   minimum) won't pick this up until you re-run the `users` tag against it by hand one
+   more time — the same manual-SSH pattern as step 5 above, since Semaphore doesn't
+   exist yet to do it for you:
+
+   ```bash
+   cd /path/to/ansible && ./scripts/bootstrap-private.sh <ansible-private-url>
+   ansible-playbook -i hosts.yml -c local provision.yml -e '{"target":"ubuntu_docker","server_password":"","short_name":"<same as original run>","abbr_name":"<same>","location_abbr":"<same>","domain_name":"<same>"}' --tags users
+   ```
+
+   Every host provisioned *after* this point picks the key up automatically from
+   `ansible-private`, no extra step needed. This whole key is the same
+   necessary-bootstrap-exception category as Komodo's own manual first start —
+   nothing better exists yet at this point in the sequence.
+
+2. Create a Semaphore **Project** (top-level container — Key Store, Repository,
+   Inventory, Variable Groups, and Templates all live inside one). Name it
+   `fleet-provisioning`, not `ansible` — the Project itself isn't the `ansible` repo,
+   it's Semaphore's own container for the things that run it, and naming it `ansible`
+   would collide with three other things named `ansible` one level down inside it:
+   the `ansible` Repository (step 4), the `ansible` service account it connects as,
+   and the `ansible-bootstrap-key` credential (step 3).
+
+3. Inside that Project, go to **Key Store → New Key**:
+   - **Name**: `ansible-bootstrap-key`.
+   - **Type**: `SSH Key`.
+   - **Username**: `ansible` (the service account from step 1).
+   - **Private Key**: paste the *private* half generated in step 1.
+
+4. Go to **Repository → New Repository**:
+   - **Name**: `ansible`.
+   - **URL**: `https://github.com/myah-mitchell/ansible`.
+   - **Branch**: `main`.
+   - **Access Key**: `None` — `ansible` is public now (unlike when this doc was first
+     written), so no deploy key is needed, the same as `docker-stacks`'s own
+     Repository entry in step 11. `dotfiles` doesn't need a Repository entry at all —
+     its own Ansible role clones it directly over plain HTTPS, no credential needed,
+     since `myah-mitchell/dotfiles` is public too.
+
+5. Go to **Inventory → New Inventory**:
+   - **Name**: `ansible-fleet`.
+   - **User Credentials**: `ansible-bootstrap-key` from step 3.
+   - **Type**: `Static YAML`.
+   - Paste `ansible-private`'s real `hosts.yml` content directly into the editor —
+     Semaphore stores it inline, it doesn't clone it from a repo. This is the *real*
+     inventory (the one with your actual hosts/IPs), not the sanitized example that
+     ships inside the public `ansible` repo.
+
+6. Go to **Variable Groups → New Group** (labeled "Environment" in older
+   Semaphore versions/docs — same `{}`-icon resource, same underlying API, just
+   renamed in the sidebar). Name it `ansible-private`. It has two tabs (**Variables**,
+   **Secrets**), and **each of those tabs is itself split in two** — read this part
+   carefully, it's not obvious from the UI alone:
+   - **Extra Variables** (top section of each tab, with a JSON/Table toggle): passed
+     to `ansible-playbook` as `--extra-vars` — real Ansible variables, exactly like
+     what `group_vars/all/private.yml` provides today. **This is where everything
+     from that file goes.**
+   - **Environment Variables** (bottom section of each tab): set as plain OS
+     environment variables on the `ansible-playbook` process — a completely
+     different namespace that Ansible never sees as a Jinja variable unless a role
+     explicitly calls `lookup('env', ...)`. None of `provision.yml`'s roles do that
+     for these values (they reference `{{ node_exporter_password }}` etc. directly).
+     **Leave this section empty.** Anything put here silently does nothing — the
+     playbook run won't error, it'll just keep using the `CHANGEME`/blank defaults
+     as if the value was never set.
+
+   With that distinction clear, split `ansible-private`'s
+   `group_vars/all/private.yml` content across the two tabs' **Extra Variables**
+   sections only:
+   - **Secrets tab → Extra Variables**: everything that's an actual credential —
+     `ansible_private_repo_token`, and, once you've picked a real value,
+     `node_exporter_password` (see step 7). Add each as a name/value pair.
+   - **Variables tab → Extra Variables**: everything else from that same file that
+     isn't sensitive — `admin_ssh_public_keys`, `ansible_ssh_public_keys`,
+     `client_ssh_public_keys`, `komodo_core_address`, `komodo_core_public_key`,
+     `ca_certificates`, `client_account`, etc. Easiest done via the **JSON** editor
+     toggle rather than re-entering every field as a table row:
+     1. On the machine where `ansible-private` is checked out, convert
+        `group_vars/all/private.yml` to JSON and drop the two keys that belong in
+        the Secrets tab instead (`ansible_private_repo_token`,
+        `node_exporter_password`) — `yq` does both in one pass:
+
+        ```bash
+        cd /path/to/ansible-private
+        yq -o=json 'del(.ansible_private_repo_token, .node_exporter_password)' \
+          group_vars/all/private.yml
+        ```
+
+        No `yq`? Use Python instead:
+
+        ```bash
+        python3 -c "
+        import yaml, json
+        data = yaml.safe_load(open('group_vars/all/private.yml'))
+        data.pop('ansible_private_repo_token', None)
+        data.pop('node_exporter_password', None)
+        print(json.dumps(data, indent=2))
+        "
+        ```
+     2. Check the output: it should be a single JSON object of the remaining
+        top-level keys (`admin_ssh_public_keys`, `komodo_core_address`, etc.), and
+        it must **not** contain `ansible_private_repo_token` or
+        `node_exporter_password` — those two only go in the Secrets tab (above).
+     3. Add one more key that isn't in `private.yml` at all:
+        `"server_password": ""`. `provision.yml` declares `server_password` as a
+        `vars_prompt` (play-level, evaluated before any `--tags` filtering), so
+        Semaphore's non-interactive run needs a value for it even though it's only
+        ever consumed by `roles/users/tasks/user_root.yml`/`user_client.yml`/
+        `user_admin.yml` (`when: server_password | length > 0`), none of which run
+        under this template's `monitoring` tag. An empty string matches the same
+        re-run convention already used in
+        `roles/pve/templates/cloudinit-vendor.yml.j2`.
+     4. In Semaphore, open `ansible-private` → **Variables** tab → **Extra
+        Variables**, click the **JSON** toggle (next to the Table toggle at the top
+        of that field), and paste the object in place of the empty `{}`.
+     5. Save the Variable Group.
+
+7. Go to **Task Templates → New Template**, choose the **Ansible Playbook** app:
+   - **Name**: `provision-monitoring` (or similar).
+   - **Playbook Filename**: `provision.yml`.
+   - **Repository**: `ansible` (step 4).
+   - **Inventory**: `ansible-fleet` (step 5).
+   - **Variable Groups**: `ansible-private` (step 6).
+   - **Tags**: `monitoring` — **not** `docker`. `node_exporter_password` is consumed
+     by `roles/monitoring/tasks/node-exporter.yml`, gated behind the `monitoring` tag
+     in `provision.yml`'s role list, not `docker`. This template does **not** need a
+     `komodo_onboarding_key` override baked in: each host's onboarding key is
+     single-use and generated fresh right before that host's own provisioning run
+     (step 5), never stored in `ansible` or Semaphore itself.
+   - **Survey Variables** (Template edit → **Survey Variables** tab): `provision.yml`
+     also declares `target`, `short_name`, `abbr_name`, `location_abbr`, and
+     `domain_name` as `vars_prompt` — same play-level, before-tag-filtering
+     situation as `server_password` above, but these four/five are genuinely
+     host-specific, so they don't belong baked into the shared `ansible-private`
+     Variable Group (that group should stay reusable across every host you ever
+     point this Template at). Add each as a Survey Variable instead — type
+     **String**, **Required** — which makes Semaphore prompt for them on every
+     run, the same way the interactive CLI prompt already does:
+     - `target`: the host or group name from `ansible-fleet`'s `hosts.yml` to run
+       against (e.g. `ci01`).
+     - `short_name`, `abbr_name`, `location_abbr`, `domain_name`: the same
+       identity values used for that host's original provisioning run. None of
+       them are actually read by `roles/monitoring/`, but the prompt still fires
+       for all four regardless of the `monitoring` tag.
+   - Before running it the first time, pick a real `node_exporter_password` and add
+     it to the `ansible-private` Variable Group's Secrets tab (step 6) — and, for
+     durability across future re-provisions and fresh hosts, commit that same real
+     value to `ansible-private`'s `group_vars/all/private.yml` too, the same
+     "commit the real value directly to `ansible-private`" pattern used for
+     `komodo_core_public_key` in `docs/komodo-bootstrap.md` step 13.
+
+8. **This role is not idempotent for a password rotation — read before running.**
+   `roles/monitoring/tasks/node-exporter.yml` only writes `/etc/node-exporter/config.yml`
+   `when: not node_exporter_config.stat.exists`. Every host provisioned before this
+   point already has that file, baked from the `CHANGEME` default. Running this
+   Template against them fixes nothing silently — no error, the task just reports
+   "skipped." On each already-provisioned host (`ci01` included), delete the stale
+   config first, then run the Template:
+
+   ```bash
+   sudo rm -f /etc/node-exporter/config.yml
+   sudo systemctl restart node_exporter
+   ```
+
+   Hosts provisioned *after* you've fixed `node_exporter_password` in
+   `ansible-private` never hit this — they get the real password on their very first
+   run, `config.yml` never exists with the `CHANGEME` hash to begin with.
+
+9. **Superseded in Phase 7**: once step-ca's SSH CA is live, switch Semaphore to a
    dedicated `semaphore` service principal using a short-lived, auto-renewed step-ca
    cert instead of the static key from step 1 — don't skip this once that phase
    lands.

@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "\\\\wsl.localhost\\Ubuntu-26.04\\opt"
+		},
+		{
+			"path": "\\\\wsl.localhost\\Ubuntu-26.04\\home\\m0rsla\\.local\\.claude"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "\\\\wsl.localhost\\Ubuntu-26.04\\home\\m0rsla\\dotfiles"
+		}
+	],
+	"settings": {}
+}

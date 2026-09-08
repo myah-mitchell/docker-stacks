@@ -48,7 +48,7 @@ This applies to every VM in the list above, which is why it lives here rather th
 
 [ci01 bootstrap](ci01-bootstrap.md) is the one that works the shared pattern out in full. Its steps 1 to 8 are identical for every VM in the fleet, so the four runbooks after it compress those into a single step that points back here rather than repeating them.
 
-ci01 runs longer than the others because it carries two stacks. Steps 1 to 13 build Semaphore and are the part later runbooks reuse; steps 14 to 21 add `stacks/victoriametrics-server`, which nothing else in the fleet duplicates.
+ci01 runs longer than the others because it carries two stacks. Steps 1 to 13 build Semaphore and are the part later runbooks reuse; steps 14 to 20 add `stacks/victoriametrics-server`, which nothing else in the fleet duplicates.
 
 That is the rule to keep when writing the next one. Point at ci01 for anything shared, and spend the page on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
 

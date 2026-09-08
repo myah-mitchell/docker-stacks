@@ -217,11 +217,11 @@ Six keys arrive as references to Variables that do not exist yet, or as values n
 | --- | --- |
 | `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec environment lines and its bouncer middleware commented out |
 | `AUTHENTIK_HOST` | id01 does not exist yet, so nothing forwards auth anywhere |
-| `VMAUTH_USER`, `VMAUTH_PASS`, `VMAUTH_HOST` | The monitoring sidecars ship metrics and logs to a vmauth that lands on ci01 in steps 14 to 21 of its runbook |
+| `VMAUTH_USER`, `VMAUTH_PASS`, `VMAUTH_HOST` | The monitoring sidecars ship metrics and logs to a vmauth that lands on ci01 in steps 14 to 20 of its runbook |
 
 The last three are worth understanding rather than just clearing. vmagent, vlagent, and vector still start and still scrape, but they have nowhere to write, so they buffer to their own data folders and retry. That is why those folders are created in step 2 even though nothing consumes them yet.
 
-Come back and let the three VMAuth keys resolve once ci01 reaches [step 17](ci01-bootstrap.md#17-create-the-three-vmauth-keys), which is where those Variables get created.
+Come back and let the three VMAuth keys resolve once ci01 reaches [step 16](ci01-bootstrap.md#16-create-the-three-vmauth-keys), which is where those Variables get created.
 
 `AUTHENTIK_HOST` waits on id01 instead. See [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide).
 

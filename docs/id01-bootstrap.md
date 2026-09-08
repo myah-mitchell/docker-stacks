@@ -2,9 +2,9 @@
 
 id01 runs Authentik, the fleet's identity provider. Nearly every stack in this repo defaults its Traefik router to `chain-authentik@file`, and until id01 exists that middleware points at nothing, which is why every VM so far has needed `TRAEFIK_AUTH_CHAIN` overridden to `chain-no-auth@file`.
 
-Its stack is `stacks/authentik-server`: the Authentik server and worker, their Postgres and its backup sidecar, a Redis, geoipupdate, and a socket-proxy. Seven services.
+Its stack is authentik-server: the Authentik server and worker, their Postgres and its backup sidecar, a Redis, geoipupdate, and a socket-proxy. Seven services.
 
-Authentik cannot sit behind Authentik, so its own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`. It still needs a Traefik on id01 to be reachable at all, and that is `stacks/traefik-bootstrap` until system-agent is ready.
+Authentik cannot sit behind Authentik, so its own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`. It still needs a Traefik on id01 to be reachable at all, and that is traefik-bootstrap until system-agent is ready.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md).
 

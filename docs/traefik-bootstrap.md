@@ -1,6 +1,6 @@
 # traefik-bootstrap
 
-`stacks/traefik-bootstrap` is a temporary, per-VM Traefik for the window before pk01 and id01 exist. Deploy it on a VM, use it, and tear it down once that VM's real system-agent stack is ready. It is not meant to be long-lived.
+traefik-bootstrap is a temporary, per-VM Traefik for the window before pk01 and id01 exist. Deploy it on a VM, use it, and tear it down once that VM's real system-agent stack is ready. It is not meant to be long-lived.
 
 ## Why it exists
 

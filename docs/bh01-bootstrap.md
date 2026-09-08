@@ -2,9 +2,9 @@
 
 bh01 is the DMZ edge, and the only host in the fleet reachable from the internet. It reaches the internet outbound-only, through a Cloudflare Tunnel, so no port is ever forwarded to it and no WAN address points at it.
 
-Its stack is `stacks/traefik-dmz`: the same traefik-agent bundle tf01 runs, plus a Redis replica of tf01's master and the cloudflared connector. Eleven services.
+Its stack is traefik-dmz: the same traefik-agent bundle tf01 runs, plus a Redis replica of tf01's master and the cloudflared connector. Eleven services.
 
-bh01 does not get `stacks/traefik-bootstrap`. Like tf01, it is a real Traefik.
+bh01 does not get traefik-bootstrap. Like tf01, it is a real Traefik.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md) and [tf01 bootstrap](tf01-bootstrap.md).
 
@@ -256,4 +256,4 @@ Nothing should be published before it is behind `chain-authentik@file`, unless i
 
 ap01 is the last VM in the running order. Its runbook is not written yet, and it cannot be: Vaultwarden has no container directory in this repo, so there is no stack to deploy. See [Running order](README.md#running-order).
 
-The work that unblocks next is not another VM. It is `stacks/system-agent`, which replaces traefik-bootstrap on every VM still running it and puts each host into tf01's routing table. That needs ci01, id01, and pk01 all live, which they now are. See [Tearing it down](traefik-bootstrap.md#tearing-it-down).
+The work that unblocks next is not another VM. It is system-agent, which replaces traefik-bootstrap on every VM still running it and puts each host into tf01's routing table. That needs ci01, id01, and pk01 all live, which they now are. See [Tearing it down](traefik-bootstrap.md#tearing-it-down).

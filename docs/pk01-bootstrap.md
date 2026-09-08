@@ -2,7 +2,7 @@
 
 pk01 runs step-ca, the internal certificate authority. It is what replaces the self-signed certificates traefik-bootstrap has been serving on every internal hostname, and it is the eventual home of the SSH CA that retires Semaphore's static key.
 
-Its stack is `stacks/step-ca-server`, and it is the smallest in the repo: one service, one volume, no database.
+Its stack is step-ca-server, and it is the smallest in the repo: one service, one volume, no database.
 
 It is also the only stack whose first boot is a ceremony rather than a deploy. step-ca generates a root key on that first start, and the root key has to be taken offline before this CA issues anything real. Read [the root key custody section](#5-the-root-key-ceremony) before you start, not when you reach it.
 

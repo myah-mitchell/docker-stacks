@@ -2,9 +2,9 @@
 
 tf01 is the fleet's Traefik hub. It runs the first real Traefik in the plan, with a Let's Encrypt cert resolver instead of self-signed TLS, and it holds the shared Redis that every other VM's traefik-kop publishes into.
 
-Its stack is `stacks/traefik-server`. That is `stacks/traefik-agent` plus a Redis master, and traefik-agent is in turn traefik-basic plus the monitoring sidecars plus traefik-kop, so ten services come up on one VM.
+Its stack is traefik-server. That is traefik-agent plus a Redis master, and traefik-agent is in turn traefik-basic plus the monitoring sidecars plus traefik-kop, so ten services come up on one VM.
 
-tf01 does not get `stacks/traefik-bootstrap`. It is the real Traefik, so there is nothing to stand in for.
+tf01 does not get traefik-bootstrap. It is the real Traefik, so there is nothing to stand in for.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have already worked through [ci01 bootstrap](ci01-bootstrap.md).
 
@@ -258,7 +258,7 @@ The dashboard is on its own `dashboard` entrypoint, on `:8443`, and it is not ga
 
 Every VM that runs traefik-kop needs `TRAEFIK_KOP_REDIS_SERVER` and `TRAEFIK_KOP_REDIS_PASSWORD` resolved, and both are now instance-wide Secrets, so nothing per host has to change.
 
-What does have to happen per host is the stack that carries traefik-kop. Only `stacks/traefik-agent` and the two stacks built on it include it, and `stacks/traefik-bootstrap` deliberately does not. A VM still on traefik-bootstrap publishes nothing into this Redis and routes only locally.
+What does have to happen per host is the stack that carries traefik-kop. Only traefik-agent and the two stacks built on it include it, and traefik-bootstrap deliberately does not. A VM still on traefik-bootstrap publishes nothing into this Redis and routes only locally.
 
 That is the ordering to keep in mind for the rest of the fleet: a VM starts on traefik-bootstrap to be reachable at all, and joins tf01's routing table when its real stack replaces it.
 

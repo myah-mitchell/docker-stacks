@@ -1,10 +1,10 @@
 # Deploying the VictoriaMetrics backend
 
-`stacks/victoriametrics-server` is the fleet's metrics, logs, and traces backend. It lands on ci01, after Semaphore, and it is the last piece of core-infra that has a stack ready to deploy.
+victoriametrics-server is the fleet's metrics, logs, and traces backend. It lands on ci01, after Semaphore, and it is the last piece of core-infra that has a stack ready to deploy.
 
 Build it before the VMs that feed it. vmagent, vlagent, and vector run as sidecars in each traefik stack, and every host after ci01 in the running order deploys with those sidecars already pointed here.
 
-This stack also pulls in `stacks/victoriametrics-agent` through an `include:` in its compose file, so ci01 gets the agent sidecars as part of the same deploy rather than as a second Stack resource.
+This stack also pulls in victoriametrics-agent through an `include:` in its compose file, so ci01 gets the agent sidecars as part of the same deploy rather than as a second Stack resource.
 
 Read [Conventions](conventions.md) first. This doc assumes its naming and secrets rules.
 
@@ -174,7 +174,7 @@ cadvisor
 socket-proxy
 ```
 
-The last five come from `stacks/victoriametrics-agent` through the `include:`. They are part of this deploy, which is why ci01 never gets an agent stack of its own.
+The last five come from victoriametrics-agent through the `include:`. They are part of this deploy, which is why ci01 never gets an agent stack of its own.
 
 If vmagent is healthy but its `node` scrape target is failing, the cause is step 1 rather than anything in this stack.
 

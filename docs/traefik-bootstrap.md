@@ -2,6 +2,8 @@
 
 traefik-bootstrap is a temporary, per-VM Traefik for the window before pk01 and id01 exist. Deploy it on a VM, use it, and tear it down once that VM's real system-agent stack is ready. It is not meant to be long-lived.
 
+Read [Conventions](conventions.md) first. This page assumes its naming and secrets rules.
+
 ## Why it exists
 
 Most stacks in this plan are reachable only through a real Traefik, gated behind `chain-authentik@file` for forward-auth and with TLS issued by step-ca. pk01 runs step-ca and id01 runs Authentik, and until both exist neither half works.
@@ -144,7 +146,7 @@ The hostname does not change when system-agent replaces this stack later. Only t
 
 ## Tearing it down
 
-Do this per VM, once that VM's system-agent stack is deployable for real.
+Do this per VM, once that VM's system-agent stack is deployable for real. [system-agent](system-agent-setup.md) does it as its step 7, so follow that page rather than this section if you are deploying the replacement now.
 
 Delete the traefik-bootstrap Stack resource in Komodo, or `docker compose down` it directly on the VM. Then clear the `TRAEFIK_AUTH_CHAIN` override on every stack that was set to `chain-no-auth@file`, so each falls back to `chain-authentik@file` on its next deploy.
 

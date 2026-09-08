@@ -1,6 +1,6 @@
 # Deploying Semaphore and wiring it to ansible
 
-Semaphore is the first stack on ci01. This doc takes it from an empty host to a Template that runs against the fleet: runtime folders, the Komodo Stack resource, then a Project, an SSH credential, the ansible repo, a real inventory, and the private variables.
+Semaphore is the second of ci01's four stacks, and the first one meant to stay. This doc takes it from an empty host to a Template that runs against the fleet: runtime folders, the Komodo Stack resource, then a Project, an SSH credential, the ansible repo, a real inventory, and the private variables.
 
 A Semaphore that is up but unwired is worth nothing, so there is no useful place to stop partway.
 
@@ -99,7 +99,7 @@ head -c32 /dev/urandom | base64  # SEMAPHORE_ACCESS_KEY_ENCRYPTION
 > [!IMPORTANT]
 > These three must stay stable across restarts. Rotating any of them invalidates every stored SSH key, every stored vault secret, and every active session.
 
-They go into Komodo Secrets in step 2, not into any file in this repo.
+They go into Komodo Secrets in step 3, not into any file in this repo.
 
 ## 3. Create the Stack resource for semaphore-server
 
@@ -149,9 +149,9 @@ Go to *Settings > Secrets* on km01 and create all nine by name. These are real c
 | `SEMAPHORE_ADMIN_NAME` | Your choice |
 | `SEMAPHORE_ADMIN_EMAIL` | Your choice |
 | `SEMAPHORE_ADMIN_PASSWORD` | Your choice, alphanumeric only |
-| `SEMAPHORE_COOKIE_HASH` | First value from step 1 |
-| `SEMAPHORE_COOKIE_ENCRYPTION` | Second value from step 1 |
-| `SEMAPHORE_ACCESS_KEY_ENCRYPTION` | Third value from step 1 |
+| `SEMAPHORE_COOKIE_HASH` | First value from step 2 |
+| `SEMAPHORE_COOKIE_ENCRYPTION` | Second value from step 2 |
+| `SEMAPHORE_ACCESS_KEY_ENCRYPTION` | Third value from step 2 |
 | `SEMAPHORE_POSTGRES_USER` | Your choice |
 | `SEMAPHORE_POSTGRES_PASSWORD` | Your choice, alphanumeric only |
 
@@ -183,9 +183,9 @@ Browse to `https://semaphore.ci01.home.myah-mitchell.com`, substituting whatever
 
 Your browser will warn about the certificate. That is expected: it is self-signed, not issued by a CA your browser trusts. Accept it and continue.
 
-Log in with the `SEMAPHORE_ADMIN_USER` and `SEMAPHORE_ADMIN_PASSWORD` you set in step 2.
+Log in with the `SEMAPHORE_ADMIN_USER` and `SEMAPHORE_ADMIN_PASSWORD` you set in step 3.
 
-If the page does not load at all, the likeliest causes are ci01's traefik-bootstrap not actually healthy, or `TRAEFIK_AUTH_CHAIN` not overridden in step 2. See [Traefik bootstrap](traefik-bootstrap.md).
+If the page does not load at all, the likeliest causes are ci01's traefik-bootstrap not actually healthy, or `TRAEFIK_AUTH_CHAIN` not overridden in step 3. See [Traefik bootstrap](traefik-bootstrap.md).
 
 ## 6. Create the bootstrap SSH key
 
@@ -220,7 +220,7 @@ In Semaphore, create a Project named `fleet-provisioning`.
 
 A Semaphore Project is the top-level container: Key Store, Repositories, Inventory, Variable Groups, and Templates all live inside one.
 
-Do not name it `ansible`. Three things one level down inside it are already called `ansible`: the Repository in step 4, the service account it connects as, and the key credential in step 3.
+Do not name it `ansible`. Three things one level down inside it are already called `ansible`: the Repository in step 9, the service account it connects as, and the key credential in step 8.
 
 ## 8. Add the SSH key to the Key Store
 
@@ -231,9 +231,9 @@ Go to *Key Store* and click **New Key**.
 | *Name* | `ansible-bootstrap-key` |
 | *Type* | **SSH Key** |
 | *Username* | `ansible` |
-| *Private Key* | The contents of `semaphore-bootstrap`, the private half from step 1 |
+| *Private Key* | The contents of `semaphore-bootstrap`, the private half from step 6 |
 
-The *Username* field here is what becomes `ansible_user` on every connection, so the inventory in step 5 does not need to set it.
+The *Username* field here is what becomes `ansible_user` on every connection, so the inventory in step 10 does not need to set it.
 
 ## 9. Add the ansible repository
 
@@ -306,7 +306,7 @@ Go to *Inventory* and click **New Inventory**.
 | --- | --- |
 | *Name* | `ansible-fleet` |
 | *Type* | **Static YAML** |
-| *User Credentials* | **ansible-bootstrap-key** from step 3 |
+| *User Credentials* | **ansible-bootstrap-key** from step 8 |
 
 Paste the full contents of ansible-private's `hosts.yml`, including the group you just added. Semaphore stores inventory inline rather than cloning it from a repo, so this is a copy, not a reference.
 
@@ -390,7 +390,7 @@ An inventory or `group_vars` value does not suppress a `vars_prompt`. Ansible ev
 
 That is why these live in the Variable Group's *Extra Variables*, which Semaphore passes as `--extra-vars`. Putting them in `hosts.yml` looks like it should work and does not.
 
-Five of the six are fleet-wide constants, so setting them once here means you never type them again. The sixth, `target`, is per-run, and step 7 handles it.
+Five of the six are fleet-wide constants, so setting them once here means you never type them again. The sixth, `target`, is per-run, and step 12 handles it.
 
 ## 12. Create the Template
 
@@ -400,9 +400,9 @@ Go to *Task Templates*, click **New Template**, and choose the **Ansible Playboo
 | --- | --- |
 | *Name* | `provision-monitoring` |
 | *Playbook Filename* | `provision.yml` |
-| *Repository* | **ansible** from step 4 |
-| *Inventory* | **ansible-fleet** from step 5 |
-| *Variable Groups* | **ansible-private** from step 6 |
+| *Repository* | **ansible** from step 9 |
+| *Inventory* | **ansible-fleet** from step 10 |
+| *Variable Groups* | **ansible-private** from step 11 |
 | *Tags* | `monitoring` |
 
 The tag is `monitoring`, not `docker`. It runs the role that installs and configures Node Exporter, which `provision.yml` tags `monitoring`.
@@ -419,13 +419,13 @@ Open the Template's *Survey Variables* tab and add one entry:
 | *Type* | **String** |
 | *Required* | **Yes** |
 
-Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the `target` prompt the same way step 6 suppresses the other five. It is a separate field because `target` changes per run and the other five never do.
+Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the `target` prompt the same way step 11 suppresses the other five. It is a separate field because `target` changes per run and the other five never do.
 
 Answer it with a host or group name from the inventory: ci01 for one host, `docker_host_h` for every Docker VM at once.
 
 ## 13. Replace this key once step-ca is live
 
-Once step-ca's SSH CA is running on pk01, replace the static key from step 1 with a dedicated semaphore service principal using a short-lived, auto-renewed step-ca certificate.
+Once step-ca's SSH CA is running on pk01, replace the static key from step 6 with a dedicated semaphore service principal using a short-lived, auto-renewed step-ca certificate.
 
 Do not skip this. A static private key stored in Semaphore that grants passwordless root on every host in the fleet is exactly what step-ca exists to remove.
 

@@ -75,7 +75,7 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 
 ## Prerequisites
 
-- ci01 is finished, through [Semaphore setup](semaphore-setup.md) and [VictoriaMetrics setup](victoriametrics-setup.md). Semaphore's step 13 is what pushes the real `node_exporter_password` to every host, and tf01's vmagent scrapes node_exporter with it.
+- ci01 is finished, through [Semaphore setup](semaphore-setup.md) and [VictoriaMetrics setup](victoriametrics-setup.md). Semaphore's `provision-monitoring` Template is what generates this host's own Node Exporter password, and tf01's vmagent scrapes node_exporter with it.
 - The three `GLOBAL_VMAUTH_` values exist, from [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys). Without them this host's monitoring sidecars deploy with nowhere to write.
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
 - The two repo changes above are committed and pushed to `main`.

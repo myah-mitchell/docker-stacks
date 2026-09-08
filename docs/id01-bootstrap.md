@@ -26,7 +26,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 - tf01 is finished, through [tf01 bootstrap](tf01-bootstrap.md). Nothing here strictly needs it, but step 8's payoff is pointless while tf01 cannot route.
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
-- ci01 is finished, through [Semaphore setup](semaphore-setup.md), so `node_exporter_password` is real fleet-wide.
+- ci01 is finished, through [Semaphore setup](semaphore-setup.md), so the `provision-monitoring` Template exists and can generate this host's own Node Exporter password.
 - A MaxMind account, for the free GeoLite2 databases. Signing up is free and takes a few minutes. Step 4 explains what happens if you skip it.
 
 ## Placeholders
@@ -138,7 +138,7 @@ The seventh, `GLOBAL_EMAIL_PASS`, goes on *Settings > Secrets* instead. It is th
 
 Authentik reads these at startup and does not test the connection, so an unreachable relay surfaces only when a flow actually tries to send, such as a password recovery. Create them with real values if you have a relay today. If you do not, give `GLOBAL_EMAIL_PORT` a real number and `GLOBAL_EMAIL_TLS` and `GLOBAL_EMAIL_SSL` a real boolean anyway, because those three are typed and a blank is not the same as a default.
 
-mailrise is a plausible relay for this, but it has no stack in this repo yet. See [What has no stack yet](victoriametrics-setup.md#what-has-no-stack-yet).
+mailrise is the relay this fleet uses. It deploys on ci01 as part of [Core infrastructure setup](core-infra-setup.md), which comes before this page in the running order, so it is already there to point at.
 
 ## 5. Create the Stack resource for authentik-server
 
@@ -233,7 +233,7 @@ Then, per stack, stop clearing `AUTHENTIK_HOST` and stop overriding `TRAEFIK_AUT
 
 Do this one stack at a time, starting with something you can afford to lock yourself out of. Authentik also needs a Provider and an Application configured for each hostname before forwardAuth returns anything but a redirect loop, and that configuration lives in Authentik's own UI rather than in this repo.
 
-Tearing down each VM's traefik-bootstrap is the last part, and it belongs with system-agent rather than here. See [Tearing it down](traefik-bootstrap.md#tearing-it-down).
+Tearing down each VM's traefik-bootstrap is the last part, and it belongs with system-agent rather than here. See [system-agent](system-agent-setup.md), which does the handover per VM in its step 7.
 
 ## What's next
 

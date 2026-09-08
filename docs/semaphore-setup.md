@@ -23,19 +23,18 @@ This is the point of building ci01 before anything else. Until Semaphore can rea
 - [10. Create the inventory](#10-create-the-inventory)
 - [11. Create the ansible-private Variable Group](#11-create-the-ansible-private-variable-group)
 - [12. Create the Template](#12-create-the-template)
-- [13. Fix existing hosts before running](#13-fix-existing-hosts-before-running)
-- [14. Replace this key once step-ca is live](#14-replace-this-key-once-step-ca-is-live)
+- [13. Replace this key once step-ca is live](#13-replace-this-key-once-step-ca-is-live)
 - [What's next](#whats-next)
 
 ## The problem this solves
 
-The ansible repo ships `node_exporter_password: "CHANGEME"` in the monitoring role's defaults.
+Cloud-init runs ansible once, on a host's first boot, from whatever the repo held that day.
 
-That password is the HTTP basic-auth credential guarding each host's node_exporter metrics endpoint. `roles/monitoring/tasks/node-exporter.yml` bcrypt-hashes it into `/etc/node-exporter/config.yml` as the password for the user `node-exporter-user`, alongside a self-signed TLS cert. Prometheus later scrapes each host with those credentials.
+After that the host is on its own. A role that gains a task, a shared credential that changes, a setting corrected across the fleet: none of it reaches a host that is already built. Fixing one host means an SSH session, and fixing all of them means a dozen.
 
-`CHANGEME` is a placeholder committed to a public repo. Every host provisioned so far is running with it. It has to become a real value, everywhere, and stay that way for every host built afterwards.
+Semaphore is what re-runs ansible against hosts that already exist. It holds the identity values from ansible-private, the fleet's SSH key, and an inventory, so a change lands everywhere by running one Template rather than by hand.
 
-The real value belongs in ansible-private's `group_vars/all/private.yml`, which is where all real values live. But committing it there only fixes hosts provisioned later. Existing hosts need a re-run, and that is what Semaphore is for.
+Every host after ci01 is built with it in place, so it never has to be retrofitted onto them.
 
 ## Prerequisites
 
@@ -132,7 +131,7 @@ Four keys in the pasted text need a value from you:
 | `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
 | `TRAEFIK_AUTH_CHAIN` | `chain-no-auth@file`, so it routes through traefik-bootstrap |
 
-Authentik does not exist yet, so the real `chain-authentik@file` default has nothing behind it. Clear that override later, once id01 is live and system-agent has replaced traefik-bootstrap here.
+Authentik does not exist yet, so the real `chain-authentik@file` default has nothing behind it. Clear that override later, in [step 7 of system-agent](system-agent-setup.md#7-tear-down-traefik-bootstrap), once that stack has replaced traefik-bootstrap here.
 
 Three more keys are blank and stay that way: `POSTGRES_BACKUP_DB`, `POSTGRES_BACKUP_USER`, and `POSTGRES_BACKUP_PASSWORD`. This stack's `compose.yaml` points all three at the same database, user, and password its own Postgres service already resolves.
 
@@ -213,7 +212,7 @@ Use the same argument-recovery trick from [Provisioning a VM](provision-a-vm.md#
 
 If `/tmp/ansible` is gone on a host, re-clone it and re-apply the private overlay first, the same way [step 5 of Provisioning a VM](provision-a-vm.md#5-give-the-host-an-onboarding-key) does.
 
-Do this on km01 and ci01 at minimum. This static key is the same kind of bootstrap exception as Komodo's own manual first start, and [step 14](#14-replace-this-key-once-step-ca-is-live) replaces it later.
+Do this on km01 and ci01 at minimum. This static key is the same kind of bootstrap exception as Komodo's own manual first start, and [step 13](#13-replace-this-key-once-step-ca-is-live) replaces it later.
 
 ## 7. Create the Project
 
@@ -329,7 +328,7 @@ The Variable Group has two tabs, *Variables* and *Secrets*, and each tab is spli
 | *Variables* tab, *Environment Variables* | Set as OS environment variables on the `ansible-playbook` process | No |
 | *Secrets* tab, *Environment Variables* | Same, masked | No |
 
-Ansible never sees an OS environment variable as a Jinja variable unless a role explicitly calls `lookup('env', ...)`, and none of `provision.yml`'s roles do. Anything put in an *Environment Variables* section is silently ignored: the run does not error, it just keeps using the `CHANGEME` and blank defaults as though you set nothing.
+Ansible never sees an OS environment variable as a Jinja variable unless a role explicitly calls `lookup('env', ...)`, and none of `provision.yml`'s roles do. Anything put in an *Environment Variables* section is silently ignored: the run does not error, it just keeps using each role's own defaults as though you set nothing.
 
 Leave both *Environment Variables* sections empty.
 
@@ -340,10 +339,9 @@ Add these as name and value pairs:
 | Variable | Value |
 | --- | --- |
 | `ansible_private_repo_token` | The real GitHub PAT from `private.yml` |
-| `node_exporter_password` | A real password, alphanumeric only. Pick it now |
 | `server_password` | The fleet's admin password |
 
-Commit that same real `node_exporter_password` to ansible-private's `group_vars/all/private.yml` as well. That key is not in the file yet, and adding it there is what overrides the monitoring role's `CHANGEME` default. Semaphore's copy fixes existing hosts; the committed one is what fresh hosts get on their very first cloud-init boot, before Semaphore ever touches them. Both need it.
+There is no node_exporter password here. The monitoring role generates one per host, on that host, so there is no shared value to distribute. See [Setting up Node Exporter](../containers/vmagent/stack-README.md) for how a host's own password is made and rotated.
 
 ### Variables tab, Extra Variables
 
@@ -353,7 +351,7 @@ Use the *JSON* toggle at the top of the field rather than entering every field a
 
 ```bash
 cd /path/to/ansible-private
-yq -o=json 'del(.ansible_private_repo_token, .node_exporter_password, .server_password)' \
+yq -o=json 'del(.ansible_private_repo_token, .server_password)' \
   group_vars/all/private.yml
 ```
 
@@ -363,13 +361,13 @@ Without `yq`, use Python:
 python3 -c "
 import yaml, json
 data = yaml.safe_load(open('group_vars/all/private.yml'))
-for k in ('ansible_private_repo_token', 'node_exporter_password', 'server_password'):
+for k in ('ansible_private_repo_token', 'server_password'):
     data.pop(k, None)
 print(json.dumps(data, indent=2))
 "
 ```
 
-Check the output before pasting. It should be one JSON object, and it must not contain `ansible_private_repo_token` or `node_exporter_password`. `server_password` is never in that file, so deleting it is only a guard in case someone adds it later.
+Check the output before pasting. It should be one JSON object, and it must not contain `ansible_private_repo_token`. `server_password` is never in that file, so deleting it is only a guard in case someone adds it later.
 
 Then add the four identity values, which are not in `private.yml` at all:
 
@@ -407,7 +405,7 @@ Go to *Task Templates*, click **New Template**, and choose the **Ansible Playboo
 | *Variable Groups* | **ansible-private** from step 6 |
 | *Tags* | `monitoring` |
 
-The tag is `monitoring`, not `docker`. The password is consumed by `roles/monitoring/tasks/node-exporter.yml`, and `provision.yml` tags that role `monitoring`.
+The tag is `monitoring`, not `docker`. It runs the role that installs and configures Node Exporter, which `provision.yml` tags `monitoring`.
 
 This Template needs no `komodo_onboarding_key`. Each host's key is single-use and generated fresh right before that host's own provisioning run.
 
@@ -425,24 +423,7 @@ Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the 
 
 Answer it with a host or group name from the inventory: ci01 for one host, `docker_host_h` for every Docker VM at once.
 
-## 13. Fix existing hosts before running
-
-`roles/monitoring/tasks/node-exporter.yml` writes `/etc/node-exporter/config.yml` only `when: not node_exporter_config.stat.exists`.
-
-Every host provisioned before now already has that file, holding the bcrypt hash of `CHANGEME`. Running the Template against them changes nothing and reports no error. The task simply reports as skipped, and the host keeps the old password.
-
-The role is idempotent for a fresh host and not idempotent for a password rotation. Delete the stale config first, on each already-provisioned host:
-
-```bash
-sudo rm -f /etc/node-exporter/config.yml
-sudo systemctl restart node_exporter
-```
-
-Then run the Template against them.
-
-Hosts built once `node_exporter_password` is committed to ansible-private never hit this. They get the real password on their first cloud-init run, and `config.yml` never exists with the wrong hash to begin with.
-
-## 14. Replace this key once step-ca is live
+## 13. Replace this key once step-ca is live
 
 Once step-ca's SSH CA is running on pk01, replace the static key from step 1 with a dedicated semaphore service principal using a short-lived, auto-renewed step-ca certificate.
 
@@ -450,8 +431,8 @@ Do not skip this. A static private key stored in Semaphore that grants passwordl
 
 ## What's next
 
-Semaphore can now reach the fleet, and shared secrets stop being a per-host chore.
+Semaphore can now reach the fleet, so a change to ansible stops being a per-host chore.
 
-ci01 has one stack left. [VictoriaMetrics setup](victoriametrics-setup.md) deploys the fleet's metrics, logs, and traces backend, and its step 1 depends on the real `node_exporter_password` step 13 above just pushed.
+ci01 has two stacks left. [VictoriaMetrics setup](victoriametrics-setup.md) deploys the fleet's metrics, logs, and traces backend, and [Core infrastructure setup](core-infra-setup.md) deploys the notification and uptime services that sit alongside it.
 
 After that, tf01 is the next VM. See [Running order](README.md#running-order).

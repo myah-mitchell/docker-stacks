@@ -21,21 +21,24 @@ These are the stacks that define what a specific VM is for.
 | step-ca-server | step-ca | pk01 | Not deployed |
 | traefik-dmz | traefik-agent plus redis (replicating from traefik-server) and cloudflared | bh01 | Not deployed |
 | victoriametrics-server | victoriametrics-agent plus victoriametrics, victorialogs, victoriatraces, vmauth, vmalert, grafana, alertmanager | ci01, later | Not deployed |
+| core-infra | ntfy, mailrise, blackbox-exporter, uptime-kuma | ci01 | Not deployed |
 
 traefik-dmz is the public edge. Only port 443 outbound to the internal Traefik hosts and 6379 outbound to traefik-server's Redis need to leave the DMZ.
 
-The rest of the core-infra bundle (ntfy, mailrise, blackbox-exporter, uptime-kuma) exists as containers but has not been assembled into a stack yet. It joins ci01 alongside semaphore-server when it is.
+core-infra is the odd one out in this table. It is not what ci01 is for, it is where the fleet's alerts and uptime checks land, and ci01 is simply the host with the rest of the observability stack on it already. See [Core infrastructure setup](core-infra-setup.md).
 
 ## One stack per VM
 
 | Stack | Deploys | Status |
 | --- | --- | --- |
-| system-agent | traefik, error-pages, logrotate, traefik-kop, vmagent, vlagent, vector, dozzle-agent, dockns, socket-proxy, socket-proxy-rw | Known unfinished, not deployed anywhere |
+| system-agent | traefik, error-pages, logrotate, traefik-kop, vmagent, vlagent, vector, cadvisor, dozzle-agent, dockns, socket-proxy, socket-proxy-rw | Not deployed anywhere yet |
 | traefik-bootstrap | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | The temporary stand-in for system-agent |
 
 system-agent is the standard per-VM bundle. Every VM's own local Traefik terminates TLS and runs the `chain-authentik@file` auth chain for that VM's services directly, without needing tf01. traefik-kop publishes a router into tf01's shared Redis only when a service also carries a `kop-public.traefik.*` label, so reaching the internet is a per-service opt-in rather than a per-VM setting.
 
 It needs live backends for monitoring (ci01), the auth chain (id01), and internal certs (pk01), so there is no point deploying it before those exist. Until then, [Traefik bootstrap](traefik-bootstrap.md) covers the temporary replacement. Do not run both on one VM: they fight over ports 80, 443, and 8443.
+
+Deploying it is the same eight steps on every VM, written once in [system-agent](system-agent-setup.md).
 
 ## Composition layers
 

@@ -1,6 +1,6 @@
 # Deploying the VictoriaMetrics backend
 
-victoriametrics-server is the fleet's metrics, logs, and traces backend. It lands on ci01, after Semaphore, and it is the last piece of core-infra that has a stack ready to deploy.
+victoriametrics-server is the fleet's metrics, logs, and traces backend. It lands on ci01, after Semaphore, and it is the third of ci01's four stacks.
 
 Build it before the VMs that feed it. vmagent, vlagent, and vector run as sidecars in each traefik stack, and every host after ci01 in the running order deploys with those sidecars already pointed here.
 
@@ -12,20 +12,19 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 
 - [Prerequisites](#prerequisites)
 - [Placeholders](#placeholders)
-- [1. Confirm node_exporter is real on ci01](#1-confirm-node_exporter-is-real-on-ci01)
+- [1. Set up Node Exporter on ci01](#1-set-up-node-exporter-on-ci01)
 - [2. Open the syslog port](#2-open-the-syslog-port)
 - [3. Create the runtime folders](#3-create-the-runtime-folders)
 - [4. Create the three VMAuth keys](#4-create-the-three-vmauth-keys)
 - [5. Create the Stack resource](#5-create-the-stack-resource)
 - [6. Verify](#6-verify)
 - [7. First access](#7-first-access)
-- [What has no stack yet](#what-has-no-stack-yet)
 - [What's next](#whats-next)
 
 ## Prerequisites
 
 - ci01 is provisioned and shows connected and healthy in Komodo, through step 2 of [ci01 bootstrap](ci01-bootstrap.md). Step 2 in particular: this stack's routers need traefik-bootstrap on ci01 to be reachable at all.
-- Semaphore is deployed and wired to the ansible repo, through [Semaphore setup](semaphore-setup.md). Its step 13 is what replaces the committed `CHANGEME` node_exporter password with a real one, and step 1 below depends on that having run.
+- Semaphore is deployed and wired to the ansible repo, through [Semaphore setup](semaphore-setup.md). Step 1 below runs one of its Templates.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md).
 
 ## Placeholders
@@ -35,24 +34,23 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 | `<ci-ip>` | ci01's address, the one set in its own runbook |
 | `<internal-subnet>` | The internal VLAN's CIDR, the one every fleet VM sits on |
 
-## 1. Confirm node_exporter is real on ci01
+## 1. Set up Node Exporter on ci01
 
-vmagent scrapes `<ci-ip>` on port 9100, over HTTPS, with a self-signed certificate and basic auth. Nothing in this stack installs node_exporter, but nothing here needs to: the ansible monitoring role already does it on every provisioned host.
+vmagent scrapes `<ci-ip>` on port 9100, over HTTPS, with a self-signed certificate and basic auth. Nothing in this stack installs Node Exporter. The ansible monitoring role does, and cloud-init already ran it once when ci01 first booted.
 
-`roles/monitoring/tasks/node-exporter.yml` installs the binary, generates the self-signed certificate, writes `/etc/node-exporter/config.yml` with a bcrypt hash of `node_exporter_password`, and runs it under a systemd unit. The basic-auth user it configures is `node-exporter-user`, which is the value already committed as the `NODE_EXPORTER_USER` default.
+Run it again anyway, from Semaphore's `provision-monitoring` Template with `target` answered `ci01`. ci01 was provisioned before Semaphore existed, so its Node Exporter predates the per-host password the role now generates.
 
-So the only thing to check is that the password is no longer the placeholder:
+Then confirm the three files this stack mounts or depends on are there:
 
 ```bash
-ssh <ci-ip> "sudo grep -c node-exporter-user /etc/node-exporter/config.yml"
+ssh <ci-ip> "sudo ls -l /etc/node-exporter/"
 ```
 
-If that file does not exist, or `node_exporter_password` is still `CHANGEME` in ansible, go back to [step 13 of Semaphore setup](semaphore-setup.md#13-fix-existing-hosts-before-running). Deploying now still works, but the `node` scrape target fails on every host until it is fixed.
+Expect `node_exporter.crt`, `config.yml`, and `scrape-password`. The last one is the copy of this host's password that vmagent reads, and it must be owned by `101000`.
 
-Have the real `node_exporter_password` from ansible-private's `group_vars/all/private.yml` to hand. Step 5 pastes it into `NODE_EXPORTER_PASS`, unhashed, because that is what vmagent sends on every scrape.
+If `scrape-password` is missing, the deploy still starts, but Docker creates the path as a directory and vmagent cannot read a password at all. Fix it before step 5 rather than after.
 
-> [!NOTE]
-> The [generated README for victoriametrics-server](../stacks/victoriametrics-server/README.md) walks through installing node_exporter by hand, from the download to the systemd unit. That predates the ansible role and is superseded by it for any host these runbooks provisioned. Follow it only for a host ansible does not manage.
+There is no password to collect. Each host's is generated on that host and never leaves it, which is why `NODE_EXPORTER_USER` is the only Node Exporter value in this stack's environment.
 
 ## 2. Open the syslog port
 
@@ -135,14 +133,13 @@ The repo is public, so Komodo needs no credential to clone it.
 
 *Environment* is a plain text editor with no option to point at a file. Open `stacks/victoriametrics-server/komodo.env` in this repo, copy its full contents, and paste them into that field.
 
-Five keys in the pasted text need a value from you:
+Four keys in the pasted text need a value from you:
 
 | Key | Value |
 | --- | --- |
 | `SERVER_NAME` | `ci01` |
 | `SUB_DOMAIN_NAME` | This site, with the trailing dot, so `home.` |
 | `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
-| `NODE_EXPORTER_PASS` | The real `node_exporter_password` from step 1 |
 | `TRAEFIK_AUTH_CHAIN` | `chain-no-auth@file`, so it routes through traefik-bootstrap |
 
 Leave `NODE_EXPORTER_USER` as the committed `node-exporter-user`. That is the user the ansible role configures, and changing it here without changing it there breaks the scrape.
@@ -184,14 +181,8 @@ Browse to `https://grafana.ci01.home.myah-mitchell.com`, substituting whatever `
 
 Grafana sets no admin credentials in its environment, so the first login is the stock `admin` and `admin`, and it forces a change. The VictoriaMetrics and VictoriaLogs datasources are provisioned from the repo and should already be present.
 
-## What has no stack yet
-
-ntfy, mailrise, blackbox-exporter, and uptime-kuma each have a container directory in this repo and no stack. Assembling them is a repo change rather than a runbook step, and there is nothing to deploy until someone does it.
-
-Two of them are referenced elsewhere. mailrise is the plausible SMTP relay behind Authentik's email settings, and ntfy is where vmalert's alerts are meant to land instead of the blackhole receiver alertmanager ships with. See [step 4 of id01 bootstrap](id01-bootstrap.md#4-create-the-komodo-secrets-and-variables).
-
 ## What's next
 
-ci01 is finished, and the fleet now has somewhere to send metrics, logs, and traces. Every host built after this one ships from its first deploy, with no keys to come back and fill in.
+The fleet now has somewhere to send metrics, logs, and traces. Every host built after this one ships from its first deploy, with no keys to come back and fill in.
 
-tf01 is the next VM, in [tf01 bootstrap](tf01-bootstrap.md). See [Running order](README.md#running-order) for the rest.
+ci01 has one stack left. [Core infrastructure setup](core-infra-setup.md) deploys ntfy, mailrise, blackbox-exporter, and uptime-kuma, which are what turn those metrics into notifications.

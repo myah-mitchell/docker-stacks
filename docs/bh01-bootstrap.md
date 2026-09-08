@@ -256,4 +256,6 @@ Nothing should be published before it is behind `chain-authentik@file`, unless i
 
 ap01 is the last VM in the running order. Its runbook is not written yet, and it cannot be: Vaultwarden has no container directory in this repo, so there is no stack to deploy. See [Running order](README.md#running-order).
 
-The work that unblocks next is not another VM. It is system-agent, which replaces traefik-bootstrap on every VM still running it and puts each host into tf01's routing table. That needs ci01, id01, and pk01 all live, which they now are. See [Tearing it down](traefik-bootstrap.md#tearing-it-down).
+The work that unblocks next is not another VM. It is system-agent, which replaces traefik-bootstrap on every VM still running it and puts each host into tf01's routing table. That needs ci01, id01, and pk01 all live, which they now are.
+
+Run [system-agent](system-agent-setup.md) once per VM, ci01 included. Its step 7 is where each VM's traefik-bootstrap comes down.

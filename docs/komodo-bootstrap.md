@@ -317,4 +317,4 @@ Two things about km01 itself to come back to later:
 
 Registering a host is worked out in full in [Provisioning a VM](provision-a-vm.md), which every VM after km01 follows. Deploying stacks to one is worked out for real against ci01's three in [ci01 bootstrap](ci01-bootstrap.md).
 
-Folding km01's own UI behind Traefik and Authentik needs ci01, id01, and pk01 all live first, plus system-agent fixed and proven on a less critical host. km01 gets that retrofit last, not first.
+Folding km01's own UI behind Traefik and Authentik needs ci01, id01, and pk01 all live first, plus [system-agent](system-agent-setup.md) proven on a less critical host. km01 gets that retrofit last, not first.

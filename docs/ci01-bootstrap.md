@@ -1,12 +1,14 @@
 # ci01 bootstrap runbook
 
-ci01 is the first VM deployed by Komodo rather than built by hand. Everything it needs is written down somewhere else, so this page is an overview and four pointers rather than a procedure.
+ci01 is the first VM deployed by Komodo rather than built by hand. Everything it needs is written down somewhere else, so this page is an overview and five pointers rather than a procedure.
 
-ci01 carries three stacks, deployed in the order they appear below. traefik-bootstrap comes first and is temporary, there only so the other two can be reached at all.
+ci01 carries four stacks, deployed in the order they appear below. traefik-bootstrap comes first and is temporary, there only so the other three can be reached at all.
 
 semaphore-server is next. Once it is up and wired to the ansible repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
 
-victoriametrics-server is last. It is the metrics, logs, and traces backend every VM after this one writes to, which is why ci01 sits second in the running order rather than later.
+victoriametrics-server is third. It is the metrics, logs, and traces backend every VM after this one writes to, which is why ci01 sits second in the running order rather than later.
+
+core-infra is last, and it is what turns those metrics into something that reaches you: push notifications, mail relayed from Proxmox, external probes, and an uptime dashboard.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
@@ -48,9 +50,9 @@ Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps end
 
 Semaphore goes before VictoriaMetrics on purpose. Once it is up and wired to the ansible repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
 
-Follow [Semaphore setup](semaphore-setup.md), fourteen steps covering semaphore-server from its runtime folders to a Template that runs against the fleet.
+Follow [Semaphore setup](semaphore-setup.md), thirteen steps covering semaphore-server from its runtime folders to a Template that runs against the fleet.
 
-Only its last step can be left: replacing the bootstrap SSH key waits on pk01. Everything before it should be done before the next step here, because step 13 there is what replaces the committed `CHANGEME` node_exporter password.
+Only its last step can be left: replacing the bootstrap SSH key waits on pk01. Everything before it should be done before the next step here, because that Template is how the next step installs Node Exporter on ci01.
 
 ## 4. Deploy the VictoriaMetrics backend
 
@@ -58,8 +60,18 @@ victoriametrics-server is the fleet's metrics, logs, and traces backend, and it 
 
 Follow [VictoriaMetrics setup](victoriametrics-setup.md), which is seven steps from host prep to Grafana.
 
+## 5. Deploy core-infra
+
+VictoriaMetrics collects and stores. core-infra is what does something with it. ntfy delivers push notifications, mailrise turns Proxmox's mail into those notifications, blackbox-exporter probes services from outside, and uptime-kuma is the at-a-glance version of the same question.
+
+It goes last on ci01 because blackbox-exporter has nothing scraping it until the previous step is done.
+
+Follow [Core infrastructure setup](core-infra-setup.md), seven steps from runtime folders to a working notification path out of Proxmox.
+
 ## What's next
 
-ci01 is finished once all four linked docs are, apart from [step 14 of Semaphore setup](semaphore-setup.md#14-replace-this-key-once-step-ca-is-live), which waits on pk01.
+ci01 is finished once all five linked docs are, apart from [step 13 of Semaphore setup](semaphore-setup.md#13-replace-this-key-once-step-ca-is-live), which waits on pk01.
 
 tf01 is the next VM. See [Running order](README.md#running-order).
+
+ci01 runs traefik-bootstrap until the whole fleet is up. Come back to it once id01 and pk01 exist, and replace it here with [system-agent](system-agent-setup.md) like every other VM.

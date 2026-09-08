@@ -22,25 +22,29 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | --- | --- | --- | --- | --- |
 | 1 | km01 | Komodo GitOps engine | [km01 bootstrap](komodo-bootstrap.md) | Up and healthy |
 | 1.1 | any | Provisioning a VM, the shared first step of every host below | [Provisioning a VM](provision-a-vm.md) | In progress |
-| 2 | ci01 | Overview, then the three stacks below | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
-| 2.1 | ci01 | traefik-bootstrap, temporary routing so the other two are reachable | [Traefik bootstrap](traefik-bootstrap.md) | Written, not yet run |
+| 2 | ci01 | Overview, then the four stacks below | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
+| 2.1 | ci01 | traefik-bootstrap, temporary routing so the other three are reachable | [Traefik bootstrap](traefik-bootstrap.md) | Written, not yet run |
 | 2.2 | ci01 | Semaphore, ansible's runner | [Semaphore setup](semaphore-setup.md) | In progress |
 | 2.3 | ci01 | VictoriaMetrics, the fleet's metrics, logs, and traces backend | [VictoriaMetrics setup](victoriametrics-setup.md) | Written, not yet run |
+| 2.4 | ci01 | core-infra, where alerts and uptime checks land | [Core infrastructure setup](core-infra-setup.md) | Written, not yet run |
 | 3 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
 | 4 | id01 | Authentik, identity | [id01 bootstrap](id01-bootstrap.md) | Written, not yet run |
 | 5 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |
 | 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | [bh01 bootstrap](bh01-bootstrap.md) | Written, not yet run |
-| 7 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
+| 7 | any | system-agent, the per-VM stack every VM runs once 2 through 5 are done | [system-agent](system-agent-setup.md) | Written, not yet run |
+| 8 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
 
 Row 1.1 is not a VM of its own. It is the provisioning procedure every host from ci01 down runs before anything else, listed here because it is the first thing you do on each of them.
 
-The 2.x rows are ci01's three stacks. Each needs real work beyond a Komodo Stack resource, so each has a doc rather than a step, and ci01's own runbook is an overview that hands off to them in order.
+The 2.x rows are ci01's four stacks. Each needs real work beyond a Komodo Stack resource, so each has a doc rather than a step, and ci01's own runbook is an overview that hands off to them in order.
 
-The order between them is load-bearing. 2.1 is what makes the other two reachable at all, and 2.2's step 13 pushes the real node_exporter password that 2.3 scrapes with.
+The order between them is load-bearing. 2.1 is what makes the other three reachable at all, and 2.2 is what gives 2.3 a way to run the ansible role that installs the Node Exporter it scrapes.
 
 Row 2.1 is not only ci01's. id01 and pk01 deploy the same stack on their own hosts, from the same doc.
 
-"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those six as needing confirmation on the first real run, and correct the page as you go.
+Row 7 is not a VM either. It is the per-VM stack that replaces traefik-bootstrap everywhere, and it comes last because it needs ci01, id01, and pk01 all live. Run it once per VM, including on ci01 itself.
+
+"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those eight as needing confirmation on the first real run, and correct the page as you go.
 
 ap01 is the exception in more than status. Vaultwarden has no directory under `containers/`, so there is no stack to point a runbook at. Building the container comes first.
 
@@ -58,11 +62,13 @@ This applies to every VM in the list above, which is why it lives here rather th
 
 ## How the host runbooks are shaped
 
-Anything identical across hosts lives in its own doc, and each host runbook points at it. [Provisioning a VM](provision-a-vm.md) is one, and [Traefik bootstrap](traefik-bootstrap.md) is the other. A host runbook's own pages are spent on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
+Anything identical across hosts lives in its own doc, and each host runbook points at it. There are three: [Provisioning a VM](provision-a-vm.md), [Traefik bootstrap](traefik-bootstrap.md), and [system-agent](system-agent-setup.md). A host runbook's own pages are spent on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
 
-Split a step out into its own doc when a second host will run it, or when a stack has real work after its deploy. Keep it inline when neither is true. ci01 is all pointers because all four of its steps qualify. The other four host runbooks point out once, for provisioning, and then deploy and verify in place, because their remaining steps are one-host-only and have no second reader.
+Split a step out into its own doc when a second host will run it, or when a stack has real work after its deploy. Keep it inline when neither is true. ci01 is all pointers because all five of its steps qualify. The other four host runbooks point out for provisioning and again for system-agent, and deploy and verify their own stack in place, because that part is one-host-only and has no second reader.
 
 The onboarding key in step 5 of provisioning is required for every future host, permanently. The traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
+
+[system-agent](system-agent-setup.md) is the third shared doc, and the one that ends the bootstrap phase. It is written once because every VM runs the same stack, and only `SERVER_NAME` and the dockns values differ between them.
 
 Name a runbook after the host once a VM is just "provision, then deploy via Komodo" (`ci01-bootstrap.md`). Name it after the service when something is structurally unique about that bootstrap, which so far means `komodo-bootstrap.md` alone. Name it after the procedure when it is not tied to a host at all (`provision-a-vm.md`).
 

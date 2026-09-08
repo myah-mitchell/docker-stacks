@@ -162,21 +162,9 @@ In Komodo's UI on km01, check *Resources > Servers* and confirm ci01 shows conne
 
 `stacks/semaphore-server` publishes no port directly, and its Traefik labels are gated behind `chain-authentik@file`. Neither Traefik nor Authentik exists anywhere in the plan yet, so without this step there is no way to reach Semaphore's UI once it deploys.
 
-`stacks/traefik-bootstrap` is a real Traefik with self-signed TLS and `chain-no-auth@file` in place of a cert resolver and Authentik. See [Traefik bootstrap](traefik-bootstrap.md) for what it does and when it gets torn down.
+`stacks/traefik-bootstrap` fills that gap: a real Traefik with self-signed TLS and `chain-no-auth@file` in place of a cert resolver and Authentik.
 
-Create its runtime folders first, following [step 1 of Traefik bootstrap](traefik-bootstrap.md#1-create-the-runtime-folders).
-
-Then follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it) for the Stack resource itself. Set its target *Server* to **ci01**. Set `SERVER_NAME` to `ci01`. Use the same `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you will use for every stack on this host.
-
-Confirm all five services show running and healthy before continuing:
-
-```text
-traefik
-error-pages
-socket-proxy
-socket-proxy-rw
-logrotate
-```
+Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Set its `SERVER_NAME` to `ci01`. Whatever sub-domain and domain you give it, use the same pair for every stack on this host. The rest of that page covers what this stack does and when it gets torn down.
 
 ## 9. Deploy Semaphore
 

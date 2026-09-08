@@ -21,18 +21,23 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | Order | VM | Role | Doc | Status |
 | --- | --- | --- | --- | --- |
 | 1 | km01 | Komodo GitOps engine | [km01 bootstrap](komodo-bootstrap.md) | Up and healthy |
-| 2 | ci01 | Provision the VM, then work both stacks below | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
-| 2.1 | ci01 | Semaphore, ansible's runner | [Semaphore setup](semaphore-setup.md) | In progress |
-| 2.2 | ci01 | VictoriaMetrics, the fleet's metrics, logs, and traces backend | [VictoriaMetrics setup](victoriametrics-setup.md) | Written, not yet run |
+| 2 | ci01 | Provision the VM, then work the three stacks below | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
+| 2.1 | ci01 | traefik-bootstrap, temporary routing so the other two are reachable | [Traefik bootstrap](traefik-bootstrap.md) | Written, not yet run |
+| 2.2 | ci01 | Semaphore, ansible's runner | [Semaphore setup](semaphore-setup.md) | In progress |
+| 2.3 | ci01 | VictoriaMetrics, the fleet's metrics, logs, and traces backend | [VictoriaMetrics setup](victoriametrics-setup.md) | Written, not yet run |
 | 3 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
 | 4 | id01 | Authentik, identity | [id01 bootstrap](id01-bootstrap.md) | Written, not yet run |
 | 5 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |
 | 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | [bh01 bootstrap](bh01-bootstrap.md) | Written, not yet run |
 | 7 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
 
-Rows 2.1 and 2.2 are ci01's two stacks. Each needs real work after its Komodo deploy, so each has a doc rather than a step, and ci01's own runbook ends by handing off to them in order. Do 2.1 before 2.2: its step 13 pushes the real node_exporter password that VictoriaMetrics scrapes with.
+The 2.x rows are ci01's three stacks. Each needs real work beyond a Komodo Stack resource, so each has a doc rather than a step, and ci01's own runbook ends by handing off to them in order.
 
-"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those five as needing confirmation on the first real run, and correct the page as you go.
+The order between them is load-bearing. 2.1 is what makes the other two reachable at all, and 2.2's step 13 pushes the real node_exporter password that 2.3 scrapes with.
+
+Row 2.1 is not only ci01's. id01 and pk01 deploy the same stack on their own hosts, from the same doc.
+
+"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those six as needing confirmation on the first real run, and correct the page as you go.
 
 ap01 is the exception in more than status. Vaultwarden has no directory under `containers/`, so there is no stack to point a runbook at. Building the container comes first.
 
@@ -52,7 +57,7 @@ This applies to every VM in the list above, which is why it lives here rather th
 
 [ci01 bootstrap](ci01-bootstrap.md) is the one that works the shared pattern out in full. Its steps 1 to 7 are identical for every VM in the fleet, so the four runbooks after it compress those into a single step that points back here rather than repeating them.
 
-Split a runbook the way ci01 is split when a stack has real work after its deploy, and keep it inline when it does not. ci01's steps 9 and 10 are pointers, at rows 2.1 and 2.2 above. The other four host runbooks deploy and verify in place, because nothing more is needed.
+Split a runbook the way ci01 is split when a stack has real work after its deploy, and keep it inline when it does not. ci01's steps 8, 9 and 10 are pointers, at rows 2.1 to 2.3 above. The other four host runbooks deploy and verify in place, because nothing more is needed.
 
 That is the rule to keep when writing the next one. Point at ci01 for anything shared, and spend the page on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
 
@@ -64,12 +69,9 @@ A page written before its VM exists is a draft, however carefully it was checked
 
 ## The rest of the docs
 
-The per-host runbooks are in [Running order](#running-order) above. These are the pages that are not tied to one VM.
+Every runbook and stack doc is in [Running order](#running-order) above. These two are not tied to any host or stack.
 
 | Page | What it covers |
 | --- | --- |
 | [Conventions](conventions.md) | Naming and secrets rules every other page assumes |
-| [Semaphore setup](semaphore-setup.md) | Deploying Semaphore on ci01, wiring it to the ansible repo, and pushing the first real secret |
-| [VictoriaMetrics setup](victoriametrics-setup.md) | Deploying the fleet's metrics, logs, and traces backend on ci01 |
-| [Traefik bootstrap](traefik-bootstrap.md) | The temporary per-VM Traefik used before pk01 and id01 exist |
 | [Stacks](stacks.md) | What every stack in this repo deploys, independent of bootstrap order |

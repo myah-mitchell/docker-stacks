@@ -79,9 +79,7 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-data
 
 step-ca publishes no port. Traefik routes to it on `9000` over HTTPS, and without a Traefik on pk01 nothing can reach the CA.
 
-Create its runtime folders first, following [step 1 of Traefik bootstrap](traefik-bootstrap.md#1-create-the-runtime-folders).
-
-Then follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it) for the Stack resource. Set its target *Server* to **pk01**. Set `SERVER_NAME` to `pk01`. Use the same `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you will use in step 4.
+Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Set its target *Server* to **pk01** and its `SERVER_NAME` to `pk01`, with the same sub-domain and domain you use in step 4.
 
 step-ca's own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`, so there is no override to set here. That is deliberate, and it stays true after id01 exists: step-ca does its own authentication per provisioner, and a forward-auth hop in front of the ACME endpoint would break the unattended clients that need to reach it.
 

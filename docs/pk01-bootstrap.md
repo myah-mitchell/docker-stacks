@@ -6,12 +6,11 @@ Its stack is `stacks/step-ca-server`, and it is the smallest in the repo: one se
 
 It is also the only stack whose first boot is a ceremony rather than a deploy. step-ca generates a root key on that first start, and the root key has to be taken offline before this CA issues anything real. Read [the root key custody section](#5-the-root-key-ceremony) before you start, not when you reach it.
 
-Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md), which spells out the shared provisioning steps this page compresses into one.
+Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md).
 
 ## Contents
 
 - [Prerequisites](#prerequisites)
-- [Placeholders](#placeholders)
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Create the runtime folders](#2-create-the-runtime-folders)
 - [3. Deploy traefik-bootstrap onto pk01](#3-deploy-traefik-bootstrap-onto-pk01)
@@ -26,33 +25,13 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - ci01 is finished, through [Semaphore setup](semaphore-setup.md).
 - Two physically separate durable locations ready for the root key backup, and a way to reach Vaultwarden for the CA password. Step 5 needs both, and it is not a step to start and then pause.
 
-## Placeholders
-
-| Placeholder | Value |
-| --- | --- |
-| `<template-vmid>` | VMID of the `ubuntu-server-2604` cloud-init template |
-| `<pk-vmid>` | VMID to give the new VM |
-| `<pk-ip>` | Static address for pk01 |
-| `<gateway-ip>` | Gateway for that subnet |
-| `<same>` | The value cloud-init already used, recovered rather than guessed |
-| `<clone-dir>` | Where Periphery cloned this repo on pk01, found in step 4 rather than assumed |
-
 ## 1. Provision the VM
 
-Follow steps 1 to 7 of [ci01 bootstrap](ci01-bootstrap.md), substituting pk01 throughout.
+Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with pk01 connected and healthy under *Resources > Servers*.
 
-One service and no database, so this is the smallest VM in the fleet:
-
-```bash
-qm clone <template-vmid> <pk-vmid> --name pk01 --full
-qm set <pk-vmid> --cores 2 --memory 2048
-qm set <pk-vmid> --ipconfig0 ip=<pk-ip>/24,gw=<gateway-ip>
-qm start <pk-vmid>
-```
+Give it two cores and 2 GB. One service and no database, so this is the smallest VM in the fleet.
 
 pk01 is internal-only and mesh-only. It is never published through bh01's tunnel. A CA that issues for the internal zone has no reason to answer from the internet.
-
-Stop when pk01 shows connected and healthy under *Resources > Servers*, which is ci01's step 7.
 
 ## 2. Create the runtime folders
 
@@ -128,6 +107,8 @@ Find the clone and clean up that stray directory:
 ls /opt/docker/repos/
 sudo rm -rf <clone-dir>/containers/step-ca/secrets/password
 ```
+
+`<clone-dir>` is whichever path that first command prints. Read it rather than assuming it.
 
 Then generate the password:
 

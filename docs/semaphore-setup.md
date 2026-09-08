@@ -39,7 +39,7 @@ The real value belongs in ansible-private's `group_vars/all/private.yml`, which 
 
 ## Prerequisites
 
-- ci01 is provisioned and shows connected and healthy in Komodo, through step 8 of [ci01 bootstrap](ci01-bootstrap.md). Step 8 in particular: without traefik-bootstrap there is no way to reach Semaphore's UI once it deploys.
+- ci01 is provisioned and shows connected and healthy in Komodo, through step 2 of [ci01 bootstrap](ci01-bootstrap.md). Step 2 in particular: without traefik-bootstrap there is no way to reach Semaphore's UI once it deploys.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md). Step 3 below fails without them.
 - You have ansible-private checked out somewhere you can commit and push from.
 - You know the four identity values the fleet was provisioned with, listed under [Placeholders](#placeholders).
@@ -104,7 +104,7 @@ They go into Komodo Secrets in step 2, not into any file in this repo.
 
 ## 3. Create the Stack resource for semaphore-server
 
-In Komodo's UI, go to *Resources > Stacks* and create a new Stack named `semaphore-server`. Set its target *Server* to **ci01**, the resource created by step 5 of the [ci01 runbook](ci01-bootstrap.md).
+In Komodo's UI, go to *Resources > Stacks* and create a new Stack named `semaphore-server`. Set its target *Server* to **ci01**, the resource created by [step 5 of Provisioning a VM](provision-a-vm.md#5-give-the-host-an-onboarding-key).
 
 ### Point it at the repo
 
@@ -180,7 +180,7 @@ To check from the host instead, SSH to ci01 and run `docker compose ps` in the s
 
 ## 5. First access
 
-Browse to `https://semaphore.ci01.home.myah-mitchell.com`, substituting whatever `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you actually set. This is real Traefik routing, through the traefik-bootstrap deployed in step 8 of the [ci01 runbook](ci01-bootstrap.md#8-deploy-traefik-bootstrap-onto-ci01).
+Browse to `https://semaphore.ci01.home.myah-mitchell.com`, substituting whatever `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you actually set. This is real Traefik routing, through the traefik-bootstrap deployed in [step 2 of the ci01 runbook](ci01-bootstrap.md#2-deploy-traefik-bootstrap-onto-ci01).
 
 Your browser will warn about the certificate. That is expected: it is self-signed, not issued by a CA your browser trusts. Accept it and continue.
 
@@ -209,9 +209,9 @@ ansible-playbook -i hosts.yml -c local provision.yml \
   --tags users
 ```
 
-Use the same argument-recovery trick from [step 5](ci01-bootstrap.md#recover-the-original-provisioning-arguments) if you do not know the four values for that host.
+Use the same argument-recovery trick from [Provisioning a VM](provision-a-vm.md#recover-the-original-provisioning-arguments) if you do not know the four values for that host.
 
-If `/tmp/ansible` is gone on a host, re-clone it and re-apply the private overlay first, the same way [step 5 of the ci01 runbook](ci01-bootstrap.md#5-give-ci01-an-onboarding-key) does.
+If `/tmp/ansible` is gone on a host, re-clone it and re-apply the private overlay first, the same way [step 5 of Provisioning a VM](provision-a-vm.md#5-give-the-host-an-onboarding-key) does.
 
 Do this on km01 and ci01 at minimum. This static key is the same kind of bootstrap exception as Komodo's own manual first start, and [step 14](#14-replace-this-key-once-step-ca-is-live) replaces it later.
 

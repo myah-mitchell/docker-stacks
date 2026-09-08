@@ -6,7 +6,7 @@ Its stack is `stacks/traefik-server`. That is `stacks/traefik-agent` plus a Redi
 
 tf01 does not get `stacks/traefik-bootstrap`. It is the real Traefik, so there is nothing to stand in for.
 
-Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have already worked through [ci01 bootstrap](ci01-bootstrap.md), which spells out the shared provisioning steps this page compresses into one.
+Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have already worked through [ci01 bootstrap](ci01-bootstrap.md).
 
 > [!WARNING]
 > Two directives tf01 depends on are commented out in `containers/traefik/compose.yaml` today. Read [What has to change in the repo first](#what-has-to-change-in-the-repo-first) before provisioning anything. Neither is fixable from Komodo's UI.
@@ -15,7 +15,6 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 - [What has to change in the repo first](#what-has-to-change-in-the-repo-first)
 - [Prerequisites](#prerequisites)
-- [Placeholders](#placeholders)
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Create the runtime folders](#2-create-the-runtime-folders)
 - [3. Open the firewall](#3-open-the-firewall)
@@ -81,34 +80,13 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 - The two repo changes above are committed and pushed to `main`.
 - A Cloudflare API token scoped to edit DNS for the zone, and the account email that owns it. The resolver uses a DNS-01 challenge, so Let's Encrypt never needs to reach tf01 from the internet.
 
-## Placeholders
-
-| Placeholder | Value |
-| --- | --- |
-| `<template-vmid>` | VMID of the `ubuntu-server-2604` cloud-init template |
-| `<tf-vmid>` | VMID to give the new VM |
-| `<tf-ip>` | Static address for tf01 |
-| `<gateway-ip>` | Gateway for that subnet |
-| `<km-ip>` | km01's address, from its own runbook |
-| `<same>` | The value cloud-init already used, recovered rather than guessed |
-| `<internal-subnet>` | The internal VLAN's CIDR, the one every fleet VM sits on |
-
 ## 1. Provision the VM
 
-Follow steps 1 to 7 of [ci01 bootstrap](ci01-bootstrap.md), substituting tf01 throughout. Those steps are identical for every VM in the fleet, and there is no tf01-specific variation in any of them.
+Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with tf01 connected and healthy under *Resources > Servers*. There is no tf01-specific variation in any of them.
 
-Size it larger than ci01. Ten services run here, and Traefik is the path every other host's traffic takes:
-
-```bash
-qm clone <template-vmid> <tf-vmid> --name tf01 --full
-qm set <tf-vmid> --cores 4 --memory 8192
-qm set <tf-vmid> --ipconfig0 ip=<tf-ip>/24,gw=<gateway-ip>
-qm start <tf-vmid>
-```
+Give it four cores and 8 GB. Ten services run here, and Traefik is the path every other host's traffic takes.
 
 tf01 is on the internal VLAN, not the DMZ. bh01 is the host that faces the internet, and it reaches tf01 over the internal network.
-
-Stop when tf01 shows connected and healthy under *Resources > Servers*, which is ci01's step 7. Skip its step 8 entirely.
 
 ## 2. Create the runtime folders
 
@@ -153,6 +131,8 @@ sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 sudo ufw allow from <internal-subnet> to any port 6379 proto tcp comment 'traefik-kop Redis'
 sudo ufw status
 ```
+
+`<internal-subnet>` is the internal VLAN's CIDR, the one every fleet VM sits on.
 
 The first three are the ports the Traefik container publishes, the same three every VM's Traefik needs.
 

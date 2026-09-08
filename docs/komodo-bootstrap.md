@@ -311,10 +311,10 @@ If a stack already failed with the interpolation error above, there is no need t
 
 km01 is up and alone. Nothing else exists for it to deploy yet, and its UI still sits on the direct `:9120` port.
 
-ci01 is next, running Semaphore. See [ci01 bootstrap](ci01-bootstrap.md), which is also the template every VM after it follows.
+ci01 is next, running Semaphore. See [ci01 bootstrap](ci01-bootstrap.md). Its first step is [Provisioning a VM](provision-a-vm.md), which every VM after it uses too.
 
 Two things about km01 itself to come back to later:
 
-Registering other hosts and deploying stacks to them through Komodo is worked out for real against ci01's first stack in [ci01 bootstrap](ci01-bootstrap.md). That is the reference to follow for every VM after it too.
+Registering a host is worked out in full in [Provisioning a VM](provision-a-vm.md), which every VM after km01 follows. Deploying stacks to one is worked out for real against ci01's three in [ci01 bootstrap](ci01-bootstrap.md).
 
 Folding km01's own UI behind Traefik and Authentik needs ci01, id01, and pk01 all live first, plus system-agent fixed and proven on a less critical host. km01 gets that retrofit last, not first.

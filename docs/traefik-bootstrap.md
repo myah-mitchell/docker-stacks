@@ -21,7 +21,7 @@ Every other stack picks up its auth chain from `${TRAEFIK_AUTH_CHAIN:-chain-auth
 
 ## When to deploy it
 
-On any VM that needs to serve stacks through real Traefik routing before pk01 and id01 exist. ci01 is the first case, in [ci01 bootstrap](ci01-bootstrap.md).
+On any VM that needs to serve stacks through real Traefik routing before pk01 and id01 exist. ci01 is the first case, in [step 2 of ci01 bootstrap](ci01-bootstrap.md#2-deploy-traefik-bootstrap-onto-ci01).
 
 ## How to deploy it
 

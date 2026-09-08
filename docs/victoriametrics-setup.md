@@ -24,7 +24,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 
 ## Prerequisites
 
-- ci01 is provisioned and shows connected and healthy in Komodo, through step 8 of [ci01 bootstrap](ci01-bootstrap.md). Step 8 in particular: this stack's routers need traefik-bootstrap on ci01 to be reachable at all.
+- ci01 is provisioned and shows connected and healthy in Komodo, through step 2 of [ci01 bootstrap](ci01-bootstrap.md). Step 2 in particular: this stack's routers need traefik-bootstrap on ci01 to be reachable at all.
 - Semaphore is deployed and wired to the ansible repo, through [Semaphore setup](semaphore-setup.md). Its step 13 is what replaces the committed `CHANGEME` node_exporter password with a real one, and step 1 below depends on that having run.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md).
 

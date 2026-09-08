@@ -6,12 +6,11 @@ Its stack is `stacks/authentik-server`: the Authentik server and worker, their P
 
 Authentik cannot sit behind Authentik, so its own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`. It still needs a Traefik on id01 to be reachable at all, and that is `stacks/traefik-bootstrap` until system-agent is ready.
 
-Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md), which spells out the shared provisioning steps this page compresses into one.
+Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md).
 
 ## Contents
 
 - [Prerequisites](#prerequisites)
-- [Placeholders](#placeholders)
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Create the runtime folders](#2-create-the-runtime-folders)
 - [3. Deploy traefik-bootstrap onto id01](#3-deploy-traefik-bootstrap-onto-id01)
@@ -29,32 +28,13 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - ci01 is finished, through [Semaphore setup](semaphore-setup.md), so `node_exporter_password` is real fleet-wide.
 - A MaxMind account, for the free GeoLite2 databases. Signing up is free and takes a few minutes. Step 4 explains what happens if you skip it.
 
-## Placeholders
-
-| Placeholder | Value |
-| --- | --- |
-| `<template-vmid>` | VMID of the `ubuntu-server-2604` cloud-init template |
-| `<id-vmid>` | VMID to give the new VM |
-| `<id-ip>` | Static address for id01 |
-| `<gateway-ip>` | Gateway for that subnet |
-| `<same>` | The value cloud-init already used, recovered rather than guessed |
-
 ## 1. Provision the VM
 
-Follow steps 1 to 7 of [ci01 bootstrap](ci01-bootstrap.md), substituting id01 throughout. Those steps are identical for every VM in the fleet.
+Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with id01 connected and healthy under *Resources > Servers*.
 
-Authentik's worker is the memory-hungry part, and Postgres sits alongside it:
-
-```bash
-qm clone <template-vmid> <id-vmid> --name id01 --full
-qm set <id-vmid> --cores 4 --memory 8192
-qm set <id-vmid> --ipconfig0 ip=<id-ip>/24,gw=<gateway-ip>
-qm start <id-vmid>
-```
+Give it four cores and 8 GB. Authentik's worker is the memory-hungry part, and Postgres sits alongside it.
 
 id01 is on the internal VLAN. Authentik is reached from the internet through bh01's tunnel later, never by exposing id01 directly.
-
-Stop when id01 shows connected and healthy under *Resources > Servers*, which is ci01's step 7.
 
 ## 2. Create the runtime folders
 

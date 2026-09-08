@@ -424,6 +424,93 @@ introduced, just more consequential now that every Periphery needs to reach it t
 
 ---
 
+### Session log, 2026-09-07
+
+Two things came together this session: `stacks/system-agent` finally got built out
+into what decision #14 says it is, and the `node_exporter_password` distribution
+problem from decision #16 got solved differently than planned.
+
+**The per-VM stack is complete.** `docs/stacks.md` has claimed for a while that it
+supersedes `traefik-agent`, `victoriametrics-agent` and `dozzle-agent` for the
+per-VM role. As it was actually built, it used the Traefik-scoped agent variants,
+so measured against `victoriametrics-agent` it silently dropped Node Exporter
+metrics, cadvisor container metrics, and all host/journald/syslog log collection.
+Either the stack or the claim had to change, and the stack was the unfinished one.
+Added a third variant family alongside `-host` and `-traefik`: `.vmagent-system`
+with a new `config/prometheus-system.yml` scraping this VM's own vmagent, vlagent,
+Traefik, cadvisor and Node Exporter, and `.vector-system` with a new
+`config/vector-system.yml` merging the host and Traefik log pipelines into one.
+Verified structurally rather than by eye: every shared component in the merged
+Vector config deep-compares equal to its source, and every `inputs:` reference
+resolves. Added cadvisor to the stack, and restored the `depends_on` blocks that
+`extends` never carries.
+
+That closes the "`system-agent`'s exact fixes" open question below. The read-through
+it asked for also turned up eight other defects across the containers it extends,
+listed in "A real bug found and fixed along the way" territory rather than here:
+a bare `environment:` key (null, schema-invalid) on two service variants, a
+half-declared CrowdSec plugin with a version but no module name (rejected at
+Traefik startup), `${TRAEFIK_EXTRA_COMMAND:-""}` passing the literal two-character
+string `""`, a hardcoded `--providers.docker.network=proxy` where everything else
+uses `${PROXY_NETWORK}`, a Traefik dashboard router with no middlewares label at
+all despite every `komodo.env` documenting `TRAEFIK_AUTH_CHAIN` as gating it, an
+unsubstituted `# <stackName> Overview` template heading in a generated README, and
+`scripts/base-README.md` telling every reader to set `projectName="projectName"`
+(followed literally, that creates `/opt/docker/volumes/projectName` and Docker then
+makes the real directories root-owned). `build.py` already extracted the real
+project name for `komodo.env`, so it now passes it to the README builder too.
+
+**Per-host Node Exporter passwords, in place of the fleet-wide push.** Decision #16
+and next step 3 both assume Semaphore's job is to push one real
+`node_exporter_password` over the committed `CHANGEME` everywhere. That is no longer
+what happens, because it never needed to be one value. Each host's vmagent only ever
+scrapes its own Node Exporter, over that host's own address, with that host's own
+self-signed certificate. Nothing requires the password to match between hosts, so
+`roles/monitoring/tasks/node-exporter.yml` in the ansible repo now generates a random
+one per host on first run, persists it, and reuses it on every later run so the value
+is stable. The plaintext is published a second time as `/etc/node-exporter/scrape-password`,
+owned by the host-side UID the user namespace maps vmagent onto, and vmagent reads it
+with `basic_auth.password_file` rather than an environment variable. Confirmed
+supported by `BasicAuthConfig` in VictoriaMetrics' `lib/promauth/config.go` before
+relying on it. `NODE_EXPORTER_PASS` is gone from the env files entirely: there is no
+password left for Komodo to hold, and none exists anywhere off the host it belongs to.
+
+Fixing that also surfaced a real bug nobody had hit yet. Both the hash task and the
+config write were gated `when: not node_exporter_config.stat.exists`, so the
+documented rotation plan would have silently no-opped on every host that was already
+provisioned, which is all of them. The bcrypt hash is now persisted separately and
+rehashed only when the password actually changes, because bcrypt salts every hash and
+rehashing unconditionally would rewrite the config and restart the service on every
+run.
+
+The ansible work is on a `monitoring/per-host-node-exporter-password` branch, local
+only.
+
+**Two runbooks that did not exist.** `core-infra` had four containers and no stack
+until now, and `system-agent` had no page at all.
+[`docs/core-infra-setup.md`](docs/core-infra-setup.md) covers ci01's fourth stack:
+runtime folders, the SMTP port UFW blocks by default, the two config files that have
+to be written into Komodo's clone by hand, the ntfy accounts everything else
+publishes through, and the Proxmox notification path out the far end.
+[`docs/system-agent-setup.md`](docs/system-agent-setup.md) is written once for the
+whole fleet, the way `provision-a-vm.md` and `traefik-bootstrap.md` are, because
+every VM runs the same twelve services and only `SERVER_NAME` and the dockns values
+differ between them. It is also the page that ends the bootstrap phase, since its
+step 7 is where each VM's `traefik-bootstrap` comes down.
+
+**A style and accuracy pass over the docs.** Checked every page against
+`/opt/global-docs/markdown-style-guide.md` and against the repo itself. The
+substantive finds were factual rather than stylistic: `docs/semaphore-setup.md` had
+twelve wrong "from step N" cross-references (the Semaphore UI steps off by five, the
+earlier ones by one), so a reader following it was sent to Verify for the repository
+and to Create the runtime folders for the SSH key; the `mailrise` stack README named
+a recipient address and a topic that `mailrise.conf.example` does not define; and
+`containers/dozzle/komodo.env` declared `TRAEFIK_AUTH_CHAIN` untagged when only
+`.dozzle-server` has a router that reads it, which left `dozzle-agent` carrying a key
+nothing used and `system-agent` carrying an orphaned comment with no key under it.
+
+---
+
 ## Naming & domains (use these everywhere, no exceptions)
 
 **Changed this session** — replaced the old `h1`/`d1`-site-prefixed pattern
@@ -857,9 +944,12 @@ token), not just new ones.
    itself still needs its own one-time onboarding key generated by hand to join
    Komodo (decision #19, step 5 of `docs/ci01-bootstrap.md`), same as every future
    host; that's permanent, not a Semaphore-removable bootstrap gap.
-3. **Once Semaphore is up and wired to the `ansible` repo** (step 13 of
-   `docs/ci01-bootstrap.md`), use its Template to push real values over the
-   `node_exporter_password` `CHANGEME` placeholder fleet-wide (decision #16).
+3. **Once Semaphore is up and wired to the `ansible` repo**, run its
+   `provision-monitoring` Template against each host. This no longer pushes one
+   shared `node_exporter_password`; as of 2026-09-07 the role generates a different
+   one per host and keeps it there. Decision #16's requirement stands, its mechanism
+   changed. Every host still needs the Template run once, including the ones
+   provisioned before Semaphore existed.
 4. **Provision `tf01`**, deploy `stacks/traefik-server` via Komodo — unblocked once
    step 3 is done.
 5. **Provision `id01`**, deploy `stacks/authentik-server` (already includes
@@ -868,13 +958,17 @@ token), not just new ones.
 6. **Provision `pk01`**, real step-ca bootstrap (Phase 5: `step ca init`, real
    root-key extraction/2-copy custody). Needed before decision #15's internal-certs
    work and before step 8 below can actually happen.
-7. **Assemble and deploy the rest of `core-infra`** onto `ci01` alongside the
-   `semaphore-server` already there (victoriametrics-server + ntfy + mailrise +
-   blackbox-exporter + uptime-kuma — not yet assembled as one stack).
-8. **Fix and deploy `stacks/system-agent` fleet-wide** (decision #14), once
-   `ci01`/`id01`/`pk01` all exist — it needs live backends for monitoring
+7. **Deploy the rest of `core-infra`** onto `ci01` alongside the `semaphore-server`
+   already there. Both halves are assembled now: `victoriametrics-server` and
+   `core-infra` (ntfy, mailrise, blackbox-exporter, uptime-kuma), with a runbook
+   each in [`docs/victoriametrics-setup.md`](docs/victoriametrics-setup.md) and
+   [`docs/core-infra-setup.md`](docs/core-infra-setup.md).
+8. **Deploy `stacks/system-agent` fleet-wide** (decision #14), once
+   `ci01`/`id01`/`pk01` all exist. It needs live backends for monitoring
    (`ci01`), the auth chain (`id01`), and internal certs (`pk01`), so there's no
-   point deploying it earlier. `km01` deliberately stays on its direct `:9120` port
+   point deploying it earlier. The stack itself was finished on 2026-09-07 and
+   [`docs/system-agent-setup.md`](docs/system-agent-setup.md) is the per-VM
+   procedure. `km01` deliberately stays on its direct `:9120` port
    until then; retrofit `system-agent` onto it last, not first, once the pattern's
    proven on a less-critical VM.
 9. Once Komodo + Authentik are up and `system-agent` is proven: gate their web UIs
@@ -908,9 +1002,10 @@ remove it).
   Traefik can actually use it. (An earlier version of this note claimed a scaffolded
   `internalca` block already existed in `containers/traefik/compose.yaml` — checked
   the file and its full git history directly, that was never true. Corrected here.)
-- **`system-agent`'s exact fixes** — resolved *what* it's for (decision #14: the
-  standard per-VM stack), still open *what specifically* is broken/unfinished about
-  it. Needs a real read-through before first deploy.
+- **`system-agent`'s exact fixes** was resolved in the 2026-09-07 session. The
+  read-through happened, the stack now uses its own `-system` agent variants and
+  includes cadvisor, and [`docs/system-agent-setup.md`](docs/system-agent-setup.md)
+  covers deploying it. Still not run against a real host.
 - **dockns UniFi alias record shape** — the Cloudflare/Technitium-era config used
   CNAME records pointing at each VM's own hostname
   (`DOCKNS_NS_<X>_RECORD_DEFAULTS_CNAME_TARGET_DOMAIN`), which assumes

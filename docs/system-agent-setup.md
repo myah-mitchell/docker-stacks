@@ -108,7 +108,7 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/*-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
 ```
 
-dockns is the one exception. It runs as root inside its container, so its directory belongs to `100000` rather than `101000`:
+dockns is the one exception. It is the only service here that does not pick up the shared `user:` override, so it runs as the image's own root and its directory belongs to `100000` rather than `101000`:
 
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/dockns-data
@@ -150,7 +150,7 @@ For UniFi, generate a local API key on that VM's own site's UniFi console, with 
 
 `DOCKNS_UNIFI_HOST` is that console's own local URL, `<unifi-url>`, not `api.ui.com`. The local connector is deliberate: internal DNS should not depend on UniFi's cloud API being reachable, and the traffic stays on the LAN. The home site and the cloud site have separate consoles, so a VM on one site cannot use the other's values.
 
-Both values are per site rather than per host, so store them once in Komodo as `[[DOCKNS_UNIFI_HOST]]` and `[[DOCKNS_UNIFI_API_KEY]]` and let every VM on that site reference them.
+Both values are per site rather than fleet-wide, so they are not `[[GLOBAL_...]]` Variables. `komodo.env` ships them as ordinary `[[...]]` references, and a two-site fleet needs a separate pair per site. Name each pair after its site, or paste the literal values into the stack's *Environment* on each VM.
 
 For Cloudflare, four more keys have to be filled in. Leave all four blank on a VM with nothing public on it.
 
@@ -194,11 +194,29 @@ Three keys need a value from you:
 
 Leave `TRAEFIK_AUTH_CHAIN` blank. Blank is what gets you the real `chain-authentik@file`, and this stack is the point at which that becomes correct.
 
-Leave `CROWDSEC_LAPI_KEY` blank as well. The base Traefik service keeps its CrowdSec plugin lines commented out, so nothing reads it.
+### Clear the two CrowdSec keys
 
-Leave every `[[GLOBAL_...]]` reference exactly as it is. Komodo resolves them from the instance-wide Variables created in [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook. Deploying before those exist fails with Compose trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` into a numeric field.
+Clear `CROWDSEC_LAPI_KEY` and `CROWDSEC_LAPI_HOST` to blank. The base Traefik service keeps its CrowdSec plugin lines commented out, so nothing reads either one, and no `GLOBAL_CROWDSEC_LAPI_HOST` Variable exists to resolve the second.
 
-The remaining `[[...]]` references are per-site or per-host rather than global: the two Cloudflare keys for ACME, the two Redis keys traefik-kop writes with, the three VMAuth keys, and the dockns values from step 4. Each has to exist as a Komodo Variable or Secret before the deploy resolves.
+That is the same reason every runbook before this one clears them.
+
+### Check that every reference resolves
+
+This is the stack with the most `[[...]]` references in the repo, and it is the first one that needs all of them at once. A reference with no Variable or Secret behind it reaches Compose as the literal string, which usually surfaces as a type error rather than as a missing credential.
+
+Nineteen `[[GLOBAL_...]]` references come from [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook, and need no action. The other ten come from later runbooks:
+
+| Reference | Created in |
+| --- | --- |
+| `GLOBAL_VMAUTH_USER`, `GLOBAL_VMAUTH_PASS`, `GLOBAL_VMAUTH_HOST` | [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys) |
+| `TRAEFIK_KOP_REDIS_PASSWORD`, `TRAEFIK_KOP_REDIS_SERVER` | [step 4 of tf01 bootstrap](tf01-bootstrap.md#4-create-the-four-komodo-secrets) |
+| `CF_API_EMAIL`, `CF_DNS_API_TOKEN` | The same step on tf01 |
+| `GLOBAL_AUTHENTIK_HOST` | [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide) |
+| `DOCKNS_UNIFI_HOST`, `DOCKNS_UNIFI_API_KEY` | Step 4 above, per site |
+
+The four `DOCKNS_CF_` and `DOCKNS_WAN_IP` references are the exception. Clear them to blank on a VM with nothing public on it, rather than creating empty Variables.
+
+That list is also why this page sits after every host runbook rather than after ci01. Four of the five hosts each contribute something it needs.
 
 ## 6. Deploy and verify
 
@@ -245,7 +263,9 @@ up{instance=~".*<host>.*"}
 
 Expect a series for the node, cadvisor, vmagent, vlagent, and Traefik jobs, all at `1`. A missing `node` series with everything else present means the Node Exporter password from step 1 is not being read, which usually means `scrape-password` is a directory rather than a file.
 
-For logs, query VictoriaLogs for `{host="<host>"}` and confirm recent journald entries. Traefik's access log lands under the `traefik-access` index instead, and only appears once something has actually been routed.
+For logs, open VictoriaLogs and filter on `stream_name`, which is the one stream field this pipeline sets. Expect streams named after this host's systemd units from journald, and `host-syslog` and similar from the files under `/var/log`.
+
+Traefik's access log is separate. It goes to its own `traefik-access` index with its own stream fields, and appears only once something has actually been routed through this VM.
 
 ## What's next
 

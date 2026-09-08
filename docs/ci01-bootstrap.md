@@ -66,7 +66,7 @@ VictoriaMetrics collects and stores. core-infra is what does something with it. 
 
 It goes last on ci01 because blackbox-exporter has nothing scraping it until the previous step is done.
 
-Follow [Core infrastructure setup](core-infra-setup.md), seven steps from runtime folders to a working notification path out of Proxmox.
+Follow [Core infrastructure setup](core-infra-setup.md), eight steps from runtime folders to a working notification path out of Proxmox.
 
 ## What's next
 

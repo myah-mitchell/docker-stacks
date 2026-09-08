@@ -1,19 +1,23 @@
 global:
-  scrape_interval: 10s
+  scrape_interval: 60s
 
 scrape_configs:
-- job_name: vmagent
+- job_name: 'vmagent-%{PROJECT_NAME}'
   static_configs:
   - targets:
-    - vmagent.%{SERVER_ADDRESS}:8429
-- job_name: vlagent
+    - '%{PROJECT_NAME}-vmagent.%{SERVER_ADDRESS}:8429'
+- job_name: 'vlagent-%{PROJECT_NAME}'
   static_configs:
   - targets:
-    - vlagent.%{SERVER_ADDRESS}:9429
-- job_name: cadvisor
+    - '%{PROJECT_NAME}-vlagent.%{SERVER_ADDRESS}:9429'
+- job_name: 'traefik-%{PROJECT_NAME}'
   static_configs:
   - targets:
-    - cadvisor.%{SERVER_ADDRESS}:8080
+    - '%{PROJECT_NAME}-traefik.%{SERVER_ADDRESS}:8080'
+- job_name: 'cadvisor-%{PROJECT_NAME}'
+  static_configs:
+  - targets:
+    - '%{PROJECT_NAME}-cadvisor.%{SERVER_ADDRESS}:8080'
 - job_name: node
   scheme: https
   tls_config:

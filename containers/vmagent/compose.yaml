@@ -106,7 +106,21 @@ services:
     hostname: ${VMAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     environment:
       NODE_EXPORTER_USER: ${NODE_EXPORTER_USER}
-      NODE_EXPORTER_PASS: ${NODE_EXPORTER_PASS}
     volumes:
       - ./config/prometheus-host.yml:/etc/prometheus/prometheus.yml:ro
       - /etc/node-exporter/node_exporter.crt:/etc/prometheus/node_exporter.crt:ro
+      # The password is generated per host by ansible and read from disk, so it
+      # is never an environment variable and never reaches Komodo. Both files are
+      # written by roles/monitoring/tasks/node-exporter.yml.
+      - /etc/node-exporter/scrape-password:/etc/prometheus/node_exporter_password:ro
+
+  ## Scrapes everything on one VM: this stack's own agents and Traefik, plus the
+  ## host's node_exporter and cadvisor. Used by system-agent, the per-VM bundle.
+  .vmagent-system:
+    extends: .vmagent
+    environment:
+      NODE_EXPORTER_USER: ${NODE_EXPORTER_USER}
+    volumes:
+      - ./config/prometheus-system.yml:/etc/prometheus/prometheus.yml:ro
+      - /etc/node-exporter/node_exporter.crt:/etc/prometheus/node_exporter.crt:ro
+      - /etc/node-exporter/scrape-password:/etc/prometheus/node_exporter_password:ro

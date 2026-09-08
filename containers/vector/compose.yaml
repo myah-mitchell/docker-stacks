@@ -124,3 +124,34 @@ services:
       socket-proxy:
         condition: service_healthy
     userns_mode: "host"
+
+  ## Both pipelines in one vector: the host's own logs and Traefik's access log.
+  ## Used by system-agent, the per-VM bundle, which runs both. Like .vector-host
+  ## it stays root and joins the host user namespace, because journald and
+  ## /var/log are not readable from inside the remapped one.
+  .vector-system:
+    extends: .vector
+    ports:
+      - "5140:5140/udp"
+      - "5140:5140/tcp"
+    environment:
+      DOCKER_HOST: tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
+    volumes:
+      - ./config/vector-system.yml:/etc/vector/vector.yaml:ro
+      # Volumes for host log collection
+      - /etc/machine-id:/etc/machine-id:ro
+      - /var/log:/var/log:ro
+      - /run/log/journal:/run/log/journal:ro
+      # Traefik writes its access log to a file rather than stdout, so the
+      # docker_logs source does not see it. host_files excludes this path to
+      # keep it from being read twice.
+      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik/:ro
+    networks:
+      - frontend
+      - socket_proxy
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+    userns_mode: "host"

@@ -2,9 +2,11 @@
 
 ci01 is the first VM deployed by Komodo rather than built by hand. It is the first real use of the pattern every host after it follows, so read it as a template even when the host you are building is not ci01.
 
-Its first stack is `stacks/semaphore-server`. Semaphore goes first on purpose: once it is up and wired to the ansible repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
+ci01 carries two stacks. `stacks/semaphore-server` goes first on purpose: once it is up and wired to the ansible repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
 
-This runbook ends when Semaphore's UI loads. Wiring Semaphore to ansible is a separate job, in [Semaphore setup](semaphore-setup.md).
+`stacks/victoriametrics-server` follows in steps 14 to 21. It is the metrics, logs, and traces backend every other VM's monitoring sidecars are already trying to write to, so it is a dependency for the rest of the fleet rather than an optional extra.
+
+Steps 1 to 13 are the template the later host runbooks reuse. Wiring Semaphore to ansible is a separate job, in [Semaphore setup](semaphore-setup.md).
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
@@ -25,7 +27,15 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - [11. Create the Stack resource for semaphore-server](#11-create-the-stack-resource-for-semaphore-server)
 - [12. Verify](#12-verify)
 - [13. First access](#13-first-access)
-- [What still lands on ci01](#what-still-lands-on-ci01)
+- [14. Resize ci01 for VictoriaMetrics](#14-resize-ci01-for-victoriametrics)
+- [15. Prepare the host for the agent services](#15-prepare-the-host-for-the-agent-services)
+- [16. Create the VictoriaMetrics runtime folders](#16-create-the-victoriametrics-runtime-folders)
+- [17. Create the three VMAuth keys](#17-create-the-three-vmauth-keys)
+- [18. Create the Stack resource for victoriametrics-server](#18-create-the-stack-resource-for-victoriametrics-server)
+- [19. Verify](#19-verify)
+- [20. First access](#20-first-access)
+- [21. Let the rest of the fleet ship to it](#21-let-the-rest-of-the-fleet-ship-to-it)
+- [What has no stack yet](#what-has-no-stack-yet)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -47,6 +57,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 | `<cephfs>` | Name of the PVE CephFS storage holding the snippets, if that host keeps them there |
 | `<same>` | The value cloud-init already used, recovered in step 5 rather than guessed |
 | `<ansible-private-url>` | Clone URL for ansible-private, from the ansible repo's README |
+| `<internal-subnet>` | The internal VLAN's CIDR, the one every fleet VM sits on |
 
 ## 1. Clone the template into a VM
 
@@ -307,17 +318,80 @@ Log in with the `SEMAPHORE_ADMIN_USER` and `SEMAPHORE_ADMIN_PASSWORD` you set in
 
 If the page does not load at all, the likeliest causes are step 9 not actually healthy, or `TRAEFIK_AUTH_CHAIN` not overridden in step 11. See [Traefik bootstrap](traefik-bootstrap.md).
 
-## What still lands on ci01
+## 14. Resize ci01 for VictoriaMetrics
 
-Semaphore is the first stack on ci01, not the only one. The plan puts the rest of core-infra here alongside it, and that is a real dependency for every other VM rather than a nice-to-have.
+vmagent, vlagent, and vector already run as sidecars in each traefik stack, buffering to their own data folders and retrying against a backend that does not exist yet. This step is where that backend gets built.
 
-### victoriametrics-server, ready now
+Step 2 gave the VM two cores and 4 GB for Semaphore alone. This stack adds twelve more services, including Grafana and three VictoriaMetrics databases, so grow the VM before you deploy it.
 
-`stacks/victoriametrics-server` is already assembled and deployable. It is the fleet's metrics, logs, and traces backend, and every other VM is already trying to write to it: vmagent, vlagent, and vector run as sidecars in each traefik stack, buffer to their own data folders, and retry.
+On the PVE host:
 
-That is why every runbook after this one tells you to clear three keys. Deploying this stack is what makes them real.
+```bash
+qm shutdown <ci-vmid>
+qm set <ci-vmid> --cores 4 --memory 8192
+qm start <ci-vmid>
+```
 
-Create them in Komodo when you do, `GLOBAL_VMAUTH_PASS` on *Settings > Secrets* and the other two on *Settings > Variables*:
+Four cores and 8 GB is a floor rather than a target. Metrics and log retention both grow on disk, so watch `/opt/docker/volumes/victoriametrics` over the first few weeks.
+
+## 15. Prepare the host for the agent services
+
+This stack pulls in `stacks/victoriametrics-agent` through an `include:` in its compose file, so ci01 gets the agent sidecars as part of the same deploy. Those sidecars collect from the host itself, not only from containers, and two of them need something on ci01 first.
+
+### node_exporter
+
+vmagent scrapes `<ci-ip>` on port 9100, over HTTPS, with a self-signed certificate and basic auth. Nothing in the stack installs node_exporter, so it goes on the host by hand.
+
+Follow *Setting Up Node Exporter* in the [generated README for victoriametrics-server](../stacks/victoriametrics-server/README.md). It covers the download, the systemd unit, the self-signed certificate, and the hashed web config.
+
+Keep the plaintext password that procedure has you hash. Step 18 pastes it into `NODE_EXPORTER_PASS`, and vmagent sends it unhashed on every scrape.
+
+### The syslog port
+
+vector's host variant publishes 5140 on TCP and UDP so it can take syslog from the network:
+
+```bash
+sudo ufw allow from <internal-subnet> to any port 5140 proto tcp comment 'Vector syslog'
+sudo ufw allow from <internal-subnet> to any port 5140 proto udp comment 'Vector syslog'
+sudo ufw status
+```
+
+The generated README opens this with a named UFW application and no source restriction. Scope it to the internal subnet instead. Only fleet hosts ship syslog here, and an open syslog port is an easy way to fill a disk from off the network.
+
+## 16. Create the VictoriaMetrics runtime folders
+
+Same rule as step 6. Neither Periphery nor Compose creates host bind-mount directories, so these have to exist with the right ownership before the first deploy.
+
+```bash
+projectName="victoriametrics"
+
+mkdir -p /opt/docker/logs/$projectName
+sudo chmod 750 /opt/docker/logs/$projectName/
+sudo chown $USER:101000 /opt/docker/logs/$projectName
+
+mkdir -p /opt/docker/volumes/$projectName
+sudo chmod 750 /opt/docker/volumes/$projectName/
+sudo chown $USER:101000 /opt/docker/volumes/$projectName
+
+mkdir -p /opt/docker/volumes/$projectName/victoriametrics-data
+mkdir -p /opt/docker/volumes/$projectName/victorialogs-data
+mkdir -p /opt/docker/volumes/$projectName/victoriatraces-data
+mkdir -p /opt/docker/volumes/$projectName/grafana-data
+mkdir -p /opt/docker/volumes/$projectName/vmagent-data
+mkdir -p /opt/docker/volumes/$projectName/vlagent-data
+mkdir -p /opt/docker/volumes/$projectName/vector-data
+sudo chown -R 101000:101000 /opt/docker/volumes/$projectName/
+```
+
+Every service here runs as `PUID`, so all seven data folders take 101000. There is no Postgres in this stack and nothing owned by 100000.
+
+The [generated README for victoriametrics-server](../stacks/victoriametrics-server/README.md) lists an eighth folder, `cadvisor-data`. Creating it is harmless, but no service mounts it, so the list above leaves it out.
+
+## 17. Create the three VMAuth keys
+
+The tf01 and bh01 runbooks both tell you to clear `VMAUTH_USER`, `VMAUTH_PASS`, and `VMAUTH_HOST`, because the Variables behind them do not exist yet. Deploying this stack is what makes them real.
+
+Create them on km01, `GLOBAL_VMAUTH_PASS` under *Settings > Secrets* and the other two under *Settings > Variables*:
 
 | Name | Value |
 | --- | --- |
@@ -327,18 +401,92 @@ Create them in Komodo when you do, `GLOBAL_VMAUTH_PASS` on *Settings > Secrets* 
 
 `GLOBAL_VMAUTH_HOST` is a hostname with no scheme. Each agent builds its own URL around it, so vmagent posts to `/api/v1/write` and vlagent to `/insert/native`, both over HTTPS.
 
-Then go back through every stack that had those three cleared and let them resolve instead. Each one starts shipping on its next deploy.
+> [!WARNING]
+> These two credentials do not protect the data. vmauth's router is hardcoded to `chain-no-auth@file`, and its `config/auth-vl-single.yml` defines only an `unauthorized_user` route, so vmauth proxies whatever reaches it. The username and password guard vmauth's own endpoints, not the traffic it forwards. Anything that can resolve that hostname can read and write all three databases, so keep it off public DNS until that config grows a real user block.
 
-Size ci01 for this before you deploy it. Step 2 gave the VM two cores and 4 GB for Semaphore alone, and this stack adds twelve more services including Grafana and three VictoriaMetrics databases.
+## 18. Create the Stack resource for victoriametrics-server
 
-### The four with no stack yet
+Same shape as step 11. In Komodo's UI, go to *Resources > Stacks*, create a Stack named `victoriametrics-server`, and set its target *Server* to **ci01**.
+
+### Point it at the repo
+
+Under *Choose Mode*, choose **Git Repo**.
+
+| Field | Value |
+| --- | --- |
+| *Repo* | `myah-mitchell/docker-stacks` |
+| *Branch* | `main` |
+| *Run Directory* | `stacks/victoriametrics-server` |
+| *File Path* | `compose.yaml`, relative to the run directory |
+
+### Paste the environment
+
+Open `stacks/victoriametrics-server/komodo.env` in this repo, copy its full contents, and paste them into *Environment*.
+
+Six keys in the pasted text need a value from you:
+
+| Key | Value |
+| --- | --- |
+| `SERVER_NAME` | `ci01` |
+| `SUB_DOMAIN_NAME` | The same value you used in step 11 |
+| `DOMAIN_NAME` | The same value you used in step 11 |
+| `NODE_EXPORTER_USER` | The user from step 15, or leave the default already in the file |
+| `NODE_EXPORTER_PASS` | The plaintext password from step 15 |
+| `TRAEFIK_AUTH_CHAIN` | `chain-no-auth@file`, for the same reason as step 11 |
+
+Five of this stack's routers fall back to `chain-authentik@file`, which still has nothing behind it. Grafana and vmauth are hardcoded to `chain-no-auth@file` and ignore the override, because both do their own authentication. Clear the override once id01 is live, alongside the one from step 11.
+
+The three `[[GLOBAL_VMAUTH_...]]` references resolve from step 17. Leave every other `[[...]]` reference exactly as it is.
+
+### Deploy
+
+Save the Stack resource, then click **Deploy**. This one pulls a dozen images on a cold host, so give it longer than Semaphore took.
+
+## 19. Verify
+
+Confirm all twelve services show running and healthy, in Komodo's container view for the resource:
+
+```text
+victoriametrics
+victorialogs
+victoriatraces
+vmauth
+vmalert
+grafana
+alertmanager
+vmagent
+vlagent
+vector
+cadvisor
+socket-proxy
+```
+
+The last five come from `stacks/victoriametrics-agent` through the `include:`. They are part of this deploy, not a second Stack resource, which is why ci01 never gets an agent stack of its own.
+
+If vmagent is healthy but its `node` scrape target is failing, the cause is step 15 rather than anything in this stack.
+
+## 20. First access
+
+Browse to `https://grafana.ci01.home.myah-mitchell.com`, substituting whatever `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you actually set. Accept the self-signed certificate warning, the same one step 13 produced.
+
+Grafana sets no admin credentials in its environment, so the first login is the stock `admin` and `admin`, and it forces a change. The VictoriaMetrics and VictoriaLogs datasources are provisioned from the repo and should already be present.
+
+## 21. Let the rest of the fleet ship to it
+
+Go back through every stack where you cleared `VMAUTH_USER`, `VMAUTH_PASS`, and `VMAUTH_HOST`, and let them resolve from step 17 instead. Each one starts shipping on its next deploy.
+
+Nothing is lost in the meantime. Each agent buffers to its own data folder and retries, capped at 100 MB per remote-write URL, so a host that has been waiting a while backfills rather than starting clean.
+
+## What has no stack yet
 
 ntfy, mailrise, blackbox-exporter, and uptime-kuma each have a container directory in this repo and no stack. Assembling them is a repo change rather than a runbook step, and there is nothing to deploy until someone does it.
 
-They are worth knowing about because two of them are referenced elsewhere. mailrise is the plausible SMTP relay behind Authentik's email settings, and ntfy is where vmalert's alerts are meant to land. See [step 4 of id01 bootstrap](id01-bootstrap.md#4-create-the-komodo-secrets-and-variables).
+They are worth knowing about because two of them are referenced elsewhere. mailrise is the plausible SMTP relay behind Authentik's email settings, and ntfy is where vmalert's alerts are meant to land instead of the blackhole receiver alertmanager ships with. See [step 4 of id01 bootstrap](id01-bootstrap.md#4-create-the-komodo-secrets-and-variables).
 
 ## What's next
 
-Semaphore is running but not yet connected to anything. Wire it to the ansible repo next, in [Semaphore setup](semaphore-setup.md). That is where the fleet's real shared secrets stop being hand-edited per host.
+Semaphore is running but not yet connected to anything. Wire it to the ansible repo in [Semaphore setup](semaphore-setup.md), which is where the fleet's real shared secrets stop being hand-edited per host.
+
+Nothing in steps 14 to 21 depends on that wiring, so it can happen any time after step 13.
 
 After that, tf01 is the next VM. See [Running order](README.md#running-order), and [How the host runbooks are shaped](README.md#how-the-host-runbooks-are-shaped) for which parts of this runbook the later ones reuse.

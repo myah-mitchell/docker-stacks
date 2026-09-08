@@ -156,7 +156,7 @@ The seventh, `GLOBAL_EMAIL_PASS`, goes on *Settings > Secrets* instead. It is th
 
 Authentik reads these at startup and does not test the connection, so an unreachable relay surfaces only when a flow actually tries to send, such as a password recovery. Create them with real values if you have a relay today. If you do not, give `GLOBAL_EMAIL_PORT` a real number and `GLOBAL_EMAIL_TLS` and `GLOBAL_EMAIL_SSL` a real boolean anyway, because those three are typed and a blank is not the same as a default.
 
-mailrise lands on ci01 later and is a plausible relay for this. See [What still lands on ci01](ci01-bootstrap.md#what-still-lands-on-ci01).
+mailrise is a plausible relay for this, but it has no stack in this repo yet. See [What has no stack yet](ci01-bootstrap.md#what-has-no-stack-yet).
 
 ## 5. Create the Stack resource for authentik-server
 

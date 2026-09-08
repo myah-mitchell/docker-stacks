@@ -539,15 +539,19 @@ Role abbreviations: `km` Komodo · `tf` Traefik hub · `ci` core-infra · `id` A
 Bootstrap docs live in `docs/` (see `docs/README.md` for the index and running
 order). This table is the status summary; that doc is the authoritative running order.
 
+Every VM below also runs `stacks/system-agent`, which is per-VM rather than
+per-host and has its own page in `docs/system-agent-setup.md`. Until `ci01`,
+`id01` and `pk01` all exist, `stacks/traefik-bootstrap` stands in for it.
+
 | Hostname | Purpose | Doc | Status |
 |---|---|---|---|
 | `km01.home.myah-mitchell.com` | Komodo GitOps engine | `docs/komodo-bootstrap.md` | **in progress** — steps 1–13 followed against a real VM, not yet confirmed fully healthy end-to-end |
-| `ci01.home.myah-mitchell.com` | Semaphore (`ansible` runner) first, rest of `core-infra` later | `docs/ci01-bootstrap.md` | doc written, not yet run against a real host — decision #16/#17 |
-| `tf01.home.myah-mitchell.com` | central Traefik + Redis master | not written yet | not started — blocked on `ci01`/Semaphore existing (decision #17) |
-| `id01.home.myah-mitchell.com` | Authentik | not written yet | not started |
-| `pk01.home.myah-mitchell.com` | step-ca | not written yet | not started |
-| `bh01.home.myah-mitchell.com` | `cloudflared` + `traefik-dmz`, isolated DMZ VLAN | not written yet | not started |
-| `ap01.home.myah-mitchell.com` | Vaultwarden (migrated data) + future self-hosted replacements | not written yet | not started |
+| `ci01.home.myah-mitchell.com` | Semaphore, then VictoriaMetrics, then `core-infra` | `docs/ci01-bootstrap.md`, plus one doc per stack | docs written, not yet run against a real host (decision #16/#17) |
+| `tf01.home.myah-mitchell.com` | central Traefik + Redis master | `docs/tf01-bootstrap.md` | doc written, not yet run. Blocked on `ci01`/Semaphore existing (decision #17) |
+| `id01.home.myah-mitchell.com` | Authentik | `docs/id01-bootstrap.md` | doc written, not yet run |
+| `pk01.home.myah-mitchell.com` | step-ca | `docs/pk01-bootstrap.md` | doc written, not yet run |
+| `bh01.home.myah-mitchell.com` | `cloudflared` + `traefik-dmz`, isolated DMZ VLAN | `docs/bh01-bootstrap.md` | doc written, not yet run |
+| `ap01.home.myah-mitchell.com` | Vaultwarden (migrated data) + future self-hosted replacements | not written yet | not started. Vaultwarden has no directory under `containers/`, so there is no stack for a runbook to point at |
 | `bk01.home.myah-mitchell.com`? | local + S3 backup target (PBS, existing) | n/a — pre-existing, out of scope for these runbooks | existing, unchanged — hostname shown here is the new-convention target, not confirmed as this host's actual current name |
 | `bk01.cloud.myah-mitchell.com`? | offsite backup target (colo PBS) | n/a — pre-existing, out of scope for these runbooks | already staged in `ansible/hosts.yml`, needs a real IP once colo networking exists; same caveat as above |
 

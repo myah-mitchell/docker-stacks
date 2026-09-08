@@ -445,7 +445,7 @@ transforms:
         .message = msg
       }
 
-      # Key-value parsing (logfmt) — skip if message looks like prose
+      # Key-value parsing (logfmt), skipped if the message looks like prose
       if msg != "" && match(msg, r'\b\w+=\S') && !contains(msg, "='") && !contains(msg, ";") && !contains(msg, " :: ") && !match(msg, r'\(\):\s') {
         parsed, e = parse_key_value(.message)
         if e == null { . = merge(., parsed) }

@@ -75,7 +75,7 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 
 ## Prerequisites
 
-- ci01 is finished, through [Semaphore setup](semaphore-setup.md). Its step 8 is what pushes the real `node_exporter_password` to every host, and tf01's vmagent scrapes node_exporter with it.
+- ci01 is finished, through [Semaphore setup](semaphore-setup.md). Its step 12 is what pushes the real `node_exporter_password` to every host, and tf01's vmagent scrapes node_exporter with it.
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
 - The two repo changes above are committed and pushed to `main`.
 - A Cloudflare API token scoped to edit DNS for the zone, and the account email that owns it. The resolver uses a DNS-01 challenge, so Let's Encrypt never needs to reach tf01 from the internet.
@@ -217,11 +217,11 @@ Six keys arrive as references to Variables that do not exist yet, or as values n
 | --- | --- |
 | `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec environment lines and its bouncer middleware commented out |
 | `AUTHENTIK_HOST` | id01 does not exist yet, so nothing forwards auth anywhere |
-| `VMAUTH_USER`, `VMAUTH_PASS`, `VMAUTH_HOST` | The monitoring sidecars ship metrics and logs to a vmauth that lands on ci01 in steps 14 to 20 of its runbook |
+| `VMAUTH_USER`, `VMAUTH_PASS`, `VMAUTH_HOST` | The monitoring sidecars ship metrics and logs to a vmauth that lands on ci01 later |
 
 The last three are worth understanding rather than just clearing. vmagent, vlagent, and vector still start and still scrape, but they have nowhere to write, so they buffer to their own data folders and retry. That is why those folders are created in step 2 even though nothing consumes them yet.
 
-Come back and let the three VMAuth keys resolve once ci01 reaches [step 16](ci01-bootstrap.md#16-create-the-three-vmauth-keys), which is where those Variables get created.
+Come back and let the three VMAuth keys resolve once ci01 reaches [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys), which is where those Variables get created.
 
 `AUTHENTIK_HOST` waits on id01 instead. See [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide).
 

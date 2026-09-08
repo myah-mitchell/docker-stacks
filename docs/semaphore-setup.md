@@ -1,6 +1,8 @@
-# Wiring Semaphore to the ansible repo
+# Deploying Semaphore and wiring it to ansible
 
-Semaphore is running after [ci01 bootstrap](ci01-bootstrap.md), but it is not connected to anything. This doc connects it: a Project, an SSH credential, the ansible repo, a real inventory, the private variables, and a Template that runs against the fleet.
+Semaphore is the first stack on ci01. Steps 1 to 4 deploy it, and steps 5 to 13 connect it to something: a Project, an SSH credential, the ansible repo, a real inventory, the private variables, and a Template that runs against the fleet.
+
+Deploying it is not the hard part, and a Semaphore that is up but unwired is worth nothing, so both halves live here rather than being split across two docs.
 
 This is the point of building ci01 before anything else. Until Semaphore can reach the fleet, every shared secret in ansible has to be fixed by hand, host by host, over SSH.
 
@@ -9,15 +11,19 @@ This is the point of building ci01 before anything else. Until Semaphore can rea
 - [The problem this solves](#the-problem-this-solves)
 - [Prerequisites](#prerequisites)
 - [Placeholders](#placeholders)
-- [1. Create the bootstrap SSH key](#1-create-the-bootstrap-ssh-key)
-- [2. Create the Project](#2-create-the-project)
-- [3. Add the SSH key to the Key Store](#3-add-the-ssh-key-to-the-key-store)
-- [4. Add the ansible repository](#4-add-the-ansible-repository)
-- [5. Create the inventory](#5-create-the-inventory)
-- [6. Create the ansible-private Variable Group](#6-create-the-ansible-private-variable-group)
-- [7. Create the Template](#7-create-the-template)
-- [8. Fix existing hosts before running](#8-fix-existing-hosts-before-running)
-- [9. Replace this key once step-ca is live](#9-replace-this-key-once-step-ca-is-live)
+- [1. Generate Semaphore's three encryption keys](#1-generate-semaphores-three-encryption-keys)
+- [2. Create the Stack resource for semaphore-server](#2-create-the-stack-resource-for-semaphore-server)
+- [3. Verify](#3-verify)
+- [4. First access](#4-first-access)
+- [5. Create the bootstrap SSH key](#5-create-the-bootstrap-ssh-key)
+- [6. Create the Project](#6-create-the-project)
+- [7. Add the SSH key to the Key Store](#7-add-the-ssh-key-to-the-key-store)
+- [8. Add the ansible repository](#8-add-the-ansible-repository)
+- [9. Create the inventory](#9-create-the-inventory)
+- [10. Create the ansible-private Variable Group](#10-create-the-ansible-private-variable-group)
+- [11. Create the Template](#11-create-the-template)
+- [12. Fix existing hosts before running](#12-fix-existing-hosts-before-running)
+- [13. Replace this key once step-ca is live](#13-replace-this-key-once-step-ca-is-live)
 - [What's next](#whats-next)
 
 ## The problem this solves
@@ -32,7 +38,7 @@ The real value belongs in ansible-private's `group_vars/all/private.yml`, which 
 
 ## Prerequisites
 
-- Semaphore's UI loads and you can log in, through step 13 of [ci01 bootstrap](ci01-bootstrap.md).
+- ci01 is provisioned and shows connected and healthy in Komodo, through step 9 of [ci01 bootstrap](ci01-bootstrap.md). Step 9 in particular: without traefik-bootstrap there is no way to reach Semaphore's UI once it deploys.
 - You have ansible-private checked out somewhere you can commit and push from.
 - You know the four identity values the fleet was provisioned with, listed under [Placeholders](#placeholders).
 
@@ -46,9 +52,110 @@ The real value belongs in ansible-private's `group_vars/all/private.yml`, which 
 | `<abbr_name>` | Fleet identity value, its abbreviation |
 | `<location_abbr>` | Fleet identity value, the site letter |
 | `<domain_name>` | Fleet identity value, the real domain |
-| `<same>` | The value that host was already provisioned with, recovered in step 1 rather than guessed |
+| `<same>` | The value that host was already provisioned with, recovered rather than guessed |
 
-## 1. Create the bootstrap SSH key
+## 1. Generate Semaphore's three encryption keys
+
+Three of Semaphore's values are base64-encoded 32-byte keys rather than plain passwords, so `scripts/build.py` deliberately does not generate them. Generate them once, now:
+
+```bash
+head -c32 /dev/urandom | base64  # SEMAPHORE_COOKIE_HASH
+head -c32 /dev/urandom | base64  # SEMAPHORE_COOKIE_ENCRYPTION
+head -c32 /dev/urandom | base64  # SEMAPHORE_ACCESS_KEY_ENCRYPTION
+```
+
+> [!IMPORTANT]
+> These three must stay stable across restarts. Rotating any of them invalidates every stored SSH key, every stored vault secret, and every active session.
+
+They go into Komodo Secrets in step 2, not into any file in this repo.
+
+## 2. Create the Stack resource for semaphore-server
+
+In Komodo's UI, go to *Resources > Stacks* and create a new Stack named `semaphore-server`. Set its target *Server* to **ci01**, the resource created by step 5 of the [ci01 runbook](ci01-bootstrap.md).
+
+### Point it at the repo
+
+Under *Choose Mode*, choose **Git Repo**.
+
+| Field | Value |
+| --- | --- |
+| *Repo* | `myah-mitchell/docker-stacks` |
+| *Branch* | `main` |
+| *Run Directory* | `stacks/semaphore-server` |
+| *File Path* | `compose.yaml`, relative to the run directory |
+
+The repo is public, so Komodo needs no credential to clone it.
+
+### Paste the environment
+
+*Environment* is a plain text editor with no option to point at a file. Open `stacks/semaphore-server/komodo.env` in this repo, copy its full contents, and paste them into that field.
+
+Four keys in the pasted text need a value from you:
+
+| Key | Value |
+| --- | --- |
+| `SERVER_NAME` | `ci01` |
+| `SUB_DOMAIN_NAME` | This site, with the trailing dot, so `home.` |
+| `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
+| `TRAEFIK_AUTH_CHAIN` | `chain-no-auth@file`, so it routes through traefik-bootstrap |
+
+Authentik does not exist yet, so the real `chain-authentik@file` default has nothing behind it. Clear that override later, once id01 is live and system-agent has replaced traefik-bootstrap here.
+
+Three more keys are blank and stay that way: `POSTGRES_BACKUP_DB`, `POSTGRES_BACKUP_USER`, and `POSTGRES_BACKUP_PASSWORD`. This stack's `compose.yaml` points all three at the same database, user, and password its own Postgres service already resolves.
+
+Leave every `[[...]]` reference in the pasted text exactly as it is. Komodo resolves them at deploy time from its own Variables and Secrets, which is the next step.
+
+### Create the nine Semaphore Secrets
+
+The `[[GLOBAL_...]]` references already resolve, from km01's step 14. The `[[SEMAPHORE_...]]` ones do not exist yet.
+
+Go to *Settings > Secrets* on km01 and create all nine by name. These are real credentials, so Secrets rather than Variables: Komodo resolves both identically, but Secrets stay masked in the UI.
+
+| Secret | Value |
+| --- | --- |
+| `SEMAPHORE_ADMIN_USER` | Your choice |
+| `SEMAPHORE_ADMIN_NAME` | Your choice |
+| `SEMAPHORE_ADMIN_EMAIL` | Your choice |
+| `SEMAPHORE_ADMIN_PASSWORD` | Your choice, alphanumeric only |
+| `SEMAPHORE_COOKIE_HASH` | First value from step 1 |
+| `SEMAPHORE_COOKIE_ENCRYPTION` | Second value from step 1 |
+| `SEMAPHORE_ACCESS_KEY_ENCRYPTION` | Third value from step 1 |
+| `SEMAPHORE_POSTGRES_USER` | Your choice |
+| `SEMAPHORE_POSTGRES_PASSWORD` | Your choice, alphanumeric only |
+
+The last two feed the `POSTGRES_USER` and `POSTGRES_PASSWORD` lines in the pasted text. Do not edit those two lines themselves.
+
+The alphanumeric-only rule matters here for the same reason it does everywhere else. See [Conventions](conventions.md#alphanumeric-only).
+
+Deploying before all nine exist fails the same way a missing `GLOBAL_*` does, with Compose trying to interpolate the literal string `[[SEMAPHORE_ADMIN_PASSWORD]]` into the container's environment. Create the Secrets and click **Deploy** again.
+
+### Deploy
+
+Save the Stack resource, then click **Deploy**. Watch the deploy log. Komodo clones the repo onto ci01, reads the compose file, and runs the equivalent of `docker compose up -d` through Periphery.
+
+## 3. Verify
+
+Confirm all three services show running and healthy, in Komodo's container view for the resource:
+
+```text
+semaphore
+postgres
+postgres-backup
+```
+
+To check from the host instead, SSH to ci01 and run `docker compose ps` in the stack's own directory under `/opt/docker/repos/`, where Periphery cloned it.
+
+## 4. First access
+
+Browse to `https://semaphore.ci01.home.myah-mitchell.com`, substituting whatever `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you actually set. This is real Traefik routing, through the traefik-bootstrap deployed in step 9 of the [ci01 runbook](ci01-bootstrap.md#9-deploy-traefik-bootstrap-onto-ci01).
+
+Your browser will warn about the certificate. That is expected: it is self-signed, not issued by a CA your browser trusts. Accept it and continue.
+
+Log in with the `SEMAPHORE_ADMIN_USER` and `SEMAPHORE_ADMIN_PASSWORD` you set in step 2.
+
+If the page does not load at all, the likeliest causes are ci01's traefik-bootstrap not actually healthy, or `TRAEFIK_AUTH_CHAIN` not overridden in step 2. See [Traefik bootstrap](traefik-bootstrap.md).
+
+## 5. Create the bootstrap SSH key
 
 Semaphore reaches every host as the `ansible` service account. The users role creates it with `NOPASSWD: ALL` sudo and an `authorized_keys` file built from `ansible_ssh_public_keys`.
 
@@ -73,9 +180,9 @@ Use the same argument-recovery trick from [step 5](ci01-bootstrap.md#recover-the
 
 If `/tmp/ansible` is gone on a host, re-clone it and re-apply the private overlay first, the same way [step 5 of the ci01 runbook](ci01-bootstrap.md#5-give-ci01-an-onboarding-key) does.
 
-Do this on km01 and ci01 at minimum. This static key is the same kind of bootstrap exception as Komodo's own manual first start, and [step 9](#9-replace-this-key-once-step-ca-is-live) replaces it later.
+Do this on km01 and ci01 at minimum. This static key is the same kind of bootstrap exception as Komodo's own manual first start, and [step 13](#13-replace-this-key-once-step-ca-is-live) replaces it later.
 
-## 2. Create the Project
+## 6. Create the Project
 
 In Semaphore, create a Project named `fleet-provisioning`.
 
@@ -83,7 +190,7 @@ A Semaphore Project is the top-level container: Key Store, Repositories, Invento
 
 Do not name it `ansible`. Three things one level down inside it are already called `ansible`: the Repository in step 4, the service account it connects as, and the key credential in step 3.
 
-## 3. Add the SSH key to the Key Store
+## 7. Add the SSH key to the Key Store
 
 Go to *Key Store* and click **New Key**.
 
@@ -96,7 +203,7 @@ Go to *Key Store* and click **New Key**.
 
 The *Username* field here is what becomes `ansible_user` on every connection, so the inventory in step 5 does not need to set it.
 
-## 4. Add the ansible repository
+## 8. Add the ansible repository
 
 Go to *Repository* and click **New Repository**.
 
@@ -111,7 +218,7 @@ The ansible repo is public, so no deploy key is needed, the same as the docker-s
 
 The dotfiles repo needs no Repository entry at all. Its own Ansible role clones it directly over plain HTTPS.
 
-## 5. Create the inventory
+## 9. Create the inventory
 
 This is the step with real work in it. The `hosts.yml` in both ansible and ansible-private is built for local runs. Its localhosts group holds three entries, ubuntu, ubuntu_docker, and wsl, and points all of them at 127.0.0.1, because every Docker VM so far was provisioned by cloud-init with `-c local`.
 
@@ -174,7 +281,7 @@ Paste the full contents of ansible-private's `hosts.yml`, including the group yo
 > [!IMPORTANT]
 > That copy does not update itself. Every time you add a host to ansible-private's `hosts.yml`, paste the new content into this Inventory too, or Semaphore keeps running against the old list.
 
-## 6. Create the ansible-private Variable Group
+## 10. Create the ansible-private Variable Group
 
 Go to *Variable Groups*, click **New Group**, and name it `ansible-private`.
 
@@ -254,7 +361,7 @@ That is why these live in the Variable Group's *Extra Variables*, which Semaphor
 
 Five of the six are fleet-wide constants, so setting them once here means you never type them again. The sixth, `target`, is per-run, and step 7 handles it.
 
-## 7. Create the Template
+## 11. Create the Template
 
 Go to *Task Templates*, click **New Template**, and choose the **Ansible Playbook** app.
 
@@ -285,7 +392,7 @@ Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the 
 
 Answer it with a host or group name from the inventory: ci01 for one host, `docker_host_h` for every Docker VM at once.
 
-## 8. Fix existing hosts before running
+## 12. Fix existing hosts before running
 
 `roles/monitoring/tasks/node-exporter.yml` writes `/etc/node-exporter/config.yml` only `when: not node_exporter_config.stat.exists`.
 
@@ -302,7 +409,7 @@ Then run the Template against them.
 
 Hosts built once `node_exporter_password` is committed to ansible-private never hit this. They get the real password on their first cloud-init run, and `config.yml` never exists with the wrong hash to begin with.
 
-## 9. Replace this key once step-ca is live
+## 13. Replace this key once step-ca is live
 
 Once step-ca's SSH CA is running on pk01, replace the static key from step 1 with a dedicated semaphore service principal using a short-lived, auto-renewed step-ca certificate.
 
@@ -312,4 +419,6 @@ Do not skip this. A static private key stored in Semaphore that grants passwordl
 
 Semaphore can now reach the fleet, and shared secrets stop being a per-host chore.
 
-tf01 is the next VM. See [Running order](README.md#running-order).
+ci01 has one stack left. [VictoriaMetrics setup](victoriametrics-setup.md) deploys the fleet's metrics, logs, and traces backend, and its step 1 depends on the real `node_exporter_password` step 12 above just pushed.
+
+After that, tf01 is the next VM. See [Running order](README.md#running-order).

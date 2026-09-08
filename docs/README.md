@@ -46,9 +46,11 @@ This applies to every VM in the list above, which is why it lives here rather th
 
 ## How the host runbooks are shaped
 
-[ci01 bootstrap](ci01-bootstrap.md) is the one that works the shared pattern out in full. Its steps 1 to 8 are identical for every VM in the fleet, so the four runbooks after it compress those into a single step that points back here rather than repeating them.
+[ci01 bootstrap](ci01-bootstrap.md) is the one that works the shared pattern out in full. Its steps 1 to 9 are identical for every VM in the fleet, so the four runbooks after it compress those into a single step that points back here rather than repeating them.
 
-ci01 runs longer than the others because it carries two stacks. Steps 1 to 13 build Semaphore and are the part later runbooks reuse; steps 14 to 20 add `stacks/victoriametrics-server`, which nothing else in the fleet duplicates.
+ci01 differs in one way. Both of its stacks need more than a Komodo Stack resource to be worth anything, so its steps 10 and 11 hand off to [Semaphore setup](semaphore-setup.md) and [VictoriaMetrics setup](victoriametrics-setup.md) instead of carrying the procedure inline.
+
+Split a runbook that way when the stack has real work after the deploy, and keep it inline when it does not. The other four host runbooks deploy and verify in place, because nothing more is needed.
 
 That is the rule to keep when writing the next one. Point at ci01 for anything shared, and spend the page on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
 
@@ -65,6 +67,7 @@ The per-host runbooks are in [Running order](#running-order) above. These are th
 | Page | What it covers |
 | --- | --- |
 | [Conventions](conventions.md) | Naming and secrets rules every other page assumes |
-| [Semaphore setup](semaphore-setup.md) | Wiring Semaphore to the ansible repo and pushing the first real secret |
+| [Semaphore setup](semaphore-setup.md) | Deploying Semaphore on ci01, wiring it to the ansible repo, and pushing the first real secret |
+| [VictoriaMetrics setup](victoriametrics-setup.md) | Deploying the fleet's metrics, logs, and traces backend on ci01 |
 | [Traefik bootstrap](traefik-bootstrap.md) | The temporary per-VM Traefik used before pk01 and id01 exist |
 | [Stacks](stacks.md) | What every stack in this repo deploys, independent of bootstrap order |

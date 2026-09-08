@@ -190,6 +190,6 @@ pk01 existing also unblocks two things that are not VM provisioning:
 
 Traefik can start asking this CA for internal certificates instead of serving self-signed ones. `containers/traefik/compose.yaml` has a commented-out `internalca` resolver block for it, and the [step-ca stack README](../stacks/step-ca-server/README.md) is explicit that the DNS-01 specifics there are unverified and need real testing before being uncommented.
 
-Semaphore's static SSH key can be replaced with a dedicated service principal on a short-lived, auto-renewed step-ca certificate. See [step 9 of Semaphore setup](semaphore-setup.md#9-replace-this-key-once-step-ca-is-live).
+Semaphore's static SSH key can be replaced with a dedicated service principal on a short-lived, auto-renewed step-ca certificate. See [step 9 of Semaphore setup](semaphore-setup.md#13-replace-this-key-once-step-ca-is-live).
 
 See [Running order](README.md#running-order) for where pk01 sits.

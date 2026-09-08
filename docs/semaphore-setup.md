@@ -423,6 +423,14 @@ Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the 
 
 Answer it with a host or group name from the inventory: ci01 for one host, `docker_host_h` for every Docker VM at once.
 
+### Run it once against every existing host
+
+Do this now, before moving on. km01 and ci01 were both built before this Template existed, so their Node Exporter was configured by whatever the role held on the day cloud-init ran.
+
+The role generates each host's own random Node Exporter password on its first run and reuses it forever after, so a host that predates that behaviour still has the old committed default. Running the Template replaces it, and every host built after this one gets the right thing from cloud-init with nothing to come back for.
+
+`docker_host_h` covers every Docker VM at the home site in one run.
+
 ## 13. Replace this key once step-ca is live
 
 Once step-ca's SSH CA is running on pk01, replace the static key from step 6 with a dedicated semaphore service principal using a short-lived, auto-renewed step-ca certificate.

@@ -60,8 +60,8 @@ Deploy [traefik-bootstrap](traefik-bootstrap.md) in the meantime, and come back 
 | --- | --- |
 | `<host>` | The VM's hostname, for example `tf01` |
 | `<host-ip>` | That VM's address |
-| `<internal-subnet>` | The internal VLAN in CIDR form, for example `192.168.1.0/24` |
-| `<unifi-url>` | The local URL of that site's UniFi console, for example `https://192.168.1.1` |
+| `<internal-subnet>` | The internal VLAN in CIDR form, from the same place `<host-ip>` came from |
+| `<unifi-url>` | That site's UniFi console over HTTPS at its LAN address, not `api.ui.com` |
 
 ## 1. Run the monitoring role against the VM
 

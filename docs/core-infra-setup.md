@@ -35,7 +35,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 | Placeholder | Value |
 | --- | --- |
 | `<ci-ip>` | ci01's address, the one set in its own runbook |
-| `<internal-subnet>` | The internal VLAN in CIDR form, for example `192.168.1.0/24` |
+| `<internal-subnet>` | The internal VLAN in CIDR form, from the same place `<ci-ip>` came from |
 | `<clone-dir>` | Where Periphery cloned this repo on ci01, found in step 4 rather than assumed |
 | `<ntfy-user>` | The account name you sign in to the ntfy apps with, your choice, created in step 6 |
 | `<ntfy-token>` | The publish token printed by step 6 |

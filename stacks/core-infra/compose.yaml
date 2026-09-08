@@ -1,0 +1,43 @@
+###############################################################################
+# Start of stack config
+###############################################################################
+# Project Name: "core"
+name: ${PROJECT_NAME}
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
+  frontend:
+    name: ${PROJECT_NAME}_frontend
+    internal: false
+  backend:
+    name: ${PROJECT_NAME}_backend
+    internal: true
+
+services:
+
+## Notification Services
+  ntfy:
+    extends:
+      file: ../../containers/ntfy/compose.yaml
+      service: .ntfy
+
+  mailrise:
+    extends:
+      file: ../../containers/mailrise/compose.yaml
+      service: .mailrise
+    depends_on:
+      ntfy:
+        condition: service_healthy
+
+## Uptime and Probe Services
+  blackbox-exporter:
+    extends:
+      file: ../../containers/blackbox-exporter/compose.yaml
+      service: .blackbox-exporter
+
+  uptime-kuma:
+    extends:
+      file: ../../containers/uptime-kuma/compose.yaml
+      service: .uptime-kuma

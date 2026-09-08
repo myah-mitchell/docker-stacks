@@ -4,10 +4,7 @@
 # Create and Setup Required Folders
 ## Create needed folders for cloudflared
 
-```bash
-mkdir -p /opt/docker/stacks/$projectName/cloudflared/config
-mkdir -p /opt/docker/stacks/$projectName/cloudflared/secrets
-```
+The compose file mounts `./config` and `./secrets` as whole directories, and those paths are relative to `containers/cloudflared/` rather than to the stack directory, because Compose resolves a relative bind mount against the file that declares it. Both live inside whichever checkout of this repo the stack runs from, and both already exist in git, so there is nothing to create. The two files that go in them are covered below.
 
 ## One-time tunnel creation (from an admin machine, not this container)
 

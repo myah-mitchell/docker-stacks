@@ -42,7 +42,6 @@ The first five come from the host's own runbook. The rest are the same for every
 | `<template-vmid>` | VMID of the cloud-init template, the same one km01 used |
 | `<gateway-ip>` | Gateway for that subnet |
 | `<km-ip>` | km01's address, from its own runbook |
-| `<cephfs>` | Name of the PVE CephFS storage holding the snippets, if that host keeps them there |
 | `<same>` | The value cloud-init already used, recovered in step 5 rather than guessed |
 | `<ansible-private-url>` | Clone URL for ansible-private, from the ansible repo's README |
 
@@ -105,7 +104,7 @@ The re-run below has to pass the same four identity values cloud-init used the f
 sudo grep -o "\-e '{[^']*}'" /var/lib/cloud/instance/scripts/runcmd
 ```
 
-If that file is gone, the same values are in the vendor snippet on the PVE host, at `/mnt/pve/<cephfs>/snippets/cloudinit-vendor.yml` or `/var/lib/vz/snippets/cloudinit-vendor.yml`.
+If that file is gone, the same values are in the vendor snippet on the PVE host, at `/var/lib/vz/snippets/cloudinit-vendor.yml`. Snippets live on the `local` storage.
 
 ### Re-run provisioning with the key
 

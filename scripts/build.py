@@ -600,7 +600,8 @@ def build_komodo_env(base_content, containers_dir, container_names,
 # ============================================================================
 
 def build_readme(base_content, existing_content, containers_dir,
-                 container_names, stack_name, service_map=None):
+                 container_names, stack_name, service_map=None,
+                 project_name=None):
     """Build a stack's README.md from existing/base + container READMEs.
 
     Merge rules:
@@ -631,6 +632,9 @@ def build_readme(base_content, existing_content, containers_dir,
         stack_name:      Stack directory name (for template substitution).
         service_map:     Optional dict mapping container name to set of
                          active service variant names for tag filtering.
+        project_name:    Optional project name extracted from compose.yaml,
+                         substituted for <projectName> in the folder-creation
+                         commands so they are copy-pasteable as written.
 
     Returns:
         Generated README.md content string.
@@ -639,6 +643,9 @@ def build_readme(base_content, existing_content, containers_dir,
         service_map = {}
     pretty_name = stack_name.replace('-', ' ').title()
     base_substituted = base_content.replace('<stackName>', pretty_name)
+    if project_name:
+        base_substituted = base_substituted.replace(
+            '<projectName>', project_name)
 
     # --- Determine starting content ---
     if existing_content is not None:
@@ -1264,7 +1271,7 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
 
     readme_output = build_readme(
         base_readme, existing_readme, containers_dir,
-        container_names, stack_name, service_map
+        container_names, stack_name, service_map, project_name
     )
     (stack_dir / 'README.md').write_text(readme_output, encoding='utf-8')
     print("    Created: README.md")

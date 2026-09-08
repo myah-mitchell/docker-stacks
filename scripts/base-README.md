@@ -4,7 +4,7 @@
 ## Create Stack Folders
 
 ```bash
-projectName="projectName"
+projectName="<projectName>"
 mkdir -p /opt/docker/logs/$projectName
 sudo chmod 750 /opt/docker/logs/$projectName/
 sudo chown $USER:101000 /opt/docker/logs/$projectName

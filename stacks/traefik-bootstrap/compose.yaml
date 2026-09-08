@@ -129,14 +129,14 @@ services:
       - --providers.file.directory=/etc/traefik/rules
       - --providers.file.watch=true
       - --providers.docker.watch=true
-      - --providers.docker.network=proxy
+      - --providers.docker.network=${PROXY_NETWORK}
       - --providers.docker.exposedbydefault=false
       - --providers.docker.endpoint=tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
 
       ################################################################
       # Plugins
       ################################################################
-      - --experimental.plugins.bouncer.version=v1.5.0
+      #- --experimental.plugins.bouncer.version=v1.5.0
 
       ################################################################
       # Certificates Resolvers (ACME) — deliberately none. No CF_DNS_API_TOKEN, no
@@ -147,7 +147,7 @@ services:
       ################################################################
       # Extra Commands from Env Vars
       ################################################################
-      - ${TRAEFIK_EXTRA_COMMAND:-""}
+      - ${TRAEFIK_EXTRA_COMMAND:-}
     labels: ## Traefik Labels
       - "traefik.enable=true"
 
@@ -158,6 +158,9 @@ services:
         Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
       - "traefik.http.routers.traefik.entrypoints=dashboard"
       - "traefik.http.routers.traefik.service=api@internal"
+      # chain-no-auth@file, not the chain-authentik@file default the base
+      # service uses: id01/Authentik does not exist during the bootstrap window.
+      - "traefik.http.routers.traefik.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-no-auth@file}"
 
       ## No defaultGeneratedCert labels here, unlike the base service. Without a
       ## resolver, domain.main/domain.sans hints don't make Traefik mint a cert for

@@ -23,6 +23,9 @@ services:
     extends:
       file: ../../containers/dozzle/compose.yaml
       service: .dozzle-agent
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
 
   socket-proxy:
     extends:

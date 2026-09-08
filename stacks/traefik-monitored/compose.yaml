@@ -37,3 +37,10 @@ services:
     extends:
       file: ../../containers/vector/compose.yaml
       service: .vector-traefik
+    depends_on:
+      traefik:
+        condition: service_healthy
+      vlagent:
+        condition: service_healthy
+      vmagent:
+        condition: service_healthy

@@ -27,7 +27,7 @@ Add a `[secrets]` block in the same file for any `[[VAR]]` reference used across
 ## Create Stack Folders
 
 ```bash
-projectName="projectName"
+projectName="komodo"
 mkdir -p /opt/docker/logs/$projectName
 sudo chmod 750 /opt/docker/logs/$projectName/
 sudo chown $USER:101000 /opt/docker/logs/$projectName

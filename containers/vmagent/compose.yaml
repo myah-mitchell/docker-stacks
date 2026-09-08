@@ -98,7 +98,6 @@ services:
 
   .vmagent-traefik:
     extends: .vmagent
-    environment:
     volumes:
       - ./config/prometheus-traefik.yml:/etc/prometheus/prometheus.yml:ro
 

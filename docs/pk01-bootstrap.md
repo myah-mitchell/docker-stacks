@@ -39,7 +39,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## 1. Provision the VM
 
-Follow steps 1 to 8 of [ci01 bootstrap](ci01-bootstrap.md), substituting pk01 throughout.
+Follow steps 1 to 7 of [ci01 bootstrap](ci01-bootstrap.md), substituting pk01 throughout.
 
 One service and no database, so this is the smallest VM in the fleet:
 
@@ -52,7 +52,7 @@ qm start <pk-vmid>
 
 pk01 is internal-only and mesh-only. It is never published through bh01's tunnel. A CA that issues for the internal zone has no reason to answer from the internet.
 
-Stop when pk01 shows connected and healthy under *Resources > Servers*, which is ci01's step 8.
+Stop when pk01 shows connected and healthy under *Resources > Servers*, which is ci01's step 7.
 
 ## 2. Create the runtime folders
 
@@ -190,6 +190,6 @@ pk01 existing also unblocks two things that are not VM provisioning:
 
 Traefik can start asking this CA for internal certificates instead of serving self-signed ones. `containers/traefik/compose.yaml` has a commented-out `internalca` resolver block for it, and the [step-ca stack README](../stacks/step-ca-server/README.md) is explicit that the DNS-01 specifics there are unverified and need real testing before being uncommented.
 
-Semaphore's static SSH key can be replaced with a dedicated service principal on a short-lived, auto-renewed step-ca certificate. See [step 9 of Semaphore setup](semaphore-setup.md#13-replace-this-key-once-step-ca-is-live).
+Semaphore's static SSH key can be replaced with a dedicated service principal on a short-lived, auto-renewed step-ca certificate. See [step 9 of Semaphore setup](semaphore-setup.md#14-replace-this-key-once-step-ca-is-live).
 
 See [Running order](README.md#running-order) for where pk01 sits.

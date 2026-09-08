@@ -64,7 +64,7 @@ That credentials file is a real credential: anything holding it can serve traffi
 
 ## 2. Provision the VM
 
-Follow steps 1 to 8 of [ci01 bootstrap](ci01-bootstrap.md), substituting bh01 throughout.
+Follow steps 1 to 7 of [ci01 bootstrap](ci01-bootstrap.md), substituting bh01 throughout.
 
 ```bash
 qm clone <template-vmid> <bh-vmid> --name bh01 --full
@@ -156,7 +156,7 @@ Three keys need a value from you:
 
 `PROJECT_NAME` stays the committed `traefik`, not `traefik-dmz`. Every traefik stack in the repo uses the same project name, which is why cloudflared's ingress rules point at the container `traefik-traefik`. It is safe because no host ever runs two of them.
 
-Clear the same six keys tf01 clears, for the same reasons. See [Keys to clear](tf01-bootstrap.md#keys-to-clear).
+Clear the same three keys tf01 clears, for the same reasons. See [Keys to clear](tf01-bootstrap.md#keys-to-clear).
 
 `CF_API_EMAIL` and `CF_DNS_API_TOKEN` are the exception: keep those, because this Traefik wants a real certificate too. They resolve from the Secrets created in [tf01's step 4](tf01-bootstrap.md#4-create-the-four-komodo-secrets), as do `TRAEFIK_KOP_REDIS_PASSWORD` and `TRAEFIK_KOP_REDIS_SERVER`.
 

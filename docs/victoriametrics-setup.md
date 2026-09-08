@@ -2,7 +2,7 @@
 
 `stacks/victoriametrics-server` is the fleet's metrics, logs, and traces backend. It lands on ci01, after Semaphore, and it is the last piece of core-infra that has a stack ready to deploy.
 
-Every other VM is already trying to write to it. vmagent, vlagent, and vector run as sidecars in each traefik stack, and until this exists they buffer to their own data folders and retry.
+Build it before the VMs that feed it. vmagent, vlagent, and vector run as sidecars in each traefik stack, and every host after ci01 in the running order deploys with those sidecars already pointed here.
 
 This stack also pulls in `stacks/victoriametrics-agent` through an `include:` in its compose file, so ci01 gets the agent sidecars as part of the same deploy rather than as a second Stack resource.
 
@@ -19,14 +19,13 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [5. Create the Stack resource](#5-create-the-stack-resource)
 - [6. Verify](#6-verify)
 - [7. First access](#7-first-access)
-- [8. Let the rest of the fleet ship to it](#8-let-the-rest-of-the-fleet-ship-to-it)
 - [What has no stack yet](#what-has-no-stack-yet)
 - [What's next](#whats-next)
 
 ## Prerequisites
 
-- ci01 is provisioned and shows connected and healthy in Komodo, through step 9 of [ci01 bootstrap](ci01-bootstrap.md). Step 9 in particular: this stack's routers need traefik-bootstrap on ci01 to be reachable at all.
-- Semaphore is deployed and wired to the ansible repo, through [Semaphore setup](semaphore-setup.md). Its step 12 is what replaces the committed `CHANGEME` node_exporter password with a real one, and step 1 below depends on that having run.
+- ci01 is provisioned and shows connected and healthy in Komodo, through step 8 of [ci01 bootstrap](ci01-bootstrap.md). Step 8 in particular: this stack's routers need traefik-bootstrap on ci01 to be reachable at all.
+- Semaphore is deployed and wired to the ansible repo, through [Semaphore setup](semaphore-setup.md). Its step 13 is what replaces the committed `CHANGEME` node_exporter password with a real one, and step 1 below depends on that having run.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md).
 
 ## Placeholders
@@ -48,7 +47,7 @@ So the only thing to check is that the password is no longer the placeholder:
 ssh <ci-ip> "sudo grep -c node-exporter-user /etc/node-exporter/config.yml"
 ```
 
-If that file does not exist, or `node_exporter_password` is still `CHANGEME` in ansible, go back to [step 12 of Semaphore setup](semaphore-setup.md#12-fix-existing-hosts-before-running). Deploying now still works, but the `node` scrape target fails on every host until it is fixed.
+If that file does not exist, or `node_exporter_password` is still `CHANGEME` in ansible, go back to [step 13 of Semaphore setup](semaphore-setup.md#13-fix-existing-hosts-before-running). Deploying now still works, but the `node` scrape target fails on every host until it is fixed.
 
 Have the real `node_exporter_password` from ansible-private's `group_vars/all/private.yml` to hand. Step 5 pastes it into `NODE_EXPORTER_PASS`, unhashed, because that is what vmagent sends on every scrape.
 
@@ -98,7 +97,7 @@ The [generated README for victoriametrics-server](../stacks/victoriametrics-serv
 
 ## 4. Create the three VMAuth keys
 
-The tf01 and bh01 runbooks both tell you to clear `VMAUTH_USER`, `VMAUTH_PASS`, and `VMAUTH_HOST`, because the Variables behind them do not exist yet. This step is what makes them real.
+Every traefik stack's `komodo.env` carries three VMAuth keys that reference Variables nothing has created yet. Create the Variables here and every later host resolves them on its first deploy.
 
 Create them on km01, `GLOBAL_VMAUTH_PASS` under *Settings > Secrets* and the other two under *Settings > Variables*:
 
@@ -185,14 +184,6 @@ Browse to `https://grafana.ci01.home.myah-mitchell.com`, substituting whatever `
 
 Grafana sets no admin credentials in its environment, so the first login is the stock `admin` and `admin`, and it forces a change. The VictoriaMetrics and VictoriaLogs datasources are provisioned from the repo and should already be present.
 
-## 8. Let the rest of the fleet ship to it
-
-Nothing on ci01 needs changing here. The stacks that need it are the ones deployed before this existed, where `VMAUTH_USER`, `VMAUTH_PASS`, and `VMAUTH_HOST` were cleared to blank because the Variables behind them did not resolve.
-
-Go back to each of those Stack resources in Komodo, restore the three keys to the `[[GLOBAL_VMAUTH_...]]` references their `komodo.env` ships with, and redeploy. So far that means tf01 and bh01. See [Keys to clear](tf01-bootstrap.md#keys-to-clear).
-
-Nothing is lost in the meantime. Each agent buffers to its own data folder and retries, capped at 100 MB per remote-write URL, so a host that has been waiting a while backfills rather than starting clean.
-
 ## What has no stack yet
 
 ntfy, mailrise, blackbox-exporter, and uptime-kuma each have a container directory in this repo and no stack. Assembling them is a repo change rather than a runbook step, and there is nothing to deploy until someone does it.
@@ -201,4 +192,6 @@ Two of them are referenced elsewhere. mailrise is the plausible SMTP relay behin
 
 ## What's next
 
-ci01 is finished. tf01 is the next VM, in [tf01 bootstrap](tf01-bootstrap.md). See [Running order](README.md#running-order) for the rest.
+ci01 is finished, and the fleet now has somewhere to send metrics, logs, and traces. Every host built after this one ships from its first deploy, with no keys to come back and fill in.
+
+tf01 is the next VM, in [tf01 bootstrap](tf01-bootstrap.md). See [Running order](README.md#running-order) for the rest.

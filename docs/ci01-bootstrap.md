@@ -4,9 +4,9 @@ ci01 is the first VM deployed by Komodo rather than built by hand. It is the fir
 
 ci01 carries two stacks. `stacks/semaphore-server` goes first on purpose: once it is up and wired to the ansible repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
 
-`stacks/victoriametrics-server` follows. It is the metrics, logs, and traces backend every other VM's monitoring sidecars are already trying to write to, so it is a dependency for the rest of the fleet rather than an optional extra.
+`stacks/victoriametrics-server` follows. It is the metrics, logs, and traces backend every VM after this one writes to, which is why ci01 sits second in the running order rather than later.
 
-Steps 1 to 9 provision the VM and are the template the later host runbooks reuse. Steps 10 and 11 hand off to a doc each, because both stacks need more than a Komodo Stack resource to be useful. Wiring Semaphore to ansible is a separate job, in [Semaphore setup](semaphore-setup.md).
+Steps 1 to 8 provision the VM and are the template the later host runbooks reuse. Steps 9 and 10 hand off to a doc each, because both stacks need more than a Komodo Stack resource to be useful.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules.
 
@@ -19,17 +19,16 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - [3. Start the VM](#3-start-the-vm)
 - [4. Verify base provisioning](#4-verify-base-provisioning)
 - [5. Give ci01 an onboarding key](#5-give-ci01-an-onboarding-key)
-- [6. Create the runtime folders](#6-create-the-runtime-folders)
-- [7. Create the proxy Docker network](#7-create-the-proxy-docker-network)
-- [8. Confirm ci01 shows as a Komodo Server](#8-confirm-ci01-shows-as-a-komodo-server)
-- [9. Deploy traefik-bootstrap onto ci01](#9-deploy-traefik-bootstrap-onto-ci01)
-- [10. Deploy Semaphore](#10-deploy-semaphore)
-- [11. Deploy the VictoriaMetrics backend](#11-deploy-the-victoriametrics-backend)
+- [6. Create the proxy Docker network](#6-create-the-proxy-docker-network)
+- [7. Confirm ci01 shows as a Komodo Server](#7-confirm-ci01-shows-as-a-komodo-server)
+- [8. Deploy traefik-bootstrap onto ci01](#8-deploy-traefik-bootstrap-onto-ci01)
+- [9. Deploy Semaphore](#9-deploy-semaphore)
+- [10. Deploy the VictoriaMetrics backend](#10-deploy-the-victoriametrics-backend)
 - [What's next](#whats-next)
 
 ## Prerequisites
 
-- km01 is finished, through step 14 of [km01 bootstrap](komodo-bootstrap.md). Its four containers are healthy, its admin account exists, its firewall allows inbound 9120, and its global `[[GLOBAL_...]]` Variables are created. Step 2 of [Semaphore setup](semaphore-setup.md) fails without those Variables.
+- km01 is finished, through step 14 of [km01 bootstrap](komodo-bootstrap.md). Its four containers are healthy, its admin account exists, its firewall allows inbound 9120, and its global `[[GLOBAL_...]]` Variables are created. Step 3 of [Semaphore setup](semaphore-setup.md) fails without those Variables.
 - The real Komodo Core address and public key are committed and pushed in ansible-private's `group_vars/all/private.yml`. That is step 13 of the km01 runbook, and ci01 reads both at first boot.
 - The `ubuntu-server-2604` cloud-init template exists on the target PVE host, the same one km01 was cloned from.
 - You can open Komodo's UI when you reach step 5. The onboarding key is single-use and short-lived, so there is nothing to prepare ahead of time.
@@ -145,36 +144,7 @@ On ci01:
 sudo -u komodo grep -A1 'core_address\|connect_as' /home/komodo/.config/komodo/periphery.config.toml
 ```
 
-## 6. Create the runtime folders
-
-```bash
-projectName="semaphore"
-
-mkdir -p /opt/docker/logs/$projectName
-sudo chmod 750 /opt/docker/logs/$projectName/
-sudo chown $USER:101000 /opt/docker/logs/$projectName
-
-mkdir -p /opt/docker/volumes/$projectName
-sudo chmod 750 /opt/docker/volumes/$projectName/
-sudo chown $USER:101000 /opt/docker/volumes/$projectName
-
-mkdir -p /opt/docker/volumes/$projectName/semaphore-data
-mkdir -p /opt/docker/volumes/$projectName/semaphore-config
-mkdir -p /opt/docker/volumes/$projectName/semaphore-tmp
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/semaphore-*
-
-mkdir -p /opt/docker/volumes/$projectName/postgres-data
-mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
-```
-
-See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
-
-Unlike km01, you do not clone docker-stacks onto ci01 yourself. Periphery clones it into `/opt/docker/repos/` the first time you point a Stack resource at it. The folders above still have to exist with the right ownership before that first deploy, because neither Periphery nor Compose creates host bind-mount directories. They are Semaphore's; VictoriaMetrics has its own set, in step 3 of [VictoriaMetrics setup](victoriametrics-setup.md).
-
-This list mirrors the [generated README for semaphore-server](../stacks/semaphore-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
-
-## 7. Create the proxy Docker network
+## 6. Create the proxy Docker network
 
 ```bash
 docker network create proxy
@@ -182,13 +152,13 @@ docker network create proxy
 
 Same one-time-per-host step as km01's step 9. Nothing creates this network, and every deployable stack's `compose.yaml` declares it `external: true`.
 
-## 8. Confirm ci01 shows as a Komodo Server
+## 7. Confirm ci01 shows as a Komodo Server
 
 Step 5's onboarding key created the ci01 Server resource the moment Periphery made its first outbound connection. There is nothing to add by hand.
 
 In Komodo's UI on km01, check *Resources > Servers* and confirm ci01 shows connected and healthy before continuing. Re-check step 5 if it is not listed at all.
 
-## 9. Deploy traefik-bootstrap onto ci01
+## 8. Deploy traefik-bootstrap onto ci01
 
 `stacks/semaphore-server` publishes no port directly, and its Traefik labels are gated behind `chain-authentik@file`. Neither Traefik nor Authentik exists anywhere in the plan yet, so without this step there is no way to reach Semaphore's UI once it deploys.
 
@@ -208,22 +178,22 @@ socket-proxy-rw
 logrotate
 ```
 
-## 10. Deploy Semaphore
+## 9. Deploy Semaphore
 
 Semaphore goes first on purpose. Once it is up and wired to the ansible repo, it becomes the way real shared secrets reach every other server, instead of being fixed by hand host by host.
 
-Both halves are in [Semaphore setup](semaphore-setup.md): steps 1 to 4 deploy `stacks/semaphore-server`, and steps 5 to 13 connect it to ansible. Do not stop after step 4. An unwired Semaphore does nothing for the fleet, and step 12 there is what replaces the committed `CHANGEME` node_exporter password, which the next step depends on.
+Follow [Semaphore setup](semaphore-setup.md), fourteen steps covering `stacks/semaphore-server` from its runtime folders to a Template that runs against the fleet.
 
-Come back here when that doc's step 13 is the only one left. That one waits on pk01.
+Only its last step can be left: replacing the bootstrap SSH key waits on pk01. Everything before it should be done before the next step here, because step 13 there is what replaces the committed `CHANGEME` node_exporter password.
 
-## 11. Deploy the VictoriaMetrics backend
+## 10. Deploy the VictoriaMetrics backend
 
-`stacks/victoriametrics-server` is the fleet's metrics, logs, and traces backend, and it lands on ci01 alongside Semaphore. It is a dependency for every other VM rather than an optional extra: vmagent, vlagent, and vector already run as sidecars in each traefik stack, buffering to their own data folders and retrying against a backend that does not exist yet.
+`stacks/victoriametrics-server` is the fleet's metrics, logs, and traces backend, and it lands on ci01 alongside Semaphore. Every VM after this one runs vmagent, vlagent, and vector as sidecars in its traefik stack, all pointed here, so building it now is what lets those hosts ship from their first deploy.
 
-Follow [VictoriaMetrics setup](victoriametrics-setup.md), which is eight steps from host prep to Grafana.
+Follow [VictoriaMetrics setup](victoriametrics-setup.md), which is seven steps from host prep to Grafana.
 
 ## What's next
 
-ci01 is finished once both linked docs are, apart from [step 13 of Semaphore setup](semaphore-setup.md#13-replace-this-key-once-step-ca-is-live), which waits on pk01.
+ci01 is finished once both linked docs are, apart from [step 14 of Semaphore setup](semaphore-setup.md#14-replace-this-key-once-step-ca-is-live), which waits on pk01.
 
 tf01 is the next VM. See [Running order](README.md#running-order), and [How the host runbooks are shaped](README.md#how-the-host-runbooks-are-shaped) for which parts of this runbook the later ones reuse.

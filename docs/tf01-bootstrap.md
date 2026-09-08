@@ -75,7 +75,8 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 
 ## Prerequisites
 
-- ci01 is finished, through [Semaphore setup](semaphore-setup.md). Its step 12 is what pushes the real `node_exporter_password` to every host, and tf01's vmagent scrapes node_exporter with it.
+- ci01 is finished, through [Semaphore setup](semaphore-setup.md) and [VictoriaMetrics setup](victoriametrics-setup.md). Semaphore's step 13 is what pushes the real `node_exporter_password` to every host, and tf01's vmagent scrapes node_exporter with it.
+- The three `GLOBAL_VMAUTH_` values exist, from [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys). Without them this host's monitoring sidecars deploy with nowhere to write.
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
 - The two repo changes above are committed and pushed to `main`.
 - A Cloudflare API token scoped to edit DNS for the zone, and the account email that owns it. The resolver uses a DNS-01 challenge, so Let's Encrypt never needs to reach tf01 from the internet.
@@ -94,7 +95,7 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 
 ## 1. Provision the VM
 
-Follow steps 1 to 8 of [ci01 bootstrap](ci01-bootstrap.md), substituting tf01 throughout. Those steps are identical for every VM in the fleet, and there is no tf01-specific variation in any of them.
+Follow steps 1 to 7 of [ci01 bootstrap](ci01-bootstrap.md), substituting tf01 throughout. Those steps are identical for every VM in the fleet, and there is no tf01-specific variation in any of them.
 
 Size it larger than ci01. Ten services run here, and Traefik is the path every other host's traffic takes:
 
@@ -107,7 +108,7 @@ qm start <tf-vmid>
 
 tf01 is on the internal VLAN, not the DMZ. bh01 is the host that faces the internet, and it reaches tf01 over the internal network.
 
-Stop when tf01 shows connected and healthy under *Resources > Servers*, which is ci01's step 8. Skip its step 9 entirely.
+Stop when tf01 shows connected and healthy under *Resources > Servers*, which is ci01's step 7. Skip its step 8 entirely.
 
 ## 2. Create the runtime folders
 
@@ -211,19 +212,16 @@ Leave the `[[GLOBAL_...]]` references as pasted, with the exceptions in the next
 
 ### Keys to clear
 
-Six keys arrive as references to Variables that do not exist yet, or as values nothing here can use. Clear each one to blank.
+Three keys arrive as references to Variables that do not exist yet, or as values nothing here can use. Clear each one to blank.
 
 | Keys | Why they do nothing yet |
 | --- | --- |
 | `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec environment lines and its bouncer middleware commented out |
 | `AUTHENTIK_HOST` | id01 does not exist yet, so nothing forwards auth anywhere |
-| `VMAUTH_USER`, `VMAUTH_PASS`, `VMAUTH_HOST` | The monitoring sidecars ship metrics and logs to a vmauth that lands on ci01 later |
 
-The last three are worth understanding rather than just clearing. vmagent, vlagent, and vector still start and still scrape, but they have nowhere to write, so they buffer to their own data folders and retry. That is why those folders are created in step 2 even though nothing consumes them yet.
+`AUTHENTIK_HOST` is the one to come back to. See [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide).
 
-Come back and let the three VMAuth keys resolve once ci01 reaches [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys), which is where those Variables get created.
-
-`AUTHENTIK_HOST` waits on id01 instead. See [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide).
+Leave the three `VMAUTH_` keys alone. ci01 comes before tf01 in the running order, so the Variables behind them already exist and this host's monitoring sidecars ship from their first deploy.
 
 ### Deploy
 

@@ -21,14 +21,18 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | Order | VM | Role | Doc | Status |
 | --- | --- | --- | --- | --- |
 | 1 | km01 | Komodo GitOps engine | [km01 bootstrap](komodo-bootstrap.md) | Up and healthy |
-| 2 | ci01 | Semaphore, then the VictoriaMetrics backend | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
+| 2 | ci01 | Provision the VM, then work both stacks below | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
+| 2.1 | ci01 | Semaphore, ansible's runner | [Semaphore setup](semaphore-setup.md) | In progress |
+| 2.2 | ci01 | VictoriaMetrics, the fleet's metrics, logs, and traces backend | [VictoriaMetrics setup](victoriametrics-setup.md) | Written, not yet run |
 | 3 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
 | 4 | id01 | Authentik, identity | [id01 bootstrap](id01-bootstrap.md) | Written, not yet run |
 | 5 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |
 | 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | [bh01 bootstrap](bh01-bootstrap.md) | Written, not yet run |
 | 7 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
 
-"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those four as needing confirmation on the first real run, and correct the page as you go.
+Rows 2.1 and 2.2 are ci01's two stacks. Each needs real work after its Komodo deploy, so each has a doc rather than a step, and ci01's own runbook ends by handing off to them in order. Do 2.1 before 2.2: its step 13 pushes the real node_exporter password that VictoriaMetrics scrapes with.
+
+"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those five as needing confirmation on the first real run, and correct the page as you go.
 
 ap01 is the exception in more than status. Vaultwarden has no directory under `containers/`, so there is no stack to point a runbook at. Building the container comes first.
 
@@ -40,21 +44,19 @@ Pre-existing hosts (bk01, mx01, vh01, and the PVE hosts themselves) are not cove
 
 Most stacks in this plan are gated behind `chain-authentik@file` and expect a real cert resolver. Neither works until pk01 (step-ca) and id01 (Authentik) are live.
 
-Until then, deploy [Traefik bootstrap](traefik-bootstrap.md) on that VM. It is real Traefik routing on real hostnames, with self-signed TLS and `chain-no-auth@file` instead. Set the stack's `TRAEFIK_AUTH_CHAIN` to `chain-no-auth@file` when you deploy it. [ci01 bootstrap](ci01-bootstrap.md) step 9 works through it for the first real case.
+Until then, deploy [Traefik bootstrap](traefik-bootstrap.md) on that VM. It is real Traefik routing on real hostnames, with self-signed TLS and `chain-no-auth@file` instead. Set the stack's `TRAEFIK_AUTH_CHAIN` to `chain-no-auth@file` when you deploy it. [ci01 bootstrap](ci01-bootstrap.md) step 8 works through it for the first real case.
 
 This applies to every VM in the list above, which is why it lives here rather than being repeated in each runbook.
 
 ## How the host runbooks are shaped
 
-[ci01 bootstrap](ci01-bootstrap.md) is the one that works the shared pattern out in full. Its steps 1 to 9 are identical for every VM in the fleet, so the four runbooks after it compress those into a single step that points back here rather than repeating them.
+[ci01 bootstrap](ci01-bootstrap.md) is the one that works the shared pattern out in full. Its steps 1 to 7 are identical for every VM in the fleet, so the four runbooks after it compress those into a single step that points back here rather than repeating them.
 
-ci01 differs in one way. Both of its stacks need more than a Komodo Stack resource to be worth anything, so its steps 10 and 11 hand off to [Semaphore setup](semaphore-setup.md) and [VictoriaMetrics setup](victoriametrics-setup.md) instead of carrying the procedure inline.
-
-Split a runbook that way when the stack has real work after the deploy, and keep it inline when it does not. The other four host runbooks deploy and verify in place, because nothing more is needed.
+Split a runbook the way ci01 is split when a stack has real work after its deploy, and keep it inline when it does not. ci01's steps 9 and 10 are pointers, at rows 2.1 and 2.2 above. The other four host runbooks deploy and verify in place, because nothing more is needed.
 
 That is the rule to keep when writing the next one. Point at ci01 for anything shared, and spend the page on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
 
-Step 5's onboarding key is required for every future host, permanently. Step 9's traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
+Step 5's onboarding key is required for every future host, permanently. Step 8's traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
 
 Name a runbook after the host once a VM is just "provision, then deploy via Komodo" (`ci01-bootstrap.md`). Name it after the service only when something is structurally unique about that bootstrap, which so far means `komodo-bootstrap.md` alone.
 

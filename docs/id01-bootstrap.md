@@ -41,7 +41,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## 1. Provision the VM
 
-Follow steps 1 to 8 of [ci01 bootstrap](ci01-bootstrap.md), substituting id01 throughout. Those steps are identical for every VM in the fleet.
+Follow steps 1 to 7 of [ci01 bootstrap](ci01-bootstrap.md), substituting id01 throughout. Those steps are identical for every VM in the fleet.
 
 Authentik's worker is the memory-hungry part, and Postgres sits alongside it:
 
@@ -54,7 +54,7 @@ qm start <id-vmid>
 
 id01 is on the internal VLAN. Authentik is reached from the internet through bh01's tunnel later, never by exposing id01 directly.
 
-Stop when id01 shows connected and healthy under *Resources > Servers*, which is ci01's step 8.
+Stop when id01 shows connected and healthy under *Resources > Servers*, which is ci01's step 7.
 
 ## 2. Create the runtime folders
 
@@ -120,7 +120,7 @@ In Komodo's UI on km01, go to *Settings > Secrets* and create these three. They 
 | `AUTHENTIK_POSTGRES_USER` | Your choice |
 | `AUTHENTIK_POSTGRES_PASSWORD` | Your choice, alphanumeric only |
 
-`AUTHENTIK_SECRET_KEY` signs sessions and encrypts stored credentials. Rotating it invalidates every active session and every secret Authentik holds, so treat it the way [Semaphore's three encryption keys](semaphore-setup.md#1-generate-semaphores-three-encryption-keys) are treated: set once, back it up, leave it alone.
+`AUTHENTIK_SECRET_KEY` signs sessions and encrypts stored credentials. Rotating it invalidates every active session and every secret Authentik holds, so treat it the way [Semaphore's three encryption keys](semaphore-setup.md#2-generate-semaphores-three-encryption-keys) are treated: set once, back it up, leave it alone.
 
 The alphanumeric-only rule applies here for the usual reason. See [Conventions](conventions.md#alphanumeric-only).
 

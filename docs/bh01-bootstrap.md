@@ -14,6 +14,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 ## Contents
 
 - [Prerequisites](#prerequisites)
+- [Placeholders](#placeholders)
 - [1. Create the tunnel from an admin machine](#1-create-the-tunnel-from-an-admin-machine)
 - [2. Provision the VM](#2-provision-the-vm)
 - [3. Create the runtime folders](#3-create-the-runtime-folders)
@@ -31,6 +32,21 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - ci01 is finished, through [Semaphore setup](semaphore-setup.md).
 - A Cloudflare account holding the zone, and the `cloudflared` CLI installed on an admin machine that is not bh01.
 - A DMZ VLAN that can reach the internal VLAN where tf01 lives, and a decision about what that firewall allows. Everything published through this tunnel crosses that boundary.
+
+## Placeholders
+
+The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+
+| Placeholder | Value |
+| --- | --- |
+| `<host>` | `bh01` |
+| `<cores>` | `4` |
+| `<memory>` | `8192` |
+| `<vmid>` | VMID to give the new VM, yours to pick |
+| `<ip>` | Static address for bh01, on the DMZ VLAN |
+| `<gateway-ip>` | The DMZ VLAN's gateway, not the internal one every host before this used |
+| `<clone-dir>` | Where Periphery cloned this repo on bh01, found in step 6 rather than assumed |
+| `<tunnel-id>` | The tunnel's UUID, printed when you create it in step 1 |
 
 ## 1. Create the tunnel from an admin machine
 
@@ -53,10 +69,8 @@ That credentials file is a real credential: anything holding it can serve traffi
 
 Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with bh01 connected and healthy under *Resources > Servers*.
 
-Give it four cores and 8 GB.
-
 > [!IMPORTANT]
-> At step 2 there, set the VLAN tag to the DMZ one, not the internal one every previous VM used. This is the only host in the running order where that differs, and it is the whole point of bh01.
+> At step 2 there, set the VLAN tag to the DMZ one, and take both `<ip>` and `<gateway-ip>` from the DMZ network. This is the only host in the running order where any of that differs, and it is the whole point of bh01.
 
 The VM still provisions the same way, still runs Periphery, and still dials out to Core on km01. Periphery's connection is outbound, so a DMZ host that cannot be reached from the internal network still joins Komodo normally.
 
@@ -160,8 +174,6 @@ Find the clone on bh01:
 ```bash
 ls /opt/docker/repos/
 ```
-
-`<clone-dir>` below is whichever path that prints, and `<tunnel-id>` is the UUID step 1 printed.
 
 Copy the credentials file from step 1 into place, as `<tunnel-id>.json`:
 

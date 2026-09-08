@@ -30,20 +30,22 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 
 ## Placeholders
 
-The first five come from the host's own runbook. The rest are the same for every host.
+The first six are in the Placeholders table of the host runbook that sent you here. The last four are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | The hostname being built, for example `ci01` |
-| `<vmid>` | VMID to give the new VM |
-| `<ip>` | Static address for it |
 | `<cores>` | Core count, sized for the stacks that host carries |
 | `<memory>` | Memory in MB, sized the same way |
+| `<gateway-ip>` | Gateway for the VLAN that host sits on |
+| `<vmid>` | VMID to give the new VM, yours to pick |
+| `<ip>` | Static address for it, on the VLAN the host runbook names |
 | `<template-vmid>` | VMID of the cloud-init template, the same one km01 used |
-| `<gateway-ip>` | Gateway for that subnet |
 | `<km-ip>` | km01's address, from its own runbook |
 | `<same>` | The value cloud-init already used, recovered in step 5 rather than guessed |
 | `<ansible-private-url>` | Clone URL for ansible-private, from the ansible repo's README |
+
+There is no single fleet gateway. Every host in the running order sits on the internal VLAN except bh01, which is the DMZ edge and takes the DMZ VLAN's gateway instead. Take `<gateway-ip>` and `<ip>` from the same VLAN the host runbook names.
 
 ## 1. Clone the template into a VM
 
@@ -62,7 +64,7 @@ qm set <vmid> --ipconfig0 ip=<ip>/24,gw=<gateway-ip>
 
 Size for every stack the host will end up carrying, rather than resizing later. Each host's runbook gives the numbers and says what drives them.
 
-Confirm the VLAN tag the template carries is the one that host belongs on. Every VM in the running order is internal-only except bh01, which is the DMZ edge.
+Confirm the VLAN tag the template carries is the one that host belongs on, and that `<gateway-ip>` is that VLAN's gateway. The template comes tagged for the internal VLAN, which is right for every host except bh01.
 
 ## 3. Start the VM
 

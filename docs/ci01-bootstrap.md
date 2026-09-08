@@ -9,6 +9,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 ## Contents
 
 - [Prerequisites](#prerequisites)
+- [Placeholders](#placeholders)
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Deploy traefik-bootstrap onto ci01](#2-deploy-traefik-bootstrap-onto-ci01)
 - [3. Deploy Semaphore](#3-deploy-semaphore)
@@ -20,11 +21,24 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - km01 is finished, through step 14 of [km01 bootstrap](komodo-bootstrap.md). Its four containers are healthy, its admin account exists, its firewall allows inbound 9120, and its global `[[GLOBAL_...]]` Variables are created. Step 3 of [Semaphore setup](semaphore-setup.md) fails without those Variables.
 - The rest of what step 1 needs is in that doc's own [Prerequisites](provision-a-vm.md#prerequisites).
 
+## Placeholders
+
+The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+
+| Placeholder | Value |
+| --- | --- |
+| `<host>` | `ci01` |
+| `<cores>` | `4` |
+| `<memory>` | `8192` |
+| `<vmid>` | VMID to give the new VM, yours to pick |
+| `<ip>` | Static address for ci01, on the internal VLAN |
+| `<gateway-ip>` | The internal VLAN's gateway |
+
 ## 1. Provision the VM
 
 Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with ci01 connected and healthy under *Resources > Servers*.
 
-Give it four cores and 8 GB. Semaphore, Postgres, and postgres-backup are light on their own, but `stacks/victoriametrics-server` adds twelve more services, including Grafana and three VictoriaMetrics databases. That is a floor rather than a target, and both metrics and log retention grow on disk, so watch `/opt/docker/volumes/victoriametrics` once it exists.
+Four cores and 8 GB is a floor rather than a target. Semaphore, Postgres, and postgres-backup are light on their own, but `stacks/victoriametrics-server` adds twelve more services, including Grafana and three VictoriaMetrics databases. Both metrics and log retention grow on disk, so watch `/opt/docker/volumes/victoriametrics` once it exists.
 
 ci01 sits on the internal VLAN. It is not in the DMZ.
 

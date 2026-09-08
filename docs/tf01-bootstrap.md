@@ -15,6 +15,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 - [What has to change in the repo first](#what-has-to-change-in-the-repo-first)
 - [Prerequisites](#prerequisites)
+- [Placeholders](#placeholders)
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Create the runtime folders](#2-create-the-runtime-folders)
 - [3. Open the firewall](#3-open-the-firewall)
@@ -80,13 +81,27 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 - The two repo changes above are committed and pushed to `main`.
 - A Cloudflare API token scoped to edit DNS for the zone, and the account email that owns it. The resolver uses a DNS-01 challenge, so Let's Encrypt never needs to reach tf01 from the internet.
 
+## Placeholders
+
+The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+
+| Placeholder | Value |
+| --- | --- |
+| `<host>` | `tf01` |
+| `<cores>` | `4` |
+| `<memory>` | `8192` |
+| `<vmid>` | VMID to give the new VM, yours to pick |
+| `<ip>` | Static address for tf01, on the internal VLAN |
+| `<gateway-ip>` | The internal VLAN's gateway |
+| `<internal-subnet>` | The internal VLAN's CIDR, the one every fleet VM but bh01 sits on |
+
 ## 1. Provision the VM
 
 Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with tf01 connected and healthy under *Resources > Servers*. There is no tf01-specific variation in any of them.
 
-Give it four cores and 8 GB. Ten services run here, and Traefik is the path every other host's traffic takes.
+Four cores and 8 GB because ten services run here, and Traefik is the path every other host's traffic takes.
 
-tf01 is on the internal VLAN, not the DMZ. bh01 is the host that faces the internet, and it reaches tf01 over the internal network.
+tf01 is on the internal VLAN, not the DMZ, so it takes the same gateway ci01 did. bh01 is the host that faces the internet, and it reaches tf01 over the internal network.
 
 ## 2. Create the runtime folders
 
@@ -131,8 +146,6 @@ sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 sudo ufw allow from <internal-subnet> to any port 6379 proto tcp comment 'traefik-kop Redis'
 sudo ufw status
 ```
-
-`<internal-subnet>` is the internal VLAN's CIDR, the one every fleet VM sits on.
 
 The first three are the ports the Traefik container publishes, the same three every VM's Traefik needs.
 

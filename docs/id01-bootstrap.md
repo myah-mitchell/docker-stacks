@@ -11,6 +11,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 ## Contents
 
 - [Prerequisites](#prerequisites)
+- [Placeholders](#placeholders)
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Create the runtime folders](#2-create-the-runtime-folders)
 - [3. Deploy traefik-bootstrap onto id01](#3-deploy-traefik-bootstrap-onto-id01)
@@ -28,11 +29,24 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - ci01 is finished, through [Semaphore setup](semaphore-setup.md), so `node_exporter_password` is real fleet-wide.
 - A MaxMind account, for the free GeoLite2 databases. Signing up is free and takes a few minutes. Step 4 explains what happens if you skip it.
 
+## Placeholders
+
+The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+
+| Placeholder | Value |
+| --- | --- |
+| `<host>` | `id01` |
+| `<cores>` | `4` |
+| `<memory>` | `8192` |
+| `<vmid>` | VMID to give the new VM, yours to pick |
+| `<ip>` | Static address for id01, on the internal VLAN |
+| `<gateway-ip>` | The internal VLAN's gateway |
+
 ## 1. Provision the VM
 
 Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with id01 connected and healthy under *Resources > Servers*.
 
-Give it four cores and 8 GB. Authentik's worker is the memory-hungry part, and Postgres sits alongside it.
+Four cores and 8 GB because Authentik's worker is the memory-hungry part, and Postgres sits alongside it.
 
 id01 is on the internal VLAN. Authentik is reached from the internet through bh01's tunnel later, never by exposing id01 directly.
 

@@ -70,7 +70,7 @@ services:
 
   .mailrise:
     <<: [*limits, *restart, *security, *user, *logging]
-    image: yoryan/mailrise:1.2.0
+    image: yoryan/mailrise:1.4.0
     hostname: ${PROJECT_NAME}-${MAILRISE_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${MAILRISE_HOSTNAME}"
     command:

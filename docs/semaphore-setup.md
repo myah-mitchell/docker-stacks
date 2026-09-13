@@ -73,14 +73,14 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 mkdir -p /opt/docker/volumes/$projectName/semaphore-data
 mkdir -p /opt/docker/volumes/$projectName/semaphore-config
 mkdir -p /opt/docker/volumes/$projectName/semaphore-tmp
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/semaphore-*
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-*
 
 mkdir -p /opt/docker/volumes/$projectName/postgres-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 ```
 
-See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
+See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary. Semaphore is hardwired to use user 1001 so we use 101001 for that container.
 
 Unlike km01, you do not clone docker-stacks onto ci01 yourself. Periphery clones it into `/opt/docker/repos/` the first time you point a Stack resource at it. The folders above still have to exist with the right ownership before that first deploy, because neither Periphery nor Compose creates host bind-mount directories. These are Semaphore's. The other stack on ci01 has its own set, in step 3 of [VictoriaMetrics setup](victoriametrics-setup.md).
 
@@ -260,10 +260,10 @@ So the fleet's real Docker hosts have to be added as new entries. They do not ex
 
 ### Add a real host group to ansible-private
 
-Open ansible-private's `hosts.yml` and add a group alongside the existing `pve_host_h` and `pbs_host_h` ones. The `_h` suffix is the `location_abbr`, so keep the same shape:
+Open ansible-private's `hosts.yml` and edit the `docker_host` group alongside the existing `pve_host` and `pbs_host` ones.
 
 ```yaml
-docker_host_h:
+docker_host:
   hosts:
     km01:
       ansible_host: <km-ip>
@@ -271,7 +271,6 @@ docker_host_h:
     ci01:
       ansible_host: <ci-ip>
       serverHostname: "ci01"
-
   vars:
     ntp_service: "chrony"
 
@@ -415,13 +414,14 @@ Open the Template's *Survey Variables* tab and add one entry:
 
 | Field | Value |
 | --- | --- |
-| *Variable* | `target` |
+| *Name* | `target` |
+| *Title* | **Target** |
 | *Type* | **String** |
 | *Required* | **Yes** |
 
 Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the `target` prompt the same way step 11 suppresses the other five. It is a separate field because `target` changes per run and the other five never do.
 
-Answer it with a host or group name from the inventory: ci01 for one host, `docker_host_h` for every Docker VM at once.
+Answer it with a host or group name from the inventory: ci01 for one host, `docker_host` for every Docker VM at once.
 
 ### Run it once against every existing host
 
@@ -429,7 +429,7 @@ Do this now, before moving on. km01 and ci01 were both built before this Templat
 
 The role generates each host's own random Node Exporter password on its first run and reuses it forever after, so a host that predates that behaviour still has the old committed default. Running the Template replaces it, and every host built after this one gets the right thing from cloud-init with nothing to come back for.
 
-`docker_host_h` covers every Docker VM at the home site in one run.
+`docker_host` covers every Docker VM in one run.
 
 ## 13. Replace this key once step-ca is live
 

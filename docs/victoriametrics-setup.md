@@ -91,8 +91,6 @@ sudo chown -R 101000:101000 /opt/docker/volumes/$projectName/
 
 Every service here runs as `PUID`, so all seven data folders take 101000. There is no Postgres in this stack and nothing owned by 100000. See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-The [generated README for victoriametrics-server](../stacks/victoriametrics-server/README.md) lists an eighth folder, `cadvisor-data`. Creating it is harmless, but no service mounts it, so the list above leaves it out.
-
 ## 4. Create the three VMAuth keys
 
 Every traefik stack's `komodo.env` carries three VMAuth keys that reference Variables nothing has created yet. Create the Variables here and every later host resolves them on its first deploy.

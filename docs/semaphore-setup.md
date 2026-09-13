@@ -82,7 +82,7 @@ sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary. Semaphore is hardwired to use user 1001 so we use 101001 for that container.
 
-Unlike km01, you do not clone docker-stacks onto ci01 yourself. Periphery clones it into `/opt/docker/repos/` the first time you point a Stack resource at it. The folders above still have to exist with the right ownership before that first deploy, because neither Periphery nor Compose creates host bind-mount directories. These are Semaphore's. The other stack on ci01 has its own set, in step 3 of [VictoriaMetrics setup](victoriametrics-setup.md).
+Unlike km01, you do not clone docker-stacks onto ci01 yourself. Periphery clones it into `/opt/docker/stacks/<stack-name>/` the first time you point a Stack resource at it, a separate clone per Stack rather than one checkout they share. `/opt/docker/repos/` stays empty: that is for standalone Repo resources, and this repo is never registered as one. The folders above still have to exist with the right ownership before that first deploy, because neither Periphery nor Compose creates host bind-mount directories. These are Semaphore's. The other stack on ci01 has its own set, in step 3 of [VictoriaMetrics setup](victoriametrics-setup.md).
 
 This list mirrors the [generated README for semaphore-server](../stacks/semaphore-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
 
@@ -175,7 +175,7 @@ postgres
 postgres-backup
 ```
 
-To check from the host instead, SSH to ci01 and run `docker compose ps` in the stack's own directory under `/opt/docker/repos/`, where Periphery cloned it.
+To check from the host instead, SSH to ci01 and run `docker compose ps` in `/opt/docker/stacks/semaphore-server/stacks/semaphore-server`, the run directory inside Periphery's clone for this Stack.
 
 ## 5. First access
 

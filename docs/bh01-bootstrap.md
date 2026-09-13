@@ -89,6 +89,7 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 mkdir -p /opt/docker/logs/$projectName/traefik
 sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
+sudo chmod 755 /opt/docker/logs/$projectName/traefik
 
 mkdir -p /opt/docker/volumes/$projectName/traefik-certs
 mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
@@ -103,6 +104,8 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-*
 ```
 
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
+
+The explicit `chmod 755` on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
 
 cloudflared needs no volume here. Its two directories live inside the clone, and step 6 covers them.
 

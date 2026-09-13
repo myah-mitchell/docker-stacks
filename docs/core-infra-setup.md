@@ -21,6 +21,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [5. Create the ntfy accounts](#5-create-the-ntfy-accounts)
 - [6. Finish mailrise and point Proxmox at it](#6-finish-mailrise-and-point-proxmox-at-it)
 - [7. First access to Uptime Kuma](#7-first-access-to-uptime-kuma)
+- [After system-agent: subscribe your phone](#after-system-agent-subscribe-your-phone)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -183,19 +184,45 @@ sudo sed -i 's/REPLACE_WITH_NTFY_TOKEN/<ntfy-token>/g' \
 
 Restart mailrise from Komodo so it reads the file again.
 
-The example config routes on the recipient's local part, so the address a sender uses picks the topic the push lands on.
+mailrise routes on the recipient address. A config key with no domain, like `backups`, matches only `backups@mailrise.xyz`, mailrise's own placeholder domain, and mail to any other domain is refused. The domain is never looked up: Proxmox hands the message straight to mailrise on port 8025, so nothing leaves the LAN.
 
 | Mail addressed to | Pushed to topic |
 | --- | --- |
-| `backups@mailrise.local` | `alerts-backups` |
-| `infra@mailrise.local` | `alerts-infra` |
+| `backups@mailrise.xyz` | `alerts-backups` |
+| `infra@mailrise.xyz` | `alerts-infra` |
 
-In both Proxmox Backup Server and Proxmox VE, under *Datacenter > Notifications*, add an SMTP target pointed at `<ci-ip>` on port `8025`, with no authentication and no TLS. Address it to `backups@mailrise.local`.
+In both Proxmox VE and Proxmox Backup Server, under *Datacenter > Notifications*, add an SMTP target:
+
+| Field | Value |
+| --- | --- |
+| *Endpoint Name* | `mail-to-ntfy` |
+| *Server* | `<ci-ip>` |
+| *Port* | `8025` |
+| *Encryption* | None |
+| *Authenticate* | Off |
+| *From Address* | `pve@mailrise.xyz` on Proxmox VE, `pbs@mailrise.xyz` on Proxmox Backup Server |
+| *Additional Recipient(s)* | `backups@mailrise.xyz` |
+
+The from address plays no part in routing. It still matters, because mailrise titles each push `$subject ($from)` by default, so the from address is what tells a PVE alert apart from a PBS one on the lock screen.
 
 > [!WARNING]
 > Keep the previous mail target as a second notification target for a couple of weeks rather than cutting straight over. A mistake in this path means no notifications at all, which is worse than the notifications-in-spam problem it replaces.
 
-Subscribe to `alerts-backups` and `alerts-infra` from the ntfy app, signed in as the account from step 5, and send a test notification from Proxmox to confirm the whole path works.
+### Check delivery from an admin machine
+
+The ntfy phone apps cannot connect yet. At this point in the running order nothing has published a DNS record for ntfy, and traefik-bootstrap serves a self-signed certificate that the apps refuse. Subscribing a phone waits until [after system-agent](#after-system-agent-subscribe-your-phone).
+
+Watch the topic from an admin machine instead, forcing the hostname to ci01's address:
+
+```bash
+curl -sk -u <ntfy-user> \
+  --resolve ntfy.home.myah-mitchell.com:443:<ci-ip> \
+  https://ntfy.home.myah-mitchell.com/alerts-backups/json
+```
+
+Substitute whatever `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you actually set. curl prompts for the password, then prints one `"event":"open"` line and waits. Your admin account from step 5 can read every topic, so this needs no access rule.
+
+In Proxmox, select the new target and click **Test**. A line with `"event":"message"` and `"topic":"alerts-backups"` arriving in that terminal proves the whole Proxmox, mailrise, ntfy path. Repeat from the other Proxmox host.
 
 ## 7. First access to Uptime Kuma
 
@@ -204,6 +231,26 @@ Browse to `https://uptime-kuma.ci01.home.myah-mitchell.com`, substituting whatev
 There are no default credentials. The first visit prompts you to create the admin account.
 
 In its notification settings, add an ntfy notification pointed at `http://ntfy` with the publisher token. Uptime Kuma is the status page, not the alerting engine, but it should still land in the same place as everything else.
+
+## After system-agent: subscribe your phone
+
+Come back to this once [system-agent](system-agent-setup.md) has run on ci01. That is the point where dockns publishes a DNS record for ntfy and traefik-bootstrap's self-signed certificate is replaced.
+
+Before starting, open `https://ntfy.home.myah-mitchell.com` in the phone's browser and confirm it loads without a certificate warning. The apps refuse any certificate the browser would warn about.
+
+On Android:
+
+1. Go to *Settings > Manage users > Add user*, with server `https://ntfy.home.myah-mitchell.com` and the `<ntfy-user>` credentials from step 5.
+2. Tap **+**, enter topic `alerts-backups`, tick *Use another server*, enter the same server URL, and subscribe.
+3. Repeat step 2 for `alerts-infra`.
+
+On iOS:
+
+1. In *Settings*, set the default server to `https://ntfy.home.myah-mitchell.com` and add the same user.
+2. Tap **+** and subscribe to `alerts-backups` and `alerts-infra`.
+3. Add `NTFY_UPSTREAM_BASE_URL: "https://ntfy.sh"` to ntfy's environment and redeploy core-infra. iOS only delivers background notifications through Apple's push service, and only ntfy.sh can reach it, so without this line nothing arrives while the app is closed. ntfy.sh receives a wake-up with no message content; the app then fetches the message from your server.
+
+Send another **Test** from Proxmox and confirm it arrives on the phone with the app closed.
 
 ## What's next
 

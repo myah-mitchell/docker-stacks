@@ -274,4 +274,6 @@ Traefik's access log is separate. It goes to its own `traefik-access` index with
 
 Repeat this page per VM. It is the same twelve services and the same eight steps every time, and only `SERVER_NAME` and the dockns values differ.
 
+On ci01, go back to [subscribe your phone](core-infra-setup.md#after-system-agent-subscribe-your-phone) once this page is done. ntfy is reachable from a phone only from this point on.
+
 See [Running order](README.md#running-order) for which VMs are still waiting on it, and [Stacks](stacks.md) for what else lands on each one.

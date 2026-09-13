@@ -19,7 +19,7 @@ Your own account (subscribe from phone/desktop apps, and administer topics):
 docker exec -it $projectName-ntfy ntfy user add --role=admin youruser
 ```
 
-A token for services that only ever publish (vmalert, mailrise, blackbox_exporter alerts, PBS/PVE via mailrise) — narrower than handing out your admin password:
+A token for services that only ever publish (vmalert, mailrise, blackbox_exporter alerts, PBS/PVE via mailrise). It is narrower than handing out your admin password:
 
 ```bash
 docker exec -it $projectName-ntfy ntfy user add --role=user publisher

@@ -1,148 +1,154 @@
-# `traefik-bootstrap` — temporary per-VM Traefik for the pre-`pk01`/`id01` window
+# traefik-bootstrap
 
-Most stacks in this plan are only reachable two ways: through a real Traefik
-instance, gated behind `chain-authentik@file` (Authentik forward-auth) and TLS
-issued by step-ca. Until `pk01` (step-ca) and `id01` (Authentik) both exist, neither
-of those work — which is why `docs/ci01-bootstrap.md` originally had to reach
-Semaphore's UI through an SSH tunnel straight to its container IP, bypassing Traefik
-entirely.
+traefik-bootstrap is a temporary, per-VM Traefik for the window before pk01 and id01 exist. Deploy it on a VM, use it, and tear it down once that VM's real system-agent stack is ready. It is not meant to be long-lived.
 
-`stacks/traefik-bootstrap` replaces that workaround: a real Traefik, on the real
-`proxy` network, with real hostnames — just with **self-signed TLS instead of a real
-cert resolver**, and **`chain-no-auth@file` instead of `chain-authentik@file`**
-(`containers/traefik/rules/chain-no-auth.yaml` already existed before this doc —
-rate-limit/secure-headers/compress, no Authentik dependency). Every other stack's
-Traefik labels already default to `chain-authentik@file` via
-`${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}` — deploying under `traefik-bootstrap`
-means setting that one variable to `chain-no-auth@file` for the stacks you want
-reachable during the bootstrap window, nothing else about them changes.
+Read [Conventions](conventions.md) first. This page assumes its naming and secrets rules.
 
-**This is temporary, per VM, by design — not a permanent stack.** Once a VM's real
-`system-agent` (decision #14) is fixed and deployable (needs `pk01`/`id01` live),
-tear `traefik-bootstrap` down on that VM and deploy `system-agent` in its place
-rather than running both.
+## Why it exists
+
+Most stacks in this plan are reachable only through a real Traefik, gated behind `chain-authentik@file` for forward-auth and with TLS issued by step-ca. pk01 runs step-ca and id01 runs Authentik, and until both exist neither half works.
+
+traefik-bootstrap is a real Traefik on the real `proxy` network, serving real hostnames, with two substitutions:
+
+| Real stack | Bootstrap stack |
+| --- | --- |
+| ACME or step-ca cert resolver | Traefik's own auto-generated self-signed certificate |
+| `chain-authentik@file` | `chain-no-auth@file`, which is rate-limit, secure-headers, and compress with no Authentik dependency |
+
+Its `compose.yaml` overrides the base Traefik service's `command` wholesale rather than diffing it, because Compose `extends` replaces list keys instead of merging them. The list stays as close to the base as it can. It drops the four ACME resolver directives and the three that ask for a real certificate on the dashboard entrypoint, and it makes one substitution.
+
+That substitution is the TLS options, and it is the part that makes this stack work at all. The base service uses `tls-opts@file`, which sets `sniStrict: true` and rejects any handshake whose SNI has no matching real certificate. This stack has no resolver, so its self-signed default never matches the hostname being asked for, and `sniStrict` would refuse every request. It uses `tls-opts-selfsigned@file` instead: the same options with `sniStrict` off.
+
+Every other stack picks up its auth chain from `${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}`, so deploying a stack behind this one means setting that single variable to `chain-no-auth@file`. Nothing else about that stack changes.
 
 ## When to deploy it
 
-Any VM that needs to serve stacks with real Traefik routing before `pk01`/`id01`
-exist. `ci01` is the first case — see `docs/ci01-bootstrap.md`.
+On any VM that needs to serve stacks through real Traefik routing before pk01 and id01 exist. ci01 is the first case, in [step 2 of ci01 bootstrap](ci01-bootstrap.md#2-deploy-traefik-bootstrap-onto-ci01).
 
 ## How to deploy it
 
-The target VM must already exist as a Komodo Server resource (its own bootstrap doc
-covers that) and already have the `proxy` Docker network created on it — every VM
-needs that once regardless of Traefik (see `docs/komodo-bootstrap.md` step 9).
+The target VM must already be a connected Komodo Server resource, and must already have the `proxy` Docker network. Its own bootstrap doc covers both.
 
-1. Create the runtime folders on the target VM:
+### 1. Create the runtime folders
 
-   ```bash
-   projectName="traefik"
+On the target VM:
 
-   mkdir -p /opt/docker/logs/$projectName
-   sudo chmod 750 /opt/docker/logs/$projectName/
-   sudo chown $USER:101000 /opt/docker/logs/$projectName
+```bash
+projectName="traefik"
 
-   mkdir -p /opt/docker/volumes/$projectName
-   sudo chmod 750 /opt/docker/volumes/$projectName/
-   sudo chown $USER:101000 /opt/docker/volumes/$projectName
+mkdir -p /opt/docker/logs/$projectName
+sudo chmod 750 /opt/docker/logs/$projectName/
+sudo chown $USER:101000 /opt/docker/logs/$projectName
 
-   mkdir -p /opt/docker/logs/$projectName/traefik
-   sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
+mkdir -p /opt/docker/volumes/$projectName
+sudo chmod 750 /opt/docker/volumes/$projectName/
+sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
-   mkdir -p /opt/docker/volumes/$projectName/traefik-certs
-   mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
-   sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
-   ```
+mkdir -p /opt/docker/logs/$projectName/traefik
+sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
 
-2. Open the firewall for Traefik's published ports (`80`, `443`, `8443` — see
-   `containers/traefik/compose.yaml`). `ansible`'s base provisioning enables UFW with
-   a default-deny inbound policy and only opens what each host's own role needs
-   (SSH, node_exporter, etc.) — nothing opens these for you, since Traefik isn't part
-   of base provisioning:
+mkdir -p /opt/docker/volumes/$projectName/traefik-certs
+mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
+```
 
-   ```bash
-   sudo ufw allow 80/tcp comment 'Traefik HTTP'
-   sudo ufw allow 443/tcp comment 'Traefik HTTPS'
-   sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
-   sudo ufw status
-   ```
+See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-3. In Komodo's UI, go to **Resources → Stacks** and create a new one — name it
-   `traefik-bootstrap`. Set its target **Server** to the VM you're deploying onto.
-4. Under **Choose Mode**, choose **Git Repo**:
-   - **Repo**: `myah-mitchell/docker-stacks` — no credential needed, the repo is
-     public.
-   - **Branch**: `main`.
-5. Under **Files**:
-   - **Run Directory**: `stacks/traefik-bootstrap`.
-   - **File Path**: `compose.yaml`, relative to that run directory.
-6. Under **Environment**, there's no "point at a file" option — it's a plain text
-   editor field (`environment`), plus a separate `env_file_path` field that's just
-   where Komodo writes the resolved result on the target VM before running compose
-   (leave it at its default, `.env` — nothing to change there). Open
-   `stacks/traefik-bootstrap/komodo.env` in this repo, copy its full contents, and
-   paste them directly into that editor — Komodo's parser accepts the same
-   `KEY: value` lines this repo's `komodo.env` already uses (as well as `KEY = value`,
-   comments, and quoted values), so it pastes in as-is, no reformatting needed. Then
-   edit the pasted text in place for the handful of keys that need a real value;
-   everything else is fine left exactly as pasted. It has three kinds of values in
-   it — only the first kind needs editing here:
-   - **No default, must set**: `SERVER_NAME` / `SUB_DOMAIN_NAME` / `DOMAIN_NAME` —
-     the same way every stack needs (see the root `README.md`'s naming
-     conventions). `PROJECT_NAME` needs no edit either, even though it drives
-     every hostname/label in the stack — it's already committed as `traefik`
-     directly in `komodo.env`, not left blank like the three above.
-   - **Has a working default, leave as-is**: `TRAEFIK_HOSTNAME` (`traefik` —
-     only change it if you want the dashboard reachable under a different
-     hostname) and `ERROR_PAGES_HOSTNAME`/`SOCKET_PROXY_HOSTNAME`/
-     `LOGROTATE_HOSTNAME` (their container hostnames — no reason to touch these).
-     `TRAEFIK_EXTRA_COMMAND` is also fine left blank; it's a passthrough for
-     extra Traefik CLI flags you don't need for this stack.
-   - **`[[GLOBAL_...]]` references, resolved automatically**: `PUID`/`PGID`/`TZ`/
-     `DOCKER_VOLUMES`/`DOCKER_LOGS`/`PROXY_NETWORK` and the resource-limit/
-     logging/health-check block below them. These pull from Komodo's own global
-     Variables (set once for the whole Komodo instance, shared by every stack) —
-     don't edit them per-stack here. **These must actually exist first** — see
-     `docs/komodo-bootstrap.md` step 14. If you deploy before creating them, Compose
-     fails trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` (etc.)
-     into a numeric field; go create the Variables, then hit Deploy again.
-   - Leave `CF_API_EMAIL`, `CF_DNS_API_TOKEN`, `CROWDSEC_LAPI_KEY`, and
-     `AUTHENTIK_HOST` blank regardless of what their `[[...]]` references resolve
-     to — this stack's `compose.yaml` deliberately doesn't reference any of them
-     (no ACME resolver, no CrowdSec plugin wiring, no Authentik forward-auth), so
-     it doesn't matter whether a real value exists for them elsewhere.
-7. Save the Stack resource, then click **Deploy**. Watch the deploy log — it clones
-   the repo, reads the compose file, and runs the Compose equivalent of
-   `docker compose up -d` on the target VM via Periphery.
+### 2. Open the firewall
 
-Confirm `traefik`, `error-pages`, `socket-proxy`, `socket-proxy-rw`, and
-`logrotate` all show running/healthy — either in Komodo's own container view for
-the resource, or `docker compose ps` on the target VM.
+```bash
+sudo ufw allow 80/tcp comment 'Traefik HTTP'
+sudo ufw allow 443/tcp comment 'Traefik HTTPS'
+sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
+sudo ufw status
+```
 
-For any *other* stack you want reachable through it (Semaphore, etc.), set that
-stack's `TRAEFIK_AUTH_CHAIN` to `chain-no-auth@file` when you deploy it — see the
-comment above that key in its own `komodo.env`.
+Those three are the ports `containers/traefik/compose.yaml` publishes. Base provisioning enables UFW with a default-deny inbound policy and opens only what each host's own roles need. Traefik is not part of base provisioning, so nothing opens these for you.
 
-**Not yet verified against a live Traefik**: omitting the cert-resolver directives
-entirely (rather than setting them blank) is expected, per Traefik's documented
-behavior, to fall back to its own auto-generated self-signed cert. Reasoned through,
-never actually run — no Docker daemon existed anywhere this was written. If it
-doesn't come up cleanly the first time you deploy it, that's the first thing to
-double-check.
+### 3. Create the Stack resource
 
-## Accessing a stack through it
+In Komodo's UI, go to *Resources > Stacks* and create a Stack named `traefik-bootstrap`. Set its target *Server* to the VM you are deploying onto.
 
-Browse to the stack's normal hostname over HTTPS — e.g.
-`https://semaphore.ci01.home.myah-mitchell.com`. **Your browser will warn about the
-certificate** — it's self-signed, not issued by a CA your browser trusts. That's
-expected here, not a misconfiguration; accept it and continue. This is real routing
-through real Traefik, not the SSH-tunnel-to-container-IP workaround it replaces.
+Under *Choose Mode*, choose **Git Repo**.
+
+| Field | Value |
+| --- | --- |
+| *Repo* | `myah-mitchell/docker-stacks` |
+| *Branch* | `main` |
+| *Run Directory* | `stacks/traefik-bootstrap` |
+| *File Path* | `compose.yaml`, relative to the run directory |
+
+The repo is public, so Komodo needs no credential to clone it.
+
+### 4. Paste the environment
+
+*Environment* is a plain text editor with no option to point at a file. Open `stacks/traefik-bootstrap/komodo.env` in this repo, copy its full contents, and paste them in.
+
+Komodo's parser accepts the `KEY: value` lines this repo uses, as well as `KEY = value`, comments, and quoted values, so it pastes in unchanged.
+
+Leave the separate *env_file_path* field at its default of `.env`. That is only where Komodo writes the resolved result on the target VM before running Compose.
+
+Three keys need a real value:
+
+| Key | Value |
+| --- | --- |
+| `SERVER_NAME` | The VM's hostname, for example `ci01` |
+| `SUB_DOMAIN_NAME` | This site, with the trailing dot, so `home.` |
+| `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
+
+`PROJECT_NAME` drives every hostname and label in the stack, but it is already committed as `traefik` rather than left blank, so it needs no edit.
+
+Leave the four hostname keys alone. `TRAEFIK_HOSTNAME` defaults to `traefik` and only matters if you want the dashboard under a different name. The other three are container hostnames with no reason to change.
+
+Leave the `[[GLOBAL_...]]` references as pasted, with the two exceptions below. Komodo resolves them from the instance-wide Variables created in [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook. Deploying before those exist fails with Compose trying to interpolate the literal string `[[GLOBAL_CPUS_LIMIT]]` into a numeric field. Create the Variables and click **Deploy** again.
+
+### Keys to clear
+
+Six keys come across in the paste that this stack has no working use for. Clear each one to blank.
+
+| Keys | Why they do nothing here |
+| --- | --- |
+| `CF_API_EMAIL`, `CF_DNS_API_TOKEN` | They reach the Traefik container, but there is no ACME resolver to use them |
+| `AUTHENTIK_HOST` | Also reaches the container, but nothing here forwards auth to Authentik |
+| `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec lines commented out |
+| `TRAEFIK_EXTRA_COMMAND` | Sits at the end of the command list and expands to nothing unless you set it |
+
+The first three are worth clearing rather than ignoring. This stack overrides the base service's `command` and `labels` but not its `environment`, so all three are still passed into the container.
+
+`AUTHENTIK_HOST` and `CROWDSEC_LAPI_HOST` are the two exceptions to leaving `[[GLOBAL_...]]` alone. They arrive as references that step 14 does not create, so clearing them is what keeps an unresolved `[[...]]` string out of the container's environment.
+
+### 5. Deploy
+
+Save the Stack resource, then click **Deploy**. Watch the deploy log.
+
+Confirm all five services show running and healthy, either in Komodo's container view or with `docker compose ps` on the target VM:
+
+```text
+traefik
+error-pages
+socket-proxy
+socket-proxy-rw
+logrotate
+```
+
+> [!NOTE]
+> Omitting the cert-resolver directives entirely, rather than setting them blank, is expected to make Traefik fall back to its own self-signed certificate. That follows Traefik's documented behaviour, but this stack has not been run against a live Traefik yet. Check it first if the stack does not come up cleanly.
+
+## Putting a stack behind it
+
+Set that stack's `TRAEFIK_AUTH_CHAIN` to `chain-no-auth@file` in its own Komodo *Environment* text when you deploy it. The comment above that key in its `komodo.env` says the same thing.
+
+Then browse to the stack's normal hostname over HTTPS, for example `https://semaphore.ci01.home.myah-mitchell.com`.
+
+Your browser will warn about the certificate. That is expected: it is self-signed, not issued by a CA your browser trusts. Accept it and continue.
+
+The hostname does not change when system-agent replaces this stack later. Only the certificate and the auth chain do.
 
 ## Tearing it down
 
-Once `system-agent` is fixed and deployed on this VM for real (decision #14), delete
-the `traefik-bootstrap` Stack resource in Komodo (or `docker compose down` it
-directly) and flip every stack that was overridden to `chain-no-auth@file` back to
-the default by clearing that override — they'll pick up `chain-authentik@file`
-automatically. Don't run both Traefik instances on the same VM at once — they'd
-fight over the same `:80`/`:443`/`:8443` host ports.
+Do this per VM, once that VM's system-agent stack is deployable for real. [system-agent](system-agent-setup.md) does it as its step 7, so follow that page rather than this section if you are deploying the replacement now.
+
+Delete the traefik-bootstrap Stack resource in Komodo, or `docker compose down` it directly on the VM. Then clear the `TRAEFIK_AUTH_CHAIN` override on every stack that was set to `chain-no-auth@file`, so each falls back to `chain-authentik@file` on its next deploy.
+
+> [!WARNING]
+> Do not run traefik-bootstrap and system-agent on the same VM at once. Both publish `:80`, `:443`, and `:8443` on the host and will fight over them.

@@ -173,7 +173,7 @@ services:
 
       # Docker provider for connecting all apps that are inside of the docker network
       - --providers.docker.watch=true
-      - --providers.docker.network=proxy
+      - --providers.docker.network=${PROXY_NETWORK}
       - --providers.docker.exposedbydefault=false
       - --providers.docker.endpoint=tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
 
@@ -185,7 +185,7 @@ services:
       ################################################################
       #- --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
       #- --experimental.plugins.bouncer.version=v1.4.6
-      - --experimental.plugins.bouncer.version=v1.5.0
+      #- --experimental.plugins.bouncer.version=v1.5.0
 
       ################################################################
       # Certificates Resolvers (ACME)
@@ -200,7 +200,7 @@ services:
       ################################################################
       # Extra Commands from Env Vars
       ################################################################
-      - ${TRAEFIK_EXTRA_COMMAND:-""}
+      - ${TRAEFIK_EXTRA_COMMAND:-}
     ports:
       - "80:80"
       - "443:443"
@@ -229,6 +229,7 @@ services:
         Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
       - "traefik.http.routers.traefik.entrypoints=dashboard"  # Defined in traefik.yaml
       - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
 
       ## Default TLS Cert
       - "traefik.tls.stores.default.defaultGeneratedCert.resolver=letsencrypt"

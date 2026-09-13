@@ -20,10 +20,12 @@ scrape_configs:
     ca_file: node_exporter.crt
     ## the certificate is Self-Signed so we need to skip verification
     insecure_skip_verify: true
-  ## User and Password in the authentication step we have created
   basic_auth:
-    username: "%{NODE_EXPORTER_USER}" # the user you set in the node-exporter in the node
-    password: "%{NODE_EXPORTER_PASS}" # the plain text password which you hashed in the Encryption step
+    username: "%{NODE_EXPORTER_USER}"
+    ## Read from a file rather than an environment variable: the password is
+    ## generated per host by ansible's monitoring role and never leaves that
+    ## host, so there is nothing to put in Komodo. See docs/system-agent-setup.md.
+    password_file: /etc/prometheus/node_exporter_password
   static_configs:
   - targets:
     - "%{SERVER_ADDRESS}:9100"

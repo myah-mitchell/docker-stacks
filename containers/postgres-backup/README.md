@@ -8,7 +8,7 @@ services:
       file: ../../containers/postgres-backup/compose.yaml
       service: .postgres-backup
     environment:
-      # Point at this stack's own postgres service/credentials — never share one
+      # Point at this stack's own postgres service/credentials. Never share one
       # postgres-backup instance across stacks. Match POSTGRES_BACKUP_DB to whatever
       # this stack's postgres service actually uses (a ${POSTGRES_DB} var, or a
       # literal like "postgres" for the FerretDB/Komodo case).

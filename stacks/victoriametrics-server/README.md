@@ -6,191 +6,32 @@ This will start up a VictoriaMetrics server stack with VictoriaMetrics, Victoria
 
 ### Setting Up Node Exporter
 
-Node Exporter is expected to be installed by the Agent stack and is used to collect metrics off of the host.
+Node Exporter reports the host's own CPU, memory, disk and network. It runs on
+the host rather than in a container, and the `monitoring` role in the ansible
+repo installs and configures it. Run that role against the host before deploying
+this stack. Nothing here has to be done by hand.
 
-These steps are a combination of the guides from the following two sites:
-* [Setting Up Node Exporter - Techdox Docs](https://docs.techdox.nz/node-exporter/)
-* [Securing Node Exporter Metrics - DEV Community](https://dev.to/cod3mason/securing-node-exporter-metrics-2ome)
+The role leaves four files in `/etc/node-exporter/` that matter to this stack:
 
-#### Download Node Exporter
+| File | What it is |
+| --- | --- |
+| `node_exporter.crt` | The self-signed certificate Node Exporter serves on port 9100. vmagent mounts it as its CA and skips verification, since it is self-signed. |
+| `config.yml` | Node Exporter's own TLS and basic-auth config, holding the bcrypt hash of this host's password. |
+| `password` | The plaintext, readable only by the `node_exporter` user. The role reads it back on later runs so the password stays the same. |
+| `scrape-password` | A second copy of the plaintext, owned by the host-side UID that Docker's user namespace maps this stack's vmagent onto. This is the one vmagent mounts. |
 
-Begin by downloading Node Exporter using the wget command:
+Every host gets a different password, generated on that host on the role's first
+run. A host's vmagent only ever scrapes that same host's Node Exporter, so the
+password never has to match between hosts, and no copy of it exists outside the
+host it belongs to. That is why `NODE_EXPORTER_USER` is the only Node Exporter
+value in this stack's environment: there is no password for Komodo to hold.
 
-```bash
-cd /tmp
-wget https://github.com/prometheus/node_exporter/releases/download/v1.10.2/node_exporter-1.10.2.linux-amd64.tar.gz
-```
+To rotate one host's password, set `node_exporter_password` for that host and run
+the role again. To rotate every host's, delete `/etc/node-exporter/password` and
+`/etc/node-exporter/password.bcrypt` first.
 
-Note: Ensure you are using the latest version of Node Exporter and the correct architecture build for your server. The provided link is for amd64. For the latest releases, check here - [Prometheus Node Exporter Releases](https://github.com/prometheus/node_exporter/releases)
-
-
-#### Extract the Contents
-
-After downloading, extract the contents with the following command:
-
-```bash
-tar xvf node_exporter-*.linux-amd64.tar.gz
-```
-
-#### Move the Node Exporter Binary
-
-Move the node_exporter binary to /usr/local/bin:
-
-```bash
-sudo cp node_exporter-*.linux-amd64/node_exporter /usr/local/bin
-```
-
-Then, clean up by removing the downloaded tar file and its directory:
-
-```bash
-rm -rf ./node_exporter-*.linux-amd64*
-```
-
-#### Create Certificate
-
-Generate a new self-signed certificate (replace "MyState", "MyCity", "MyOrg", and "ServerFQDN" with real data):
-
-```bash
-sudo mkdir /etc/node-exporter
-sudo openssl req -new -newkey rsa:2048 -days 3650 -nodes -x509 -keyout /etc/node-exporter/node_exporter.key -out /etc/node-exporter/node_exporter.crt -subj "/C=US/ST=MyState/L=MyCity/O=MyOrg/CN=node-exporter" -addext "subjectAltName = DNS:ServerFQDN"
-```
-
-#### Create Authentication Hash
-
-Now generate node-exporter password creator by creating `/etc/node-exporter/gen-pass.py`
-
-```python
-#!/usr/bin/python3
-
-import getpass
-import bcrypt
-
-password = getpass.getpass("password: ")
-hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-print(hashed_password.decode())
-```
-
-And now running the script to hash your node-exporter password:
-
-```bash
-python3 gen-pass.py
-```
-
-#### Setup and Configure `node-exporter`
-
-Add certificates and authentication into `/etc/node-exporter/config.yml`
-
-```yaml
-tls_server_config:
-  cert_file: /etc/node-exporter/node_exporter.crt
-  key_file: /etc/node-exporter/node_exporter.key
-basic_auth_users:
-  node-exporter-user: <HASHED-PASSWD>
-```
-
-#### Set proper permissions
-
-```bash
-sudo chmod 775 /etc/node-exporter
-sudo chmod 644 /etc/node-exporter/*
-sudo chmod 400 /etc/node-exporter/node_exporter.key
-```
-
-#### Create a Node Exporter User
-
-Create a dedicated user for running Node Exporter:
-
-```bash
-sudo useradd --no-create-home --shell /bin/false node_exporter
-```
-
-Assign ownership permissions of the node_exporter binary to this user:
-
-```bash
-sudo chown node_exporter:node_exporter -R /etc/node-exporter
-```
-
-#### Configure the Service
-
-To ensure Node Exporter automatically starts on server reboot, configure the systemd service:
-
-```bash
-sudo vi /etc/systemd/system/node_exporter.service
-```
-
-Then, paste the following configuration:
-```bash
-[Unit]
-Description=Node Exporter
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=node_exporter
-Group=node_exporter
-Type=simple
-ExecStart=/usr/local/bin/node_exporter --web.config.file=/etc/node-exporter/config.yml
-Restart=always
-RestartSec=3
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Save and exit the editor.
-
-#### Enable and Start the Service
-
-Reload the systemd daemon:
-
-```bash
-sudo systemctl daemon-reload
-```
-
-Enable the Node Exporter service:
-
-```bash
-sudo systemctl enable node_exporter
-```
-
-Start the service:
-
-```bash
-sudo systemctl start node_exporter
-```
-
-To confirm the service is running properly, check its status:
-
-```bash
-sudo systemctl status node_exporter.service
-```
-
-#### Open Port in UFW for Node-Exporter
-
-We need to create a UFW application so that we can let vmagent scrape Node-Exporter
-
-```bash
-sudo vi /etc/ufw/applications.d/node-exporter
-```
-
-```bash
-[Node-Exporter]
-title=Node-Exporter
-description=Allows incoming traffic for Node-Exporter on port 9100
-ports=9100/tcp
-```
-
-We then can enable this new application
-
-```bash
-sudo ufw app update Node-Exporter
-sudo ufw app list
-sudo ufw allow Node-Exporter
-```
-
-sudo ufw app update Node-Exporter
-sudo ufw app list
-sudo ufw allow Node-Exporter
+The role also opens port 9100 in UFW as the `Node-Exporter` application, so
+vmagent can reach it.
 
 ## Prerequisites for using vector
 
@@ -223,7 +64,7 @@ sudo ufw allow Vector-Syslog
 ## Create Stack Folders
 
 ```bash
-projectName="projectName"
+projectName="victoriametrics"
 mkdir -p /opt/docker/logs/$projectName
 sudo chmod 750 /opt/docker/logs/$projectName/
 sudo chown $USER:101000 /opt/docker/logs/$projectName

@@ -9,4 +9,4 @@ services:
       service: .mailrise
 ```
 
-Requires `ntfy` in the same stack (or reachable on the `backend` network) — `mailrise.conf` routes everything to it.
+Requires `ntfy` in the same stack (or reachable on the `backend` network), because `mailrise.conf` routes everything to it.

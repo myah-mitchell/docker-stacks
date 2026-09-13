@@ -56,7 +56,7 @@ services:
   vmagent:
     extends:
       file: ../../containers/vmagent/compose.yaml
-      service: .vmagent-traefik
+      service: .vmagent-system
 
   vlagent:
     extends:
@@ -66,13 +66,30 @@ services:
   vector:
     extends:
       file: ../../containers/vector/compose.yaml
-      service: .vector-traefik
+      service: .vector-system
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+      vlagent:
+        condition: service_healthy
+      vmagent:
+        condition: service_healthy
+
+  cadvisor:
+    extends:
+      file: ../../containers/cadvisor/compose.yaml
+      service: .cadvisor
 
 ## Dozzle Related Services
   dozzle-agent:
     extends:
       file: ../../containers/dozzle/compose.yaml
       service: .dozzle-agent
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
 
 ## Dockns Related Services
   dockns:

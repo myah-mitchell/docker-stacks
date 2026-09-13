@@ -6,7 +6,7 @@ This will start up a basic Traefik stack with monitoring and log collection but 
 ## Create Stack Folders
 
 ```bash
-projectName="projectName"
+projectName="traefik"
 mkdir -p /opt/docker/logs/$projectName
 sudo chmod 750 /opt/docker/logs/$projectName/
 sudo chown $USER:101000 /opt/docker/logs/$projectName

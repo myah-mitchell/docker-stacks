@@ -6,19 +6,19 @@
 
 To Enroll the Server run the following:
 
-```
+```bash
 cscli console enroll <EnrollToken>
 ```
 
 To generate an API Key for a Traefik Bouncer run:
 
-```
+```bash
 docker exec -t crowdsec cscli bouncers add traefik-bouncer-<hostname>
 ```
 
 To generate a maching login for a Crowsec Satellite run:
 
-```
+```bash
 cscli machines add <hostname> --auto -f /tmp/crowdsec.yaml
 cat /tmp/crowdsec.yaml
 rm /tmp/crowdsec.yaml

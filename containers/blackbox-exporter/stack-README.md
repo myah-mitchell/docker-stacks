@@ -4,15 +4,18 @@
 # Create and Setup Required Folders
 ## Create needed folders for blackbox-exporter
 
+The compose file mounts this config as `./config/blackbox.yml`, and that path is relative to `containers/blackbox-exporter/` rather than to the stack directory, because Compose resolves a relative bind mount against the file that declares it. So it belongs in this container's own `config/` folder, inside whichever checkout of this repo the stack runs from:
+
 ```bash
-mkdir -p /opt/docker/stacks/$projectName/blackbox-exporter/config
+cp containers/blackbox-exporter/config/blackbox.yml.example \
+   containers/blackbox-exporter/config/blackbox.yml
 ```
 
-Copy `config/blackbox.yml.example` to `config/blackbox.yml` (or edit in place) to add/adjust probe modules.
+Edit that copy to add or adjust probe modules. Create it before the first start. Docker creates an empty directory in place of a missing bind-mount file, which makes blackbox-exporter fail at startup with nothing obvious to point at.
 
 ## vmagent scrape config
 
-blackbox_exporter is a multi-target proxy — vmagent needs a scrape job with `relabel_configs` rewriting the target into a `/probe` query param. Example addition to `vmagent`'s `prometheus.yml`:
+blackbox_exporter is a multi-target proxy, so vmagent needs a scrape job with `relabel_configs` rewriting the target into a `/probe` query param. Example addition to `vmagent`'s `prometheus.yml`:
 
 ```yaml
 - job_name: 'blackbox-http'
@@ -32,4 +35,4 @@ blackbox_exporter is a multi-target proxy — vmagent needs a scrape job with `r
       replacement: blackbox-exporter:9115
 ```
 
-Pair with a `vmalert` rule (`probe_success == 0`) notifying through `ntfy` (Phase 2) — this is the "is it actually up" signal Icinga used to provide.
+Pair with a `vmalert` rule (`probe_success == 0`) notifying through `ntfy` (Phase 2). That is the "is it actually up" signal Icinga used to provide.

@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 60s
+
+scrape_configs:
+- job_name: 'vmagent-%{PROJECT_NAME}'
+  static_configs:
+  - targets:
+    - '%{PROJECT_NAME}-vmagent.%{SERVER_ADDRESS}:8429'
+- job_name: 'vlagent-%{PROJECT_NAME}'
+  static_configs:
+  - targets:
+    - '%{PROJECT_NAME}-vlagent.%{SERVER_ADDRESS}:9429'
+- job_name: 'traefik-%{PROJECT_NAME}'
+  static_configs:
+  - targets:
+    - '%{PROJECT_NAME}-traefik.%{SERVER_ADDRESS}:8080'
+- job_name: 'cadvisor-%{PROJECT_NAME}'
+  static_configs:
+  - targets:
+    - '%{PROJECT_NAME}-cadvisor.%{SERVER_ADDRESS}:8080'
+- job_name: node
+  scheme: https
+  tls_config:
+    ca_file: node_exporter.crt
+    ## the certificate is Self-Signed so we need to skip verification
+    insecure_skip_verify: true
+  basic_auth:
+    username: "%{NODE_EXPORTER_USER}"
+    ## Read from a file rather than an environment variable: the password is
+    ## generated per host by ansible's monitoring role and never leaves that
+    ## host, so there is nothing to put in Komodo. See docs/system-agent-setup.md.
+    password_file: /etc/prometheus/node_exporter_password
+  static_configs:
+  - targets:
+    - "%{SERVER_ADDRESS}:9100"

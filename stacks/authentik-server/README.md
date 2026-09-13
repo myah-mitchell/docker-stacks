@@ -2,7 +2,7 @@
 ## Create Stack Folders
 
 ```bash
-projectName="projectName"
+projectName="authentik"
 mkdir -p /opt/docker/logs/$projectName
 sudo chmod 750 /opt/docker/logs/$projectName/
 sudo chown $USER:101000 /opt/docker/logs/$projectName
@@ -35,7 +35,7 @@ mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-*
 ```
 
-## Restore from a dump (verify this actually works — an untested backup isn't a backup)
+## Restore from a dump
 
 List available dumps (daily/weekly/monthly subfolders, gzip-compressed SQL):
 

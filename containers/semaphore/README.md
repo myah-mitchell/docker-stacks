@@ -14,4 +14,4 @@ services:
       service: .postgres
 ```
 
-No `socket-proxy` needed — Semaphore never talks to Docker, only outbound git/SSH to the fleet.
+No `socket-proxy` needed. Semaphore never talks to Docker, only outbound git/SSH to the fleet.

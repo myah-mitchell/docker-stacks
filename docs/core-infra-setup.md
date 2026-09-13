@@ -230,7 +230,57 @@ Browse to `https://uptime-kuma.ci01.home.myah-mitchell.com`, substituting whatev
 
 There are no default credentials. The first visit prompts you to create the admin account.
 
-In its notification settings, add an ntfy notification pointed at `http://ntfy` with the publisher token. Uptime Kuma is the status page, not the alerting engine, but it should still land in the same place as everything else.
+### Add the ntfy notification
+
+Uptime Kuma is the status page, not the alerting engine, but its down and up events should still land in the same place as everything else. Set the notification up now, before any monitor exists, so every monitor you add later picks it up automatically.
+
+Go to *Settings > Notifications* and click **Setup Notification**. Fill in the dialog:
+
+| Field | Value |
+| --- | --- |
+| *Notification Type* | `ntfy` |
+| *Friendly Name* | `ntfy alerts-infra` |
+| *ntfy Topic* | `alerts-infra` |
+| *Server URL* | `http://ntfy` |
+| *Priority* | `3` |
+| *Authentication Method* | Access Token |
+| *Access Token* | `<ntfy-token>`, the publisher token from step 5 |
+| *Icon URL* | Leave blank |
+| *Default enabled* | Ticked |
+| *Apply on all existing monitors* | Leave unticked, there are none yet |
+
+A few of those are less obvious than they look.
+
+*Server URL* is ntfy's own container name over the `backend` network the two share, in plain HTTP. The request never passes through Traefik, so the self-signed certificate does not matter. Leave the topic out of it: Uptime Kuma posts JSON to the server root and names the topic inside the body, and the form warns if the URL contains one.
+
+*Access Token* rather than your admin login. The publisher token can only write, and only to `alerts-*`, so it is the narrower credential to leave stored in another application's database.
+
+*Priority* is not applied evenly. Uptime Kuma sends every event at the number you set, except *DOWN* events, which it sends one higher. The form pre-fills `5`, which sends everything at ntfy's maximum, recoveries included. `3` sends recoveries at ntfy's default priority and outages at `4`, high, so the two are distinguishable at a glance.
+
+*Default enabled* pre-selects this notification on every monitor created from now on. If you ever add monitors before this, tick *Apply on all existing monitors* instead to attach it to those as well.
+
+### Test it
+
+Start the same watch as step 6, pointed at this topic:
+
+```bash
+curl -sk -u <ntfy-user> \
+  --resolve ntfy.home.myah-mitchell.com:443:<ci-ip> \
+  https://ntfy.home.myah-mitchell.com/alerts-infra/json
+```
+
+Click **Test** in the dialog. Uptime Kuma should report *Sent Successfully.*, and the terminal should print a message titled `alerts-infra [Uptime-Kuma]` with the `test_tube` tag.
+
+If the test fails instead:
+
+| Error | Cause |
+| --- | --- |
+| `forbidden` with code `40301` | The token is missing or wrong, or the topic is outside `alerts-*`. ntfy's `deny-all` default refuses anything unauthenticated |
+| `getaddrinfo ENOTFOUND ntfy` | Uptime Kuma is not on the `backend` network, so the name `ntfy` does not resolve |
+
+Once the test lands, click **Save**.
+
+Real events look different from the test. A monitor going down arrives titled `<monitor> Down [Uptime-Kuma]` with a red circle, the check's error as the message, and an *Open <monitor>* button linking to the monitored URL. Recovery arrives as `<monitor> Up [Uptime-Kuma]` with a green circle.
 
 ## After system-agent: subscribe your phone
 

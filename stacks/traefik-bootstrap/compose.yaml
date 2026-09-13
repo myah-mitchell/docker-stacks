@@ -108,6 +108,12 @@ services:
       # back to the same self-signed default cert as every other entrypoint instead
       # of requesting a real one.
       - --entrypoints.dashboard.address=:8443
+      # tls.options is what keeps TLS switched on for this entrypoint. The base
+      # service gets that from its certresolver line, which this stack drops, and
+      # without any http.tls key the entrypoint serves plain HTTP: the dashboard
+      # router stops matching HTTPS requests and Traefik answers 404. Same
+      # tls-opts-selfsigned as the https entrypoint, and for the same reason.
+      - --entrypoints.dashboard.http.tls.options=tls-opts-selfsigned@file
           # Trusted IPs (Local)
       - --entrypoints.dashboard.forwardedheaders.trustedips=
           127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12

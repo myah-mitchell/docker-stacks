@@ -22,11 +22,11 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | --- | --- | --- | --- | --- |
 | 1 | km01 | Komodo GitOps engine | [km01 bootstrap](komodo-bootstrap.md) | Up and healthy |
 | 1.1 | any | Provisioning a VM, the shared first step of every host below | [Provisioning a VM](provision-a-vm.md) | In progress |
-| 2 | ci01 | Overview, then the four stacks below | [ci01 bootstrap](ci01-bootstrap.md) | In progress |
+| 2 | ci01 | Overview, then the four stacks below | [ci01 bootstrap](ci01-bootstrap.md) | Up and healthy |
 | 2.1 | ci01 | traefik-bootstrap, temporary routing so the other three are reachable | [Traefik bootstrap](traefik-bootstrap.md) | Up and healthy |
 | 2.2 | ci01 | Semaphore, ansible's runner | [Semaphore setup](semaphore-setup.md) | Up and healthy |
 | 2.3 | ci01 | VictoriaMetrics, the fleet's metrics, logs, and traces backend | [VictoriaMetrics setup](victoriametrics-setup.md) | Up and healthy |
-| 2.4 | ci01 | core-infra, where alerts and uptime checks land | [Core infrastructure setup](core-infra-setup.md) | Written, not yet run |
+| 2.4 | ci01 | core-infra, where alerts and uptime checks land | [Core infrastructure setup](core-infra-setup.md) | Up and healthy |
 | 3 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
 | 4 | id01 | Authentik, identity | [id01 bootstrap](id01-bootstrap.md) | Written, not yet run |
 | 5 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |

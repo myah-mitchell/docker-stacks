@@ -69,7 +69,11 @@ x-environment: &default_environment
 services:
 
   .uptime-kuma:
-    <<: [*limits, *restart, *security, *user, *logging]
+    # No *user here. extra/entrypoint.sh starts as root, chowns /app/data, then
+    # drops to PUID:PGID itself with setpriv --clear-groups. Forcing user: 1000
+    # leaves that entrypoint non-root, so setgroups fails with EPERM and the
+    # container restart-loops. PUID/PGID below still decide what it runs as.
+    <<: [*limits, *restart, *security, *logging]
     image: louislam/uptime-kuma:1.23.16
     hostname: ${PROJECT_NAME}-${UPTIME_KUMA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${UPTIME_KUMA_HOSTNAME}"

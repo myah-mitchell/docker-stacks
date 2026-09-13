@@ -17,12 +17,11 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - [Placeholders](#placeholders)
 - [1. Create the tunnel from an admin machine](#1-create-the-tunnel-from-an-admin-machine)
 - [2. Provision the VM](#2-provision-the-vm)
-- [3. Create the runtime folders](#3-create-the-runtime-folders)
+- [3. Create the runtime folders and install the tunnel config](#3-create-the-runtime-folders-and-install-the-tunnel-config)
 - [4. Open the firewall](#4-open-the-firewall)
 - [5. Create the Stack resource for traefik-dmz](#5-create-the-stack-resource-for-traefik-dmz)
-- [6. Install the tunnel credentials and config](#6-install-the-tunnel-credentials-and-config)
-- [7. Verify](#7-verify)
-- [8. Publish the first hostname](#8-publish-the-first-hostname)
+- [6. Verify](#6-verify)
+- [7. Publish the first hostname](#7-publish-the-first-hostname)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -45,12 +44,11 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for bh01, on the DMZ VLAN |
 | `<gateway-ip>` | The DMZ VLAN's gateway, not the internal one every host before this used |
-| `<clone-dir>` | Where Periphery cloned this repo on bh01, found in step 6 rather than assumed |
 | `<tunnel-id>` | The tunnel's UUID, printed when you create it in step 1 |
 
 ## 1. Create the tunnel from an admin machine
 
-Do this first. The tunnel has to exist before the stack can connect to it, and creating it produces the credentials file step 6 installs.
+Do this first. The tunnel has to exist before the stack can connect to it, and creating it produces the credentials file step 3 installs.
 
 Run these on an admin machine with the `cloudflared` CLI, not on bh01:
 
@@ -63,7 +61,7 @@ The first opens a browser and authorises against the Cloudflare account holding 
 
 `home-edge` names this site's edge. A cloud site, if one is ever added, gets its own `cloud-edge` tunnel rather than sharing this one.
 
-That credentials file is a real credential: anything holding it can serve traffic for your hostnames. Treat it the way this repo treats every other one, which means it lives in a `secrets/` folder and is never committed. See [config/ and secrets/](conventions.md#config-and-secrets).
+That credentials file is a real credential: anything holding it can serve traffic for your hostnames. Treat it the way this repo treats every other one, which means it lives on the host under `/opt/docker/volumes`, outside any repo checkout, and is never committed. See [config/ and secrets/](conventions.md#config-and-secrets).
 
 ## 2. Provision the VM
 
@@ -74,7 +72,7 @@ Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with bh01 conn
 
 The VM still provisions the same way, still runs Periphery, and still dials out to Core on km01. Periphery's connection is outbound, so a DMZ host that cannot be reached from the internal network still joins Komodo normally.
 
-## 3. Create the runtime folders
+## 3. Create the runtime folders and install the tunnel config
 
 ```bash
 projectName="traefik"
@@ -101,13 +99,53 @@ mkdir -p /opt/docker/volumes/$projectName/vector-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-*
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-*
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-*
+
+mkdir -p /opt/docker/volumes/$projectName/cloudflared-config
+mkdir -p /opt/docker/volumes/$projectName/cloudflared-secrets
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-*
+sudo chmod 700 /opt/docker/volumes/$projectName/cloudflared-secrets
 ```
 
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
 The explicit `chmod 755` on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
 
-cloudflared needs no volume here. Its two directories live inside the clone, and step 6 covers them.
+cloudflared's two directories are host volumes for the same reason every other one is. Periphery re-clones over its run directory, so a credential written inside the checkout does not survive.
+
+### Install the tunnel credentials
+
+Copy the credentials file from step 1 onto bh01, then put it in place as `<tunnel-id>.json`:
+
+```bash
+sudo install -m 600 <tunnel-id>.json \
+  /opt/docker/volumes/$projectName/cloudflared-secrets/<tunnel-id>.json
+sudo chown 101000:101000 \
+  /opt/docker/volumes/$projectName/cloudflared-secrets/<tunnel-id>.json
+```
+
+### Write the ingress config
+
+Seed it from the example this repo serves publicly, so nothing has to be cloned first:
+
+```bash
+sudo curl -fsSL -o /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
+  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/cloudflared/config/config.yml.example
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config/config.yml
+```
+
+Edit that copy and fill in the real tunnel ID in both the `tunnel:` and `credentials-file:` lines. The example ships one ingress rule and a catch-all:
+
+```yaml
+ingress:
+  - hostname: vault.myah-mitchell.com
+    service: http://traefik-traefik:80
+
+  - service: http_status:404
+```
+
+Every rule points at `http://traefik-traefik:80`, which is this stack's own Traefik on the `proxy` network. cloudflared never routes to a backend directly, and never to a WAN port. Traefik on bh01 is what decides where the request actually goes.
+
+The catch-all matters. Without it, an unmatched hostname is proxied somewhere unintended rather than refused. Keep it last, because cloudflared matches rules in order.
 
 This list mirrors the [generated README for traefik-dmz](../stacks/traefik-dmz/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
 
@@ -159,59 +197,9 @@ Clear the same three keys tf01 clears, for the same reasons. See [Keys to clear]
 
 ### Deploy
 
-Save the Stack resource, then click **Deploy**. Ten of the eleven services should come up. cloudflared will not, because its config and credentials do not exist yet, and step 6 is what fixes that.
+Save the Stack resource, then click **Deploy**. All eleven services should come up, cloudflared included, because its config and credentials went in during step 3.
 
-## 6. Install the tunnel credentials and config
-
-cloudflared mounts two directories from inside the clone:
-
-```yaml
-- ./config:/etc/cloudflared:ro
-- ./secrets:/etc/cloudflared/secrets:ro
-```
-
-Those paths are relative to `containers/cloudflared/`, not to the stack directory, because Compose resolves a relative bind mount against the file that declares it and this service is reached through `extends`.
-
-Find the clone on bh01:
-
-```bash
-ls /opt/docker/repos/
-```
-
-Copy the credentials file from step 1 into place, as `<tunnel-id>.json`:
-
-```bash
-sudo install -m 600 <tunnel-id>.json <clone-dir>/containers/cloudflared/secrets/<tunnel-id>.json
-sudo chown 101000:101000 <clone-dir>/containers/cloudflared/secrets/<tunnel-id>.json
-```
-
-Then create the config from the example already in the clone:
-
-```bash
-sudo cp <clone-dir>/containers/cloudflared/config/config.yml.example \
-        <clone-dir>/containers/cloudflared/config/config.yml
-```
-
-Edit that copy and fill in the real tunnel ID in both the `tunnel:` and `credentials-file:` lines. The example ships one ingress rule and a catch-all:
-
-```yaml
-ingress:
-  - hostname: vault.myah-mitchell.com
-    service: http://traefik-traefik:80
-
-  - service: http_status:404
-```
-
-Every rule points at `http://traefik-traefik:80`, which is this stack's own Traefik on the `proxy` network. cloudflared never routes to a backend directly, and never to a WAN port. Traefik on bh01 is what decides where the request actually goes.
-
-The catch-all matters. Without it, an unmatched hostname is proxied somewhere unintended rather than refused. Keep it last, because cloudflared matches rules in order.
-
-Redeploy the stack. cloudflared should now connect and report healthy.
-
-> [!NOTE]
-> `config.yml` sits in `config/`, which this repo never gitignores, so a copy made inside the clone is visible to git even though only `secrets/` is ignored. That is intentional, since ingress hostnames are not secret, but check `git status` in the clone before committing anything from bh01.
-
-## 7. Verify
+## 6. Verify
 
 Confirm all eleven services show running and healthy, in Komodo's container view:
 
@@ -237,7 +225,7 @@ docker exec traefik-redis redis-cli info replication
 
 Look for `role:slave` and `master_link_status:up`. A replica that cannot reach its master reports `down` here and keeps serving stale data silently, which is the failure worth catching now rather than during an outage.
 
-## 8. Publish the first hostname
+## 7. Publish the first hostname
 
 Publishing is two steps: a DNS record, and an ingress rule.
 

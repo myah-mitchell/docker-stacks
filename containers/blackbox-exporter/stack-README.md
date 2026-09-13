@@ -4,14 +4,22 @@
 # Create and Setup Required Folders
 ## Create needed folders for blackbox-exporter
 
-The compose file mounts this config as `./config/blackbox.yml`, and that path is relative to `containers/blackbox-exporter/` rather than to the stack directory, because Compose resolves a relative bind mount against the file that declares it. So it belongs in this container's own `config/` folder, inside whichever checkout of this repo the stack runs from:
-
 ```bash
-cp containers/blackbox-exporter/config/blackbox.yml.example \
-   containers/blackbox-exporter/config/blackbox.yml
+mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
 ```
 
-Edit that copy to add or adjust probe modules. Create it before the first start. Docker creates an empty directory in place of a missing bind-mount file, which makes blackbox-exporter fail at startup with nothing obvious to point at.
+Seed the config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
+
+```bash
+sudo curl -fsSL -o /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
+  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/blackbox-exporter/config/blackbox.yml.example
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml
+```
+
+Edit that copy to add or adjust probe modules. It is usable unchanged, defining probe modules and nothing host-specific.
+
+Do all of this before the first deploy. Docker creates an empty directory in place of a missing bind-mount file, which makes blackbox-exporter fail at startup with nothing obvious to point at. The file lives here rather than in the repo checkout because Periphery re-clones over its run directory, which would take any file written inside it along with it.
 
 ## vmagent scrape config
 

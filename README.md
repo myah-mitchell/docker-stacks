@@ -30,12 +30,12 @@ km01 is the one deliberate exception to "everything is GitOps": Komodo cannot Gi
 
 | Path | Contents |
 | --- | --- |
-| `containers/<name>/` | One container definition: `compose.yaml`, `komodo.env`, `testing.env`, `README.md`, and `stack-README.md`, plus `config/`, `secrets/`, or `rules/` where needed |
+| `containers/<name>/` | One container definition: `compose.yaml`, `komodo.env`, `testing.env`, `README.md`, and `stack-README.md`, plus `config/` or `rules/` where needed |
 | `stacks/<name>/` | A deployable composition of containers via Compose `extends` and `include`. Only `compose.yaml` is hand-written |
 | `scripts/build.py` | Regenerates every stack's `komodo.env`, `.env`, and `README.md` from the base templates plus each container's fragments |
 | `scripts/project-layout.md` | The full mechanics of `build.py` and the generated-file conventions |
 
-A container's `config/` is always safe to commit and never holds a real credential. Its `secrets/` holds the real ones and is gitignored, with a tracked `.gitkeep` so the folder exists. See cloudflared, mailrise, or komodo for the pattern.
+A container's `config/` is always safe to commit and never holds a real credential. It holds `.example` templates and non-sensitive files only. A real credential lives on the host instead, under `${DOCKER_VOLUMES}/${PROJECT_NAME}/<container>-secrets/`, bind-mounted in by the compose file, so a checkout stays disposable. See cloudflared, mailrise, komodo, or step-ca for the pattern.
 
 Run `scripts/build.py` after adding a container to a stack, or after editing one of a container's own fragments. Those are its `komodo.env`, `stack-README.md`, and `testing.env`.
 

@@ -17,11 +17,10 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [1. Create the runtime folders](#1-create-the-runtime-folders)
 - [2. Open the SMTP port](#2-open-the-smtp-port)
 - [3. Create the Stack resource](#3-create-the-stack-resource)
-- [4. Write the two config files into the clone](#4-write-the-two-config-files-into-the-clone)
-- [5. Verify](#5-verify)
-- [6. Create the ntfy accounts](#6-create-the-ntfy-accounts)
-- [7. Finish mailrise and point Proxmox at it](#7-finish-mailrise-and-point-proxmox-at-it)
-- [8. First access to Uptime Kuma](#8-first-access-to-uptime-kuma)
+- [4. Verify](#4-verify)
+- [5. Create the ntfy accounts](#5-create-the-ntfy-accounts)
+- [6. Finish mailrise and point Proxmox at it](#6-finish-mailrise-and-point-proxmox-at-it)
+- [7. First access to Uptime Kuma](#7-first-access-to-uptime-kuma)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -36,9 +35,8 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 | --- | --- |
 | `<ci-ip>` | ci01's address, the one set in its own runbook |
 | `<internal-subnet>` | The internal VLAN in CIDR form, from the same place `<ci-ip>` came from |
-| `<clone-dir>` | Where Periphery cloned this repo on ci01, found in step 4 rather than assumed |
-| `<ntfy-user>` | The account name you sign in to the ntfy apps with, your choice, created in step 6 |
-| `<ntfy-token>` | The publish token printed by step 6 |
+| `<ntfy-user>` | The account name you sign in to the ntfy apps with, your choice, created in step 5 |
+| `<ntfy-token>` | The publish token printed by step 5 |
 
 ## 1. Create the runtime folders
 
@@ -57,11 +55,34 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 mkdir -p /opt/docker/volumes/$projectName/ntfy-data
 mkdir -p /opt/docker/volumes/$projectName/uptime-kuma-data
+mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
+mkdir -p /opt/docker/volumes/$projectName/mailrise-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/ntfy-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/uptime-kuma-data
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
+sudo chmod 700 /opt/docker/volumes/$projectName/mailrise-secrets
 ```
 
-Only ntfy and uptime-kuma keep state. mailrise and blackbox-exporter read a config file and hold nothing. See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
+ntfy and uptime-kuma keep state. mailrise and blackbox-exporter each read one config file that is not in git, so those two directories hold the files rather than the repo checkout does. Periphery re-clones over its run directory, and anything written inside that directory goes with it.
+
+Seed both files now, from the examples this repo serves publicly, so nothing has to be cloned first:
+
+```bash
+sudo curl -fsSL -o /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
+  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/blackbox-exporter/config/blackbox.yml.example
+sudo curl -fsSL -o /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
+  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/mailrise/config/mailrise.conf.example
+sudo chmod 600 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
+```
+
+The blackbox copy is usable as it stands. It defines probe modules and nothing host-specific.
+
+The mailrise copy is not, because it carries two `REPLACE_WITH_NTFY_TOKEN` placeholders and the token does not exist until step 5. Leave them for now. mailrise starts and accepts mail with a placeholder token, it just cannot deliver. It gets mode `600` because that is the file the real token ends up in.
+
+See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
 ## 2. Open the SMTP port
 
@@ -110,54 +131,13 @@ blackbox-exporter and uptime-kuma both fall back to `chain-authentik@file`, whic
 
 Leave every `[[GLOBAL_...]]` reference exactly as it is.
 
-### Deploy, and expect two failures
+### Deploy
 
 Save the Stack resource, then click **Deploy**.
 
-mailrise and blackbox-exporter will not start. Both mount a config file that is deliberately not in the repo, and Docker creates an empty directory wherever a bind-mount file is missing. That is the expected result of this first deploy, and step 4 fixes it.
+All four services should come up. Both config files were put in place in step 1, so there is nothing to fix up afterwards and nothing to redeploy for.
 
-## 4. Write the two config files into the clone
-
-This deploy existed to make Periphery clone the repo onto ci01. Find that clone:
-
-```bash
-ls /opt/docker/repos/
-```
-
-Remove the two empty directories Docker created in place of the missing files:
-
-```bash
-sudo rm -rf <clone-dir>/containers/mailrise/secrets/mailrise.conf
-sudo rm -rf <clone-dir>/containers/blackbox-exporter/config/blackbox.yml
-```
-
-Both paths are relative to their own container directory rather than to the stack directory, because Compose resolves a relative bind mount against the file that declares it.
-
-Then copy each example into place:
-
-```bash
-sudo cp <clone-dir>/containers/mailrise/config/mailrise.conf.example \
-        <clone-dir>/containers/mailrise/secrets/mailrise.conf
-sudo cp <clone-dir>/containers/blackbox-exporter/config/blackbox.yml.example \
-        <clone-dir>/containers/blackbox-exporter/config/blackbox.yml
-sudo chmod 600 <clone-dir>/containers/mailrise/secrets/mailrise.conf
-sudo chown 101000:101000 \
-        <clone-dir>/containers/mailrise/secrets/mailrise.conf \
-        <clone-dir>/containers/blackbox-exporter/config/blackbox.yml
-```
-
-`mailrise.conf` is the one that ends up holding a credential, which is why it gets mode `600`. It also lives in `secrets/` rather than alongside its own example. That directory is gitignored across this repo, so a real token can sit in a checkout without being committable.
-
-The blackbox copy is usable as it stands. It defines probe modules and nothing host-specific.
-
-The mailrise copy is not, because it carries two `REPLACE_WITH_NTFY_TOKEN` placeholders and the token does not exist until step 6. Leave them for now. mailrise starts and accepts mail with a placeholder token, it just cannot deliver.
-
-Click **Deploy** again.
-
-> [!NOTE]
-> Redeploying a Git Repo stack can re-clone over the run directory. Confirm both files survive a redeploy before relying on them, and keep a copy of the finished `mailrise.conf` somewhere outside the clone either way. `secrets/` is gitignored across this repo precisely so a real credential can live in a checkout without ever being committable.
-
-## 5. Verify
+## 4. Verify
 
 Confirm all four services show running and healthy, in Komodo's container view for the resource:
 
@@ -170,7 +150,7 @@ uptime-kuma
 
 mailrise starts after ntfy is healthy, so a stuck mailrise usually means ntfy is the real problem.
 
-## 6. Create the ntfy accounts
+## 5. Create the ntfy accounts
 
 ntfy deploys with `NTFY_AUTH_DEFAULT_ACCESS` set to `deny-all`, so nothing can publish or subscribe until you say so. Nothing is broken; it is waiting.
 
@@ -190,15 +170,15 @@ docker exec -it core-ntfy ntfy token add publisher
 
 Keep the token that last command prints. Everything that sends alerts uses it, and handing out a write-only token is a good deal narrower than handing out your admin password.
 
-Store it in Vaultwarden. It is the same token step 7 needs and the same one Alertmanager will need later.
+Store it in Vaultwarden. It is the same token step 6 needs and the same one Alertmanager will need later.
 
-## 7. Finish mailrise and point Proxmox at it
+## 6. Finish mailrise and point Proxmox at it
 
-Replace both `REPLACE_WITH_NTFY_TOKEN` placeholders in the config from step 4 with the token from step 6:
+Replace both `REPLACE_WITH_NTFY_TOKEN` placeholders in the config seeded in step 1 with the token from step 5:
 
 ```bash
 sudo sed -i 's/REPLACE_WITH_NTFY_TOKEN/<ntfy-token>/g' \
-        <clone-dir>/containers/mailrise/secrets/mailrise.conf
+        /opt/docker/volumes/core/mailrise-secrets/mailrise.conf
 ```
 
 Restart mailrise from Komodo so it reads the file again.
@@ -215,9 +195,9 @@ In both Proxmox Backup Server and Proxmox VE, under *Datacenter > Notifications*
 > [!WARNING]
 > Keep the previous mail target as a second notification target for a couple of weeks rather than cutting straight over. A mistake in this path means no notifications at all, which is worse than the notifications-in-spam problem it replaces.
 
-Subscribe to `alerts-backups` and `alerts-infra` from the ntfy app, signed in as the account from step 6, and send a test notification from Proxmox to confirm the whole path works.
+Subscribe to `alerts-backups` and `alerts-infra` from the ntfy app, signed in as the account from step 5, and send a test notification from Proxmox to confirm the whole path works.
 
-## 8. First access to Uptime Kuma
+## 7. First access to Uptime Kuma
 
 Browse to `https://uptime-kuma.ci01.home.myah-mitchell.com`, substituting whatever `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you actually set. Your browser will warn about the certificate, because traefik-bootstrap signs its own. Accept it and continue.
 

@@ -16,22 +16,23 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/step-ca-data
+mkdir -p /opt/docker/volumes/$projectName/step-ca-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-data
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets
+sudo chmod 700 /opt/docker/volumes/$projectName/step-ca-secrets
 ```
 
 The service runs as `user: ${PUID:-1000}`, and Docker here is configured with `userns-remap: default`, so the container's UID 1000 is host UID 101000. Owning this folder as `1000:1000` gives it to your own login account instead, and step-ca cannot then write to `/home/step`.
 
 ## Generate the CA password once
 
-The compose file mounts this password as `./secrets/password`, and that path is relative to `containers/step-ca/` rather than to the stack directory, because Compose resolves a relative bind mount against the file that declares it. So it belongs in this container's own `secrets/` folder, inside whichever checkout of this repo the stack runs from:
-
 ```bash
-head -c32 /dev/urandom | base64 | sudo tee containers/step-ca/secrets/password > /dev/null
-sudo chmod 600 containers/step-ca/secrets/password
-sudo chown 101000:101000 containers/step-ca/secrets/password
+head -c32 /dev/urandom | base64 | sudo tee /opt/docker/volumes/$projectName/step-ca-secrets/password > /dev/null
+sudo chmod 600 /opt/docker/volumes/$projectName/step-ca-secrets/password
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets/password
 ```
 
-Create it before the first start. Docker creates an empty directory in place of a missing bind-mount file, which makes step-ca fail at startup with nothing obvious to point at.
+Do this before the first deploy. Docker creates an empty directory in place of a missing bind-mount file, which makes step-ca fail at startup with nothing obvious to point at. The file lives here rather than in the repo checkout because Periphery re-clones over its run directory, which would take any file written inside it along with it.
 
 This password protects both the root and intermediate private keys at rest (step-ca's own encryption, independent of the extra age/GPG layer applied to the extracted root key below). Store a copy of it in Vaultwarden, and a second copy in the same offline location as the root key backups, outside Vaultwarden. Losing this password after the root key is already offline means losing the ability to ever unlock it again, defeating the whole point of keeping a backup.
 

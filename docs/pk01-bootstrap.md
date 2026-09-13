@@ -15,7 +15,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Create the runtime folders](#2-create-the-runtime-folders)
 - [3. Deploy traefik-bootstrap onto pk01](#3-deploy-traefik-bootstrap-onto-pk01)
-- [4. Create the Stack resource and the CA password](#4-create-the-stack-resource-and-the-ca-password)
+- [4. Create the Stack resource](#4-create-the-stack-resource)
 - [5. The root key ceremony](#5-the-root-key-ceremony)
 - [6. Verify](#6-verify)
 - [What's next](#whats-next)
@@ -38,7 +38,6 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for pk01, on the internal VLAN |
 | `<gateway-ip>` | The internal VLAN's gateway |
-| `<clone-dir>` | Where Periphery cloned this repo on pk01, found in step 4 rather than assumed |
 
 ## 1. Provision the VM
 
@@ -62,12 +61,27 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 mkdir -p /opt/docker/volumes/$projectName/step-ca-data
+mkdir -p /opt/docker/volumes/$projectName/step-ca-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-data
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets
+sudo chmod 700 /opt/docker/volumes/$projectName/step-ca-secrets
 ```
 
 `101000` here is the same rule every other stack follows, and it is worth checking rather than assuming: the service runs as its own `PUID`, so the container's UID 1000 is host UID 101000. See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000).
 
 `step-ca-data` is the CA's entire state: its configuration, its database of issued certificates, and the encrypted intermediate key. Back it up.
+
+`step-ca-secrets` holds one file, the CA password, and it has to exist before the first start. Generate it now:
+
+```bash
+head -c32 /dev/urandom \
+  | base64 \
+  | sudo tee /opt/docker/volumes/$projectName/step-ca-secrets/password > /dev/null
+sudo chmod 600 /opt/docker/volumes/$projectName/step-ca-secrets/password
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets/password
+```
+
+Store a copy in Vaultwarden, and a second copy in the same offline location as the root key backups from step 5. This password encrypts both the root and intermediate private keys at rest. Losing it after the root key is offline means the backup can never be unlocked again, which defeats the point of keeping one.
 
 ## 3. Deploy traefik-bootstrap onto pk01
 
@@ -77,15 +91,15 @@ Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps end
 
 step-ca's own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`, so there is no override to set here. That is deliberate, and it stays true after id01 exists: step-ca does its own authentication per provisioner, and a forward-auth hop in front of the ACME endpoint would break the unattended clients that need to reach it.
 
-## 4. Create the Stack resource and the CA password
+## 4. Create the Stack resource
 
-This stack is unusual in that a file has to exist on disk before the first successful start. `containers/step-ca/compose.yaml` mounts it:
+The CA password created in step 2 is mounted in from the host:
 
 ```yaml
-- ./secrets/password:/home/step/secrets/password:ro
+- ${DOCKER_VOLUMES}/${PROJECT_NAME}/step-ca-secrets/password:/home/step/secrets/password:ro
 ```
 
-That path is relative to `containers/step-ca/`, not to the stack directory, because Compose resolves a relative bind mount against the file that declares it and this service is reached through `extends`. So on pk01 the file lands under the repo Periphery clones, at `containers/step-ca/secrets/password`.
+It lives on the host rather than in the repo checkout because Periphery re-clones over its run directory, and a credential written inside that directory does not survive.
 
 ### Create the Stack resource
 
@@ -112,31 +126,11 @@ Open `stacks/step-ca-server/komodo.env`, copy its full contents, and paste them 
 
 Leave every `[[GLOBAL_...]]` reference as pasted. This stack needs nothing beyond km01's step 14.
 
-### Write the password, then deploy
+### Deploy
 
-Save the Stack resource and click **Deploy** once. It will not come up, and that is expected: the password file does not exist yet, so Docker creates an empty directory where the file should be.
+Save the Stack resource and click **Deploy**.
 
-Find the clone and clean up that stray directory:
-
-```bash
-ls /opt/docker/repos/
-sudo rm -rf <clone-dir>/containers/step-ca/secrets/password
-```
-
-Then generate the password:
-
-```bash
-head -c32 /dev/urandom | base64 | sudo tee <clone-dir>/containers/step-ca/secrets/password > /dev/null
-sudo chmod 600 <clone-dir>/containers/step-ca/secrets/password
-sudo chown 101000:101000 <clone-dir>/containers/step-ca/secrets/password
-```
-
-Store a copy in Vaultwarden, and a second copy in the same offline location as the root key backups from step 5. This password encrypts both the root and intermediate private keys at rest. Losing it after the root key is offline means the backup can never be unlocked again, which defeats the point of keeping one.
-
-Click **Deploy** again. This time step-ca initialises: it generates the root and intermediate keys, writes its configuration, and starts answering.
-
-> [!NOTE]
-> Redeploying a Git Repo stack can re-clone over the run directory. Confirm the password file survived a redeploy before relying on it, and if it does not, keep a copy outside the clone and restore it as part of the deploy routine. This is worth settling on pk01 rather than discovering later.
+step-ca initialises on first start: it generates the root and intermediate keys, writes its configuration, and starts answering. Nothing has to be fixed up afterwards, because the password file went in during step 2.
 
 ## 5. The root key ceremony
 

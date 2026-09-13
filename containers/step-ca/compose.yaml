@@ -96,10 +96,9 @@ services:
       DOCKER_STEPCA_INIT_SSH: "true"
     volumes:
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/step-ca-data:/home/step
-      # CA password, generated once and never committed — see stack-README. Same
-      # "sensitive file lives on disk, not in an env var" pattern as cloudflared's
-      # tunnel credentials and step-ca's own root key.
-      - ./secrets/password:/home/step/secrets/password:ro
+      # CA password, generated once. Same "sensitive file on disk, not in an env
+      # var" pattern as cloudflared's tunnel credentials. See stack-README.
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/step-ca-secrets/password:/home/step/secrets/password:ro
     labels: ## Traefik
       - "traefik.enable=true"
       - "traefik.docker.network=${PROXY_NETWORK}"

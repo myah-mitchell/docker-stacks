@@ -83,7 +83,7 @@ services:
     environment:
       <<: [*environment_tz, *environment_user]
     volumes:
-      - ./secrets/mailrise.conf:/etc/mailrise.conf:ro
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/mailrise-secrets/mailrise.conf:/etc/mailrise.conf:ro
     labels:
       ## Komodo Labels
       - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers

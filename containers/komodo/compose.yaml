@@ -83,11 +83,10 @@ services:
       KOMODO_TITLE: ${KOMODO_TITLE:-Komodo}
       KOMODO_HOST: ${PROJECT_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     volumes:
-      # core.config.toml (git_provider tokens, core [secrets] used to resolve this
-      # repo's [[VAR]] references) holds real credentials once filled in — lives in
-      # secrets/, never config/. See containers/komodo/config/core.config.toml.example
+      # Holds git_provider tokens and the core [secrets] block that resolves this
+      # repo's [[VAR]] references. See containers/komodo/config/core.config.toml.example
       # for the field reference (unmodified upstream default, safe to keep in git).
-      - ./secrets/core.config.toml:/config/config.toml:ro
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-secrets/core.config.toml:/config/config.toml:ro
       # Core's own PKI keypair (v2 auth, replaces the old shared KOMODO_PASSKEY) is
       # auto-generated on first boot and lives at /config/keys/core.key — this MUST
       # persist across recreation, or every Periphery agent loses trust with Core.

@@ -95,4 +95,8 @@ It is about breakage that has already happened. Those five characters are all sy
 
 A container's `config/` never holds a real secret. It holds `.example` templates and non-sensitive files, and it is always safe to commit.
 
-When a container's real config would contain a credential, such as a tunnel credentials file or an API token baked into a config file, the real file goes in that container's `secrets/` folder instead. That folder is gitignored with a tracked `.gitkeep` so the folder itself exists. See cloudflared, mailrise, or komodo for the pattern.
+When a container's real config would contain a credential, such as a tunnel credentials file or an API token baked into a config file, the real file never goes in the repo at all. It lives on the host, under `${DOCKER_VOLUMES}/${PROJECT_NAME}/<container>-secrets/`, and the compose file bind-mounts it in from there. See cloudflared, mailrise, komodo, or step-ca for the pattern.
+
+The same applies to a non-secret config file that is edited per host, such as cloudflared's ingress rules: it lives in `<container>-config/` on the host. Only the `.example` it was seeded from is committed.
+
+The reason is that a checkout has to be disposable. Periphery re-clones over a stack's run directory whenever it redeploys, so anything hand-written inside the checkout is lost on the next deploy. Nothing in a checkout should have to survive; deleting the directory and letting it be recreated should cost nothing.

@@ -3,9 +3,11 @@
 */.env
 .env
 
-# config/ is never gitignored — it must never hold real secrets by convention.
-# Any container whose real config would contain a credential (e.g. mailrise's
-# ntfy token, cloudflared's tunnel credentials.json) keeps the real file in
-# secrets/ instead (see each container's stack-README), never in config/.
-containers/*/secrets/*
-!containers/*/secrets/.gitkeep
+# config/ is never gitignored. It holds .example templates and non-sensitive
+# files only, and must never hold a real secret by convention.
+#
+# A real credential never lives in a checkout at all. It lives on the host,
+# under ${DOCKER_VOLUMES}/${PROJECT_NAME}/<container>-secrets/, and the compose
+# file bind-mounts it in. See each container's stack-README. This rule stays as
+# a backstop in case one is ever written into a checkout by hand.
+containers/*/secrets/

@@ -4,16 +4,23 @@
 # Create and Setup Required Folders
 ## Create needed folders for mailrise
 
-The compose file mounts this config as `./secrets/mailrise.conf`, and that path is relative to `containers/mailrise/` rather than to the stack directory, because Compose resolves a relative bind mount against the file that declares it. So it belongs in this container's own `secrets/` folder, inside whichever checkout of this repo the stack runs from:
-
 ```bash
-cp containers/mailrise/config/mailrise.conf.example \
-   containers/mailrise/secrets/mailrise.conf
+mkdir -p /opt/docker/volumes/$projectName/mailrise-secrets
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
 ```
 
-Fill in the `token` value with the ntfy publish-only token created in ntfy's own post-deploy step. It goes in `secrets/` rather than `config/`, which only ever holds the non-secret example and is always tracked in git.
+Seed the config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
 
-Create it before the first start. Docker creates an empty directory in place of a missing bind-mount file, which makes mailrise fail at startup with nothing obvious to point at.
+```bash
+sudo curl -fsSL -o /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
+  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/mailrise/config/mailrise.conf.example
+sudo chmod 600 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
+```
+
+Fill in the `token` value with the ntfy publish-only token created in ntfy's own post-deploy step.
+
+Do all of this before the first deploy. Docker creates an empty directory in place of a missing bind-mount file, which makes mailrise fail at startup with nothing obvious to point at. The file lives here rather than in the repo checkout because Periphery re-clones over its run directory, which would take any file written inside it along with it.
 
 ## Point PBS and PVE at it
 

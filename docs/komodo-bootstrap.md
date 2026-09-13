@@ -132,7 +132,9 @@ mkdir -p /opt/docker/volumes/$projectName/komodo-backups
 mkdir -p /opt/docker/volumes/$projectName/komodo-sync
 mkdir -p /opt/docker/volumes/$projectName/komodo-cache
 mkdir -p /opt/docker/volumes/$projectName/komodo-keys
+mkdir -p /opt/docker/volumes/$projectName/komodo-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-*
+sudo chmod 700 /opt/docker/volumes/$projectName/komodo-secrets
 ```
 
 Periphery does not create host bind-mount directories, and neither does Compose, so these have to exist with the right ownership before the first deploy.
@@ -190,14 +192,24 @@ python3 scripts/build.py
 
 ## 8. Create Komodo's own secrets file
 
-`containers/komodo/compose.yaml` mounts `secrets/core.config.toml` into the container. Docker silently creates an empty directory at that path if the file is missing, and Komodo then fails at startup.
+`containers/komodo/compose.yaml` mounts `core.config.toml` in from the host directory made in step 6:
 
-Create it from the committed template:
+```yaml
+- ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-secrets/core.config.toml:/config/config.toml:ro
+```
+
+It has to exist before the first start, or Docker creates an empty directory at that path and Komodo fails at startup. Create it from the committed template:
 
 ```bash
-cd /opt/docker/stacks/docker-stacks/containers/komodo
-cp config/core.config.toml.example secrets/core.config.toml
+projectName="komodo"
+
+sudo cp /opt/docker/stacks/docker-stacks/containers/komodo/config/core.config.toml.example \
+        /opt/docker/volumes/$projectName/komodo-secrets/core.config.toml
+sudo chmod 600 /opt/docker/volumes/$projectName/komodo-secrets/core.config.toml
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-secrets/core.config.toml
 ```
+
+km01's checkout at `/opt/docker/stacks/docker-stacks` is the one that is hand-made and permanent, so copying from it is fine. Every other host gets its checkout from Periphery, which re-clones over it, which is why this file lives under `/opt/docker/volumes` like every other piece of state.
 
 Leave it as it is. The repo is public, so Komodo needs no `[[git_provider]]` credential to clone it. Add one, using the commented-out example already in the file, only if you later point Komodo at a private repo.
 

@@ -93,6 +93,10 @@ services:
       ## Komodo Labels
       - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
     networks:
+      # frontend is here only so the SMTP port publishes. Docker skips port
+      # publishing for a container whose only network is internal, and backend
+      # is, so on backend alone 8025 is silently never bound on the host.
+      - frontend
       - backend
     depends_on:
       ntfy:

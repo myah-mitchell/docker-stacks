@@ -69,7 +69,7 @@ x-environment: &default_environment
 services:
 
   .semaphore:
-    <<: [*limits, *restart, *security, *user, *logging]
+    <<: [*limits, *restart, *security, *logging]
     image: semaphoreui/semaphore:v2.13.13
     hostname: ${PROJECT_NAME}-${SEMAPHORE_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
     container_name: "${PROJECT_NAME}-${SEMAPHORE_HOSTNAME}"

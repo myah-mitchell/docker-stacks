@@ -8,60 +8,49 @@ tf01 does not get traefik-bootstrap. It is the real Traefik, so there is nothing
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have already worked through [ci01 bootstrap](ci01-bootstrap.md).
 
-> [!WARNING]
-> Two directives tf01 depends on are commented out in `containers/traefik/compose.yaml` today. Read [What has to change in the repo first](#what-has-to-change-in-the-repo-first) before provisioning anything. Neither is fixable from Komodo's UI.
-
 ## Contents
 
-- [What has to change in the repo first](#what-has-to-change-in-the-repo-first)
+- [What tf01 turns on in the base Traefik service](#what-tf01-turns-on-in-the-base-traefik-service)
 - [Prerequisites](#prerequisites)
 - [Placeholders](#placeholders)
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Create the runtime folders](#2-create-the-runtime-folders)
 - [3. Open the firewall](#3-open-the-firewall)
-- [4. Create the four Komodo Secrets](#4-create-the-four-komodo-secrets)
+- [4. Create the five Komodo Secrets](#4-create-the-five-komodo-secrets)
 - [5. Create the Stack resource for traefik-server](#5-create-the-stack-resource-for-traefik-server)
 - [6. Verify](#6-verify)
 - [7. First access](#7-first-access)
 - [8. Point the other VMs at this Redis](#8-point-the-other-vms-at-this-redis)
 - [What's next](#whats-next)
 
-## What has to change in the repo first
+## What tf01 turns on in the base Traefik service
 
-Both of these are edits to `containers/traefik/compose.yaml`, committed and pushed before Komodo clones the repo onto tf01. Neither can be worked around from the *Environment* text, and `TRAEFIK_EXTRA_COMMAND` cannot cover them because it expands as a single argument and each fix needs more than one flag.
+Every Traefik stack in the fleet extends the one `.traefik` service in `containers/traefik/compose.yaml`. Two parts of it matter here first, and both are driven by values in this stack's `komodo.env` rather than by anything tf01-specific in the compose file.
 
-### The Redis provider is commented out
+### The Redis provider
 
-```yaml
-# Docker Redis provider for storing proxy labels from traefik-kop hosts
-#- --providers.redis.endpoints=redis:6379
-```
-
-Aggregating routers published by every other VM's traefik-kop is tf01's entire reason to exist. Until that line is live, tf01 serves only the containers running on tf01 itself, and traefik-kop elsewhere writes into a Redis nobody reads.
-
-Enabling it needs the password too, so it is two flags rather than one:
+Aggregating the routers every other VM's traefik-kop publishes is tf01's entire reason to exist. Its Traefik reads them from Redis:
 
 ```yaml
-- --providers.redis.endpoints=redis:6379
-- --providers.redis.password=${REDIS_PASSWORD}
+- ${TRAEFIK_REDIS_ENDPOINTS:+--providers.redis.endpoints=${TRAEFIK_REDIS_ENDPOINTS}}
+- ${TRAEFIK_REDIS_ENDPOINTS:+--providers.redis.password=${REDIS_PASSWORD}}
 ```
 
-Guard both behind something that keeps them off every other Traefik in the fleet. Only tf01 has a Redis to point at, and a Traefik that cannot reach its configured Redis provider does not start cleanly.
+Both lines are gated on `TRAEFIK_REDIS_ENDPOINTS`. When it is blank or absent, each expands to an empty argument and the provider stays off, which is what every Traefik without a local Redis needs.
 
-### The ACME resolver has no email
+`scripts/build.py` adds `TRAEFIK_REDIS_ENDPOINTS: redis:6379` only to stacks that run the Redis master or a replica, so traefik-server and traefik-dmz get it and nothing else does. Leave it as pasted.
 
-The `letsencrypt` resolver defines its storage, its Cloudflare DNS-01 challenge, and its resolvers, but no account email:
+Compose replaces `command:` as a whole list rather than merging it, so a stack cannot append these two flags to the base service on its own. Traefik's `TRAEFIK_PROVIDERS_REDIS_*` environment variables are no way around that either: Traefik reads its install configuration from only one source, and once any flag is on the command line it ignores those variables.
+
+### The ACME account email
 
 ```yaml
-- --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/certs/acme.json
-- --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
-- --certificatesresolvers.letsencrypt.acme.dnschallenge.delaybeforecheck=10
-- --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+- --certificatesresolvers.letsencrypt.acme.email=${LE_EMAIL}
 ```
 
-The service does set `LE_EMAIL` in its environment, but that is not a name Traefik reads. Traefik takes an ACME email from `--certificatesresolvers.<name>.acme.email` or from `TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL`, and registers no account without one.
+`LE_EMAIL` resolves from a Komodo Secret created in [step 4](#4-create-the-five-komodo-secrets), and Let's Encrypt registers the resolver's account under it.
 
-This has never been exercised, because traefik-bootstrap strips the resolver entirely and no other stack has run with it. tf01 is the first stack that asks Let's Encrypt for a certificate, so it is the first that finds out.
+tf01 is the first stack that exercises this. traefik-bootstrap strips the resolver entirely, so no earlier host has asked Let's Encrypt for anything.
 
 ### What is already correct
 
@@ -78,7 +67,6 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 - ci01 is finished, through [Semaphore setup](semaphore-setup.md) and [VictoriaMetrics setup](victoriametrics-setup.md). Semaphore's `provision-monitoring` Template is what generates this host's own Node Exporter password, and tf01's vmagent scrapes node_exporter with it.
 - The three `GLOBAL_VMAUTH_` values exist, from [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys). Without them this host's monitoring sidecars deploy with nowhere to write.
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
-- The two repo changes above are committed and pushed to `main`.
 - A Cloudflare API token scoped to edit DNS for the zone, and the account email that owns it. The resolver uses a DNS-01 challenge, so Let's Encrypt never needs to reach tf01 from the internet.
 
 ## Placeholders
@@ -154,16 +142,17 @@ The first three are the ports the Traefik container publishes, the same three ev
 
 The fourth is specific to tf01. `.redis-public` publishes `6379` on the host, because traefik-kop on every other VM connects to it across the network. Scope it to the internal subnet rather than opening it outright: Redis here holds routing configuration for the whole fleet, and it is reachable with nothing but the password.
 
-## 4. Create the four Komodo Secrets
+## 4. Create the five Komodo Secrets
 
-`stacks/traefik-server/komodo.env` carries four references that no earlier runbook creates. Deploying before they exist passes the literal string `[[CF_DNS_API_TOKEN]]` into the container.
+`stacks/traefik-server/komodo.env` carries five references that no earlier runbook creates. Deploying before they exist passes the literal string `[[CF_DNS_API_TOKEN]]` into the container.
 
-In Komodo's UI on km01, go to *Settings > Secrets* and create all four by name, with no `[[` or `]]`.
+In Komodo's UI on km01, go to *Settings > Secrets* and create all five by name, with no `[[` or `]]`.
 
 | Secret | Value |
 | --- | --- |
 | `CF_API_EMAIL` | The Cloudflare account email that owns the DNS token |
 | `CF_DNS_API_TOKEN` | The Cloudflare API token, scoped to edit DNS for the zone |
+| `LE_EMAIL` | The address to register the Let's Encrypt account under |
 | `TRAEFIK_KOP_REDIS_PASSWORD` | Your choice, alphanumeric only |
 | `TRAEFIK_KOP_REDIS_SERVER` | `tf01.home.myah-mitchell.com` |
 
@@ -202,7 +191,7 @@ Three keys need a value from you:
 | `SUB_DOMAIN_NAME` | This site, with the trailing dot, so `home.` |
 | `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
 
-Leave `PROJECT_NAME` as the committed `traefik`, and leave the hostname keys alone.
+Leave `PROJECT_NAME` as the committed `traefik`, `TRAEFIK_REDIS_ENDPOINTS` as the committed `redis:6379`, and the hostname keys alone.
 
 Leave the `[[GLOBAL_...]]` references as pasted, with the exceptions in the next section. Komodo resolves them from the Variables created in [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook.
 
@@ -247,7 +236,7 @@ sudo ls -l /opt/docker/volumes/traefik/traefik-certs/acme.json
 docker logs traefik-traefik 2>&1 | grep -i acme
 ```
 
-An `acme.json` of a few hundred bytes holds a registration and no certificate. A missing account email shows up here first, as a registration error in the log.
+An `acme.json` of a few hundred bytes holds a registration and no certificate. A bad account email shows up here first, as a registration error in the log. An `LE_EMAIL` Secret that was never created reaches Traefik as the literal `[[LE_EMAIL]]`, and fails the same way.
 
 ## 7. First access
 

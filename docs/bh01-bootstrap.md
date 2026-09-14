@@ -9,7 +9,7 @@ bh01 does not get traefik-bootstrap. Like tf01, it is a real Traefik.
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md) and [tf01 bootstrap](tf01-bootstrap.md).
 
 > [!WARNING]
-> The two repo changes described in [What has to change in the repo first](tf01-bootstrap.md#what-has-to-change-in-the-repo-first) apply here too. bh01 runs the same base Traefik service, wants the same Let's Encrypt resolver, and reads the same Redis provider. Settle both on tf01 before starting here.
+> bh01 runs the same base Traefik service as tf01, with the same Let's Encrypt resolver and the same Redis provider, pointed at its own local replica. See [What tf01 turns on in the base Traefik service](tf01-bootstrap.md#what-tf01-turns-on-in-the-base-traefik-service), and bring tf01 up first.
 
 ## Contents
 
@@ -193,7 +193,7 @@ Three keys need a value from you:
 
 Clear the same three keys tf01 clears, for the same reasons. See [Keys to clear](tf01-bootstrap.md#keys-to-clear).
 
-`CF_API_EMAIL` and `CF_DNS_API_TOKEN` are the exception: keep those, because this Traefik wants a real certificate too. They resolve from the Secrets created in [tf01's step 4](tf01-bootstrap.md#4-create-the-four-komodo-secrets), as do `TRAEFIK_KOP_REDIS_PASSWORD` and `TRAEFIK_KOP_REDIS_SERVER`.
+`CF_API_EMAIL`, `CF_DNS_API_TOKEN`, and `LE_EMAIL` are the exception: keep those, because this Traefik wants a real certificate too. They resolve from the Secrets created in [tf01's step 4](tf01-bootstrap.md#4-create-the-five-komodo-secrets), as do `TRAEFIK_KOP_REDIS_PASSWORD` and `TRAEFIK_KOP_REDIS_SERVER`.
 
 ### Deploy
 

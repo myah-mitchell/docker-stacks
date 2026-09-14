@@ -107,7 +107,7 @@ Leave the `[[GLOBAL_...]]` references as pasted, with the two exceptions below. 
 
 ### Keys to clear
 
-Six keys come across in the paste that this stack has no working use for. Clear each one to blank.
+Seven keys come across in the paste that this stack has no working use for. Clear each one to blank.
 
 | Keys | Why they do nothing here |
 | --- | --- |
@@ -115,6 +115,7 @@ Six keys come across in the paste that this stack has no working use for. Clear 
 | `AUTHENTIK_HOST` | Also reaches the container, but nothing here forwards auth to Authentik |
 | `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec lines commented out |
 | `TRAEFIK_EXTRA_COMMAND` | Sits at the end of the command list and expands to nothing unless you set it |
+| `LE_EMAIL` | Only the ACME resolver reads it, and this stack's command list leaves the resolver out |
 
 The first three are worth clearing rather than ignoring. This stack overrides the base service's `command` and `labels` but not its `environment`, so all three are still passed into the container.
 

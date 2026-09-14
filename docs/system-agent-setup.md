@@ -207,13 +207,13 @@ That is the same reason every runbook before this one clears them.
 
 This is the stack with the most `[[...]]` references in the repo, and it is the first one that needs all of them at once. A reference with no Variable or Secret behind it reaches Compose as the literal string, which usually surfaces as a type error rather than as a missing credential.
 
-Nineteen `[[GLOBAL_...]]` references come from [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook, and need no action. The other ten come from later runbooks:
+Nineteen `[[GLOBAL_...]]` references come from [step 14](komodo-bootstrap.md#14-create-komodos-global-variables) of the km01 runbook, and need no action. The other eleven come from later runbooks:
 
 | Reference | Created in |
 | --- | --- |
 | `GLOBAL_VMAUTH_USER`, `GLOBAL_VMAUTH_PASS`, `GLOBAL_VMAUTH_HOST` | [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys) |
-| `TRAEFIK_KOP_REDIS_PASSWORD`, `TRAEFIK_KOP_REDIS_SERVER` | [step 4 of tf01 bootstrap](tf01-bootstrap.md#4-create-the-four-komodo-secrets) |
-| `CF_API_EMAIL`, `CF_DNS_API_TOKEN` | The same step on tf01 |
+| `TRAEFIK_KOP_REDIS_PASSWORD`, `TRAEFIK_KOP_REDIS_SERVER` | [step 4 of tf01 bootstrap](tf01-bootstrap.md#4-create-the-five-komodo-secrets) |
+| `CF_API_EMAIL`, `CF_DNS_API_TOKEN`, `LE_EMAIL` | The same step on tf01 |
 | `GLOBAL_AUTHENTIK_HOST` | [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide) |
 | `DOCKNS_UNIFI_HOST`, `DOCKNS_UNIFI_API_KEY` | Step 4 above, per site |
 

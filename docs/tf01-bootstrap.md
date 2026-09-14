@@ -87,7 +87,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 ## 1. Provision the VM
 
-Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with tf01 connected and healthy under *Resources > Servers*. There is no tf01-specific variation in any of them.
+Follow [Provisioning a VM](provision-a-vm.md), six steps ending with tf01 connected and healthy under *Resources > Servers*. There is no tf01-specific variation in any of them.
 
 Four cores and 8 GB because ten services run here, and Traefik is the path every other host's traffic takes.
 

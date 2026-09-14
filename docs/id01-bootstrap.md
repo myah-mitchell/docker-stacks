@@ -43,7 +43,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 ## 1. Provision the VM
 
-Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with id01 connected and healthy under *Resources > Servers*.
+Follow [Provisioning a VM](provision-a-vm.md), six steps ending with id01 connected and healthy under *Resources > Servers*.
 
 Four cores and 8 GB because Authentik's worker is the memory-hungry part, and Postgres sits alongside it.
 

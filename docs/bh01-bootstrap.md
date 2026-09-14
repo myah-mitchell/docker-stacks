@@ -65,7 +65,7 @@ That credentials file is a real credential: anything holding it can serve traffi
 
 ## 2. Provision the VM
 
-Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with bh01 connected and healthy under *Resources > Servers*.
+Follow [Provisioning a VM](provision-a-vm.md), six steps ending with bh01 connected and healthy under *Resources > Servers*.
 
 > [!IMPORTANT]
 > At step 2 there, set the VLAN tag to the DMZ one, and take both `<ip>` and `<gateway-ip>` from the DMZ network. This is the only host in the running order where any of that differs, and it is the whole point of bh01.

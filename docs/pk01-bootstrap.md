@@ -41,7 +41,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 ## 1. Provision the VM
 
-Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with pk01 connected and healthy under *Resources > Servers*.
+Follow [Provisioning a VM](provision-a-vm.md), six steps ending with pk01 connected and healthy under *Resources > Servers*.
 
 Two cores and 2 GB because there is one service and no database, so this is the smallest VM in the fleet.
 

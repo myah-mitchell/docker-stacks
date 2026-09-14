@@ -17,8 +17,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [3. Start the VM](#3-start-the-vm)
 - [4. Verify base provisioning](#4-verify-base-provisioning)
 - [5. Give the host an onboarding key](#5-give-the-host-an-onboarding-key)
-- [6. Create the proxy Docker network](#6-create-the-proxy-docker-network)
-- [7. Confirm the host shows as a Komodo Server](#7-confirm-the-host-shows-as-a-komodo-server)
+- [6. Confirm the host shows as a Komodo Server](#6-confirm-the-host-shows-as-a-komodo-server)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -82,15 +81,18 @@ SSH in once cloud-init finishes:
 
 ```bash
 docker version
+docker network inspect proxy --format '{{.Name}}'
 systemctl status ufw
 sudo -u komodo XDG_RUNTIME_DIR=/run/user/$(id -u komodo) systemctl --user status periphery.service
 systemctl status node_exporter
 sudo test -s /etc/node-exporter/scrape-password && echo present
 ```
 
-All four services should be up and running, and the last line should print `present`.
+All four services should be up and running, the network check should print `proxy`, and the last line should print `present`.
 
 The last command needs that exact shape. Periphery runs as a `--user` systemd service under a dedicated `komodo` OS account, so a plain `systemctl status periphery` from your own login finds nothing. Ansible's docker role is what creates that account.
+
+The docker role also creates the `proxy` network. Every deployable stack's `compose.yaml` declares it `external: true`, and Compose never creates an external network, so a host without it fails its first deploy with nothing to attach to.
 
 The last two lines check the monitoring role. On its first run it generates this host's own Node Exporter password and publishes a copy to `scrape-password` for the host's vmagent, so nothing needs running from Semaphore afterwards. A missing file means the role failed during cloud-init. Re-run it from the `/tmp/ansible` checkout, the same way step 5 re-runs the docker role but with `--tags monitoring` and no onboarding key, rather than finding out later as a missing `node` series in system-agent.
 
@@ -149,15 +151,7 @@ On the new host:
 sudo -u komodo grep -A1 'core_address\|connect_as' /home/komodo/.config/komodo/periphery.config.toml
 ```
 
-## 6. Create the proxy Docker network
-
-```bash
-docker network create proxy
-```
-
-Same one-time-per-host step as km01's step 9. Nothing creates this network, and every deployable stack's `compose.yaml` declares it `external: true`.
-
-## 7. Confirm the host shows as a Komodo Server
+## 6. Confirm the host shows as a Komodo Server
 
 Step 5's onboarding key created the Server resource the moment Periphery made its first outbound connection. There is nothing to add by hand.
 

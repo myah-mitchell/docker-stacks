@@ -18,7 +18,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - [6. Create the runtime folders](#6-create-the-runtime-folders)
 - [7. Generate and fill in the stack's .env](#7-generate-and-fill-in-the-stacks-env)
 - [8. Create Komodo's own secrets file](#8-create-komodos-own-secrets-file)
-- [9. Create the proxy Docker network](#9-create-the-proxy-docker-network)
+- [9. Confirm the proxy Docker network](#9-confirm-the-proxy-docker-network)
 - [10. Open the firewall for Core](#10-open-the-firewall-for-core)
 - [11. Bring the stack up](#11-bring-the-stack-up)
 - [12. Create the admin account](#12-create-the-admin-account)
@@ -213,15 +213,19 @@ km01's checkout at `/opt/docker/stacks/docker-stacks` is the one that is hand-ma
 
 Leave it as it is. The repo is public, so Komodo needs no `[[git_provider]]` credential to clone it. Add one, using the commented-out example already in the file, only if you later point Komodo at a private repo.
 
-## 9. Create the proxy Docker network
+## 9. Confirm the proxy Docker network
+
+```bash
+docker network inspect proxy --format '{{.Name}}'
+```
+
+It should print `proxy`. Every deployable stack's `compose.yaml` declares `proxy` as `external: true`, and Compose never creates an external network, so it has to exist before a host's first stack starts or `docker compose up -d` fails with nothing to attach to.
+
+Ansible's docker role creates it during provisioning, on km01 and on every VM after it. If the command errors instead, km01 was provisioned before the role did that. Create it by hand once:
 
 ```bash
 docker network create proxy
 ```
-
-Every deployable stack's `compose.yaml` declares `proxy` as `external: true`. No stack creates it, so it has to exist on a host before that host's first stack starts, or `docker compose up -d` fails with nothing to attach to.
-
-This is a one-time step on every VM in the plan, not just km01.
 
 ## 10. Open the firewall for Core
 

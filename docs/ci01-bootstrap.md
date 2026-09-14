@@ -32,7 +32,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 ## 1. Provision the VM
 
-Follow [Provisioning a VM](provision-a-vm.md), seven steps ending with ci01 connected and healthy under *Resources > Servers*.
+Follow [Provisioning a VM](provision-a-vm.md), six steps ending with ci01 connected and healthy under *Resources > Servers*.
 
 Four cores and 8 GB is a floor rather than a target. Semaphore, Postgres, and postgres-backup are light on their own, but victoriametrics-server adds twelve more services, including Grafana and three VictoriaMetrics databases. Both metrics and log retention grow on disk, so watch `/opt/docker/volumes/victoriametrics` once it exists.
 

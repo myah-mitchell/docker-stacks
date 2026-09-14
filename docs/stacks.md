@@ -34,6 +34,8 @@ core-infra is the odd one out in this table. It is not what ci01 is for, it is w
 | system-agent | traefik, error-pages, logrotate, traefik-kop, vmagent, vlagent, vector, cadvisor, dozzle-agent, dockns, socket-proxy, socket-proxy-rw | Not deployed anywhere yet |
 | traefik-bootstrap | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | The temporary stand-in for system-agent |
 
+Komodo requires every Stack name to be unique, so the Stack resource for either of these is named after the stack plus its host, such as `system-agent-ci01` or `traefik-bootstrap-id01`. The one-per-host stacks above keep their plain names. Container and network names are unaffected, because they come from `PROJECT_NAME` rather than the Stack name.
+
 system-agent is the standard per-VM bundle. Every VM's own local Traefik terminates TLS and runs the `chain-authentik@file` auth chain for that VM's services directly, without needing tf01. traefik-kop publishes a router into tf01's shared Redis only when a service also carries a `kop-public.traefik.*` label, so reaching the internet is a per-service opt-in rather than a per-VM setting.
 
 It needs live backends for monitoring (ci01), the auth chain (id01), and internal certs (pk01), so there is no point deploying it before those exist. Until then, [Traefik bootstrap](traefik-bootstrap.md) covers the temporary replacement. Do not run both on one VM: they fight over ports 80, 443, and 8443.

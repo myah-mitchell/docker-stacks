@@ -70,7 +70,7 @@ Split a step out into its own doc when a second host will run it, or when a stac
 
 The onboarding key in step 5 of provisioning is required for every future host, permanently. The traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
 
-[system-agent](system-agent-setup.md) is the third shared doc, and the one that ends the bootstrap phase. It is written once because every VM runs the same stack, and only `SERVER_NAME` and the dockns values differ between them.
+[system-agent](system-agent-setup.md) is the third shared doc, and the one that ends the bootstrap phase. It is written once because every VM runs the same stack, and only the Stack name, `SERVER_NAME`, and the dockns values differ between them.
 
 Name a runbook after the host once a VM is just "provision, then deploy via Komodo" (`ci01-bootstrap.md`). Name it after the service when something is structurally unique about that bootstrap, which so far means `komodo-bootstrap.md` alone. Name it after the procedure when it is not tied to a host at all (`provision-a-vm.md`).
 

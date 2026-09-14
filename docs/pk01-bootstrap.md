@@ -87,7 +87,7 @@ Store a copy in Vaultwarden, and a second copy in the same offline location as t
 
 step-ca publishes no port. Traefik routes to it on `9000` over HTTPS, and without a Traefik on pk01 nothing can reach the CA.
 
-Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Set its target *Server* to **pk01** and its `SERVER_NAME` to `pk01`, with the same sub-domain and domain you use in step 4.
+Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Name the Stack `traefik-bootstrap-pk01`, set its target *Server* to **pk01**, and set its `SERVER_NAME` to `pk01`, with the same sub-domain and domain you use in step 4.
 
 step-ca's own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`, so there is no override to set here. That is deliberate, and it stays true after id01 exists: step-ca does its own authentication per provisioner, and a forward-auth hop in front of the ACME endpoint would break the unattended clients that need to reach it.
 

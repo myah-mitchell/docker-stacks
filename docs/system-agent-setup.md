@@ -168,7 +168,9 @@ For Cloudflare, four more keys have to be filled in. Leave all four blank on a V
 
 ## 5. Create the Stack resource
 
-In Komodo's UI, go to *Resources > Stacks*, create a Stack named `system-agent`, and set its target *Server* to the VM you are deploying onto.
+In Komodo's UI, go to *Resources > Stacks*, create a Stack named `system-agent-<host>`, for example `system-agent-ci01`, and set its target *Server* to that same VM.
+
+Komodo requires every Stack name to be unique, and every VM runs this stack, so the host name goes on the end.
 
 ### Point it at the repo
 
@@ -248,7 +250,7 @@ Then browse to `https://traefik.<host>.home.myah-mitchell.com`, substituting wha
 
 Only if this VM was running it. tf01 and bh01 never did, because their own stacks are a Traefik already.
 
-Delete the traefik-bootstrap Stack resource in Komodo. It cannot run alongside this one.
+Delete this VM's `traefik-bootstrap-<host>` Stack resource in Komodo. It cannot run alongside this one.
 
 Then clear the `TRAEFIK_AUTH_CHAIN` override on every other stack on this VM that was set to `chain-no-auth@file`, and redeploy each. They fall back to `chain-authentik@file` and pick up the real auth chain.
 

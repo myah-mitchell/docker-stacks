@@ -85,7 +85,7 @@ That generated README is also the authority for this folder list, and `scripts/b
 
 Authentik publishes no port directly. Without a Traefik on id01 there is no way to reach its setup flow, and the setup flow is the only way to create the first admin account.
 
-Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Set its target *Server* to **id01** and its `SERVER_NAME` to `id01`, with the same sub-domain and domain you use in step 5.
+Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Name the Stack `traefik-bootstrap-id01`, set its target *Server* to **id01**, and set its `SERVER_NAME` to `id01`, with the same sub-domain and domain you use in step 5.
 
 There is a real ordering trap here. traefik-bootstrap is what makes Authentik reachable, and Authentik is what eventually makes traefik-bootstrap unnecessary. Deploy the bootstrap Traefik first, then Authentik, and tear the bootstrap down per VM only once each VM's real stack is ready.
 

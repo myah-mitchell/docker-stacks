@@ -44,7 +44,7 @@ semaphore-server publishes no port directly, and its Traefik labels are gated be
 
 traefik-bootstrap fills that gap: a real Traefik with self-signed TLS and `chain-no-auth@file` in place of a cert resolver and Authentik.
 
-Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Set its `SERVER_NAME` to `ci01`. Whatever sub-domain and domain you give it, use the same pair for every stack on this host. The rest of that page covers what this stack does and when it gets torn down.
+Follow [How to deploy it](traefik-bootstrap.md#how-to-deploy-it), five steps ending with all five services healthy. Name the Stack `traefik-bootstrap-ci01` and set its `SERVER_NAME` to `ci01`. Whatever sub-domain and domain you give it, use the same pair for every stack on this host. The rest of that page covers what this stack does and when it gets torn down.
 
 ## 3. Deploy Semaphore
 

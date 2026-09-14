@@ -70,7 +70,9 @@ Those three are the ports `containers/traefik/compose.yaml` publishes. Base prov
 
 ### 3. Create the Stack resource
 
-In Komodo's UI, go to *Resources > Stacks* and create a Stack named `traefik-bootstrap`. Set its target *Server* to the VM you are deploying onto.
+In Komodo's UI, go to *Resources > Stacks* and create a Stack named `traefik-bootstrap-<host>`, for example `traefik-bootstrap-ci01`. Set its target *Server* to that same VM.
+
+Komodo requires every Stack name to be unique, and this stack runs on several VMs at once, so the host name goes on the end.
 
 Under *Choose Mode*, choose **Git Repo**.
 
@@ -152,7 +154,7 @@ The hostname does not change when system-agent replaces this stack later. Only t
 
 Do this per VM, once that VM's system-agent stack is deployable for real. [system-agent](system-agent-setup.md) does it as its step 7, so follow that page rather than this section if you are deploying the replacement now.
 
-Delete the traefik-bootstrap Stack resource in Komodo, or `docker compose down` it directly on the VM. Then clear the `TRAEFIK_AUTH_CHAIN` override on every stack that was set to `chain-no-auth@file`, so each falls back to `chain-authentik@file` on its next deploy.
+Delete the VM's `traefik-bootstrap-<host>` Stack resource in Komodo, or `docker compose down` it directly on the VM. Then clear the `TRAEFIK_AUTH_CHAIN` override on every stack that was set to `chain-no-auth@file`, so each falls back to `chain-authentik@file` on its next deploy.
 
 > [!WARNING]
 > Do not run traefik-bootstrap and system-agent on the same VM at once. Both publish `:80`, `:443`, and `:8443` on the host and will fight over them.

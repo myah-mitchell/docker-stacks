@@ -27,9 +27,9 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | 2.2 | ci01 | Semaphore, ansible's runner | [Semaphore setup](semaphore-setup.md) | Up and healthy |
 | 2.3 | ci01 | VictoriaMetrics, the fleet's metrics, logs, and traces backend | [VictoriaMetrics setup](victoriametrics-setup.md) | Up and healthy |
 | 2.4 | ci01 | core-infra, where alerts and uptime checks land | [Core infrastructure setup](core-infra-setup.md) | Up and healthy |
-| 3 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
-| 4 | id01 | Authentik, identity | [id01 bootstrap](id01-bootstrap.md) | Written, not yet run |
-| 5 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |
+| 3 | id01 | Authentik, identity | [id01 bootstrap](id01-bootstrap.md) | Written, not yet run |
+| 4 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |
+| 5 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
 | 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | [bh01 bootstrap](bh01-bootstrap.md) | Written, not yet run |
 | 7 | any | system-agent, the per-VM stack every VM runs once 2 through 5 are done | [system-agent](system-agent-setup.md) | Written, not yet run |
 | 8 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
@@ -48,7 +48,9 @@ Row 7 is not a VM either. It is the per-VM stack that replaces traefik-bootstrap
 
 ap01 is the exception in more than status. Vaultwarden has no directory under `containers/`, so there is no stack to point a runbook at. Building the container comes first.
 
-tf01 and bh01 carry one more caveat. Both depend on two directives that are commented out in `containers/traefik/compose.yaml` today, and neither can be enabled from Komodo's UI. See [What has to change in the repo first](tf01-bootstrap.md#what-has-to-change-in-the-repo-first).
+tf01 comes after id01 and pk01 because nothing before bh01 needs it. Its Redis stays empty until system-agent puts traefik-kop on each VM, and its dashboard defaults to `chain-authentik@file`, which only resolves once id01 exists. bh01 is the one host that needs tf01 first, because its Redis replicates tf01's.
+
+tf01 and bh01 are also the first hosts to use the Redis provider and the Let's Encrypt resolver in the base Traefik service. See [What tf01 turns on in the base Traefik service](tf01-bootstrap.md#what-tf01-turns-on-in-the-base-traefik-service).
 
 Pre-existing hosts (bk01, mx01, vh01, and the PVE hosts themselves) are not covered here. They predate this plan and are not provisioned by these runbooks.
 

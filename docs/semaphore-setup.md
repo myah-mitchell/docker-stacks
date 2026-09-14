@@ -443,4 +443,4 @@ Semaphore can now reach the fleet, so a change to ansible stops being a per-host
 
 ci01 has two stacks left. [VictoriaMetrics setup](victoriametrics-setup.md) deploys the fleet's metrics, logs, and traces backend, and [Core infrastructure setup](core-infra-setup.md) deploys the notification and uptime services that sit alongside it.
 
-After that, tf01 is the next VM. See [Running order](README.md#running-order).
+After that, id01 is the next VM. See [Running order](README.md#running-order).

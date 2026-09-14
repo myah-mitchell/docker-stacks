@@ -72,6 +72,6 @@ Follow [Core infrastructure setup](core-infra-setup.md), eight steps from runtim
 
 ci01 is finished once all five linked docs are, apart from [step 13 of Semaphore setup](semaphore-setup.md#13-replace-this-key-once-step-ca-is-live), which waits on pk01.
 
-tf01 is the next VM. See [Running order](README.md#running-order).
+id01 is the next VM. See [Running order](README.md#running-order).
 
 ci01 runs traefik-bootstrap until the whole fleet is up. Come back to it once id01 and pk01 exist, and replace it here with [system-agent](system-agent-setup.md) like every other VM.

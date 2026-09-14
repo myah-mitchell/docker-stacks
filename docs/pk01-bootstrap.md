@@ -170,7 +170,7 @@ The `-k` is expected while pk01 is still behind traefik-bootstrap. That certific
 
 ## What's next
 
-bh01 is the next VM, and it is the first one that faces the internet. See [bh01 bootstrap](bh01-bootstrap.md).
+tf01 is the next VM, the Traefik hub and the Redis master that bh01 replicates. See [tf01 bootstrap](tf01-bootstrap.md).
 
 pk01 existing also unblocks two things that are not VM provisioning:
 

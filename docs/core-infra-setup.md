@@ -308,4 +308,4 @@ ci01 is finished. It runs Semaphore, the VictoriaMetrics backend, and the notifi
 
 blackbox-exporter is deployed but nothing probes anything yet. It is a multi-target proxy, so it needs a vmagent scrape job that rewrites each target into a `/probe` query parameter, and a vmalert rule on `probe_success` to notify through ntfy. The [generated README for core-infra](../stacks/core-infra/README.md) has the scrape job to copy. Both belong with the rest of the alerting work rather than here.
 
-tf01 is the next VM, in [tf01 bootstrap](tf01-bootstrap.md). See [Running order](README.md#running-order) for the rest.
+id01 is the next VM, in [id01 bootstrap](id01-bootstrap.md). See [Running order](README.md#running-order) for the rest.

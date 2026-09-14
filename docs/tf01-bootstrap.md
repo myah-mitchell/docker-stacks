@@ -6,7 +6,7 @@ Its stack is traefik-server. That is traefik-agent plus a Redis master, and trae
 
 tf01 does not get traefik-bootstrap. It is the real Traefik, so there is nothing to stand in for.
 
-Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have already worked through [ci01 bootstrap](ci01-bootstrap.md).
+Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have already worked through [ci01 bootstrap](ci01-bootstrap.md), [id01 bootstrap](id01-bootstrap.md), and [pk01 bootstrap](pk01-bootstrap.md).
 
 ## Contents
 
@@ -64,9 +64,11 @@ That label is live, and it covers the domain and its wildcards. Leave the entryp
 
 ## Prerequisites
 
-- ci01 is finished, through [Semaphore setup](semaphore-setup.md) and [VictoriaMetrics setup](victoriametrics-setup.md). Semaphore's `provision-monitoring` Template is what generates this host's own Node Exporter password, and tf01's vmagent scrapes node_exporter with it.
+- ci01 is finished, through [VictoriaMetrics setup](victoriametrics-setup.md), so this host's vmagent, vlagent, and vector have a backend to write to from their first deploy. The Node Exporter password vmagent scrapes with needs nothing from ci01: cloud-init's first run of the monitoring role generates it, and [step 4 of Provisioning a VM](provision-a-vm.md#4-verify-base-provisioning) checks it is there.
 - The three `GLOBAL_VMAUTH_` values exist, from [step 4 of VictoriaMetrics setup](victoriametrics-setup.md#4-create-the-three-vmauth-keys). Without them this host's monitoring sidecars deploy with nowhere to write.
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
+- id01 is finished, through [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide), so `GLOBAL_AUTHENTIK_HOST` exists and this Traefik's `chain-authentik@file` has something to forward to.
+- pk01 is finished, through [pk01 bootstrap](pk01-bootstrap.md).
 - A Cloudflare API token scoped to edit DNS for the zone, and the account email that owns it. The resolver uses a DNS-01 challenge, so Let's Encrypt never needs to reach tf01 from the internet.
 
 ## Placeholders
@@ -197,14 +199,13 @@ Leave the `[[GLOBAL_...]]` references as pasted, with the exceptions in the next
 
 ### Keys to clear
 
-Three keys arrive as references to Variables that do not exist yet, or as values nothing here can use. Clear each one to blank.
+Two keys arrive as values nothing here can use. Clear each one to blank.
 
 | Keys | Why they do nothing yet |
 | --- | --- |
 | `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec environment lines and its bouncer middleware commented out |
-| `AUTHENTIK_HOST` | id01 does not exist yet, so nothing forwards auth anywhere |
 
-`AUTHENTIK_HOST` is the one to come back to. See [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide).
+Leave `AUTHENTIK_HOST` as pasted. id01 comes before tf01, so `GLOBAL_AUTHENTIK_HOST` already exists and this stack is gated from its first deploy.
 
 Leave the three `VMAUTH_` keys alone. ci01 comes before tf01 in the running order, so the Variables behind them already exist and this host's monitoring sidecars ship from their first deploy.
 
@@ -244,7 +245,9 @@ Browse to `https://traefik.tf01.home.myah-mitchell.com`, substituting whatever `
 
 Unlike every stack reached through traefik-bootstrap, this one should present a certificate your browser already trusts. A warning here means the resolver did not issue, and step 6's log check says why.
 
-The dashboard is on its own `dashboard` entrypoint, on `:8443`, and it is not gated behind anything yet. Gating it belongs with the rest of the Authentik work, after id01. See [id01 bootstrap](id01-bootstrap.md).
+The dashboard is on its own `dashboard` entrypoint, on `:8443`, behind `chain-authentik@file`. Expect Authentik to ask you to sign in.
+
+A redirect loop instead of a sign-in page means Authentik has no Provider and Application for this hostname yet. Add them in Authentik's UI, as [step 8 of id01 bootstrap](id01-bootstrap.md#8-turn-on-chain-authentik-fleet-wide) describes. Setting `TRAEFIK_AUTH_CHAIN` to `chain-no-auth@file` and redeploying gets you in meanwhile, but clear it again once Authentik answers.
 
 ## 8. Point the other VMs at this Redis
 
@@ -256,6 +259,6 @@ That is the ordering to keep in mind for the rest of the fleet: a VM starts on t
 
 ## What's next
 
-id01 is the next VM. Authentik is what turns `chain-authentik@file` from a middleware that nothing can satisfy into the fleet's real auth gate, and it is what unblocks tearing down traefik-bootstrap everywhere.
+bh01 is the next VM. Its Redis replicates this one, and it is the first host that faces the internet.
 
-See [id01 bootstrap](id01-bootstrap.md), and [Running order](README.md#running-order) for where tf01 sits.
+See [bh01 bootstrap](bh01-bootstrap.md), and [Running order](README.md#running-order) for where tf01 sits.

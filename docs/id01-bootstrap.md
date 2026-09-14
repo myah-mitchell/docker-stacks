@@ -24,9 +24,8 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Prerequisites
 
-- tf01 is finished, through [tf01 bootstrap](tf01-bootstrap.md). Nothing here strictly needs it, but step 8's payoff is pointless while tf01 cannot route.
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
-- ci01 is finished, through [Semaphore setup](semaphore-setup.md), so the `provision-monitoring` Template exists and can generate this host's own Node Exporter password.
+- ci01 is finished, through [ci01 bootstrap](ci01-bootstrap.md), so this host's metrics and logs have a backend once system-agent replaces traefik-bootstrap here. The Node Exporter password needs nothing from ci01: cloud-init's first run of the monitoring role generates it, and [step 4 of Provisioning a VM](provision-a-vm.md#4-verify-base-provisioning) checks it is there.
 - A MaxMind account, for the free GeoLite2 databases. Signing up is free and takes a few minutes. Step 4 explains what happens if you skip it.
 
 ## Placeholders

@@ -84,11 +84,15 @@ SSH in once cloud-init finishes:
 docker version
 systemctl status ufw
 sudo -u komodo XDG_RUNTIME_DIR=/run/user/$(id -u komodo) systemctl --user status periphery.service
+systemctl status node_exporter
+sudo test -s /etc/node-exporter/scrape-password && echo present
 ```
 
-All three should be up and running.
+All four services should be up and running, and the last line should print `present`.
 
 The last command needs that exact shape. Periphery runs as a `--user` systemd service under a dedicated `komodo` OS account, so a plain `systemctl status periphery` from your own login finds nothing. Ansible's docker role is what creates that account.
+
+The last two lines check the monitoring role. On its first run it generates this host's own Node Exporter password and publishes a copy to `scrape-password` for the host's vmagent, so nothing needs running from Semaphore afterwards. A missing file means the role failed during cloud-init. Re-run it from the `/tmp/ansible` checkout, the same way step 5 re-runs the docker role but with `--tags monitoring` and no onboarding key, rather than finding out later as a missing `node` series in system-agent.
 
 ## 5. Give the host an onboarding key
 
@@ -97,6 +101,9 @@ This is the one manual step, and it is permanent. Every future host needs its ow
 The ansible repo ships `komodo_onboarding_key` blank in the docker role's defaults, because a real value is single-use and must never be committed. Periphery needs one to make its first outbound connection to Core. After that, Core and the new host trust each other by their own Ed25519 keypairs and the onboarding key is discarded.
 
 In Komodo's UI on km01, at `http://<km-ip>:9120`, go to *Settings > Onboarding* and click **New Onboarding Key**.
+
+> [!NOTE]
+> Once Semaphore is up on ci01, the re-run below can also be done from a Semaphore Task Template, the same way [provision-monitoring](semaphore-setup.md#12-create-the-template) runs the monitoring role, with the `docker` tag and the onboarding key as a secret Survey Variable. The manual steps here work either way.
 
 ### Recover the original provisioning arguments
 

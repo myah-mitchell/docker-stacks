@@ -1,0 +1,149 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+    - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .stalwart:
+    # No *user here. The image runs as its own stalwart user, UID 2000, which
+    # owns /etc/stalwart and /var/lib/stalwart. Forcing 1000 would leave it
+    # unable to write either once they are bind-mounted from the host.
+    <<: [*limits, *restart, *security, *logging]
+    image: stalwartlabs/stalwart:v0.16.22
+    hostname: ${PROJECT_NAME}-${STALWART_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${STALWART_HOSTNAME}"
+    # Mail protocols cannot go through an HTTP router, so they are published
+    # straight from this container and port-forwarded from the router's WAN
+    # side. The web side, on 8080, is reached only through Traefik.
+    ports:
+      - "25:25" # SMTP, mail from other servers
+      - "465:465" # Submission, implicit TLS
+      - "587:587" # Submission, STARTTLS
+      - "993:993" # IMAP, implicit TLS
+    environment:
+      <<: [*environment_tz]
+      # Discovery documents, autoconfig, and OAuth metadata are built from this.
+      STALWART_PUBLIC_URL: https://${STALWART_SERVICE_NAME}.${DOMAIN_NAME}
+      # Settings > Enterprise reads the license from this variable, so the key
+      # lives in a Komodo Secret rather than in Stalwart's database.
+      STALWART_LICENSE_KEY: ${STALWART_LICENSE_KEY:-}
+    volumes:
+      # config.json, written by the setup wizard on first start.
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/stalwart-config:/etc/stalwart
+      # Every mailbox, account, and setting made in the WebUI. Back it up.
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/stalwart-data:/var/lib/stalwart
+    labels: ## Traefik Labels
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK}"
+        ## HTTP Routers
+        # autoconfig and mta-sts are the two names mail clients and other mail
+        # servers fetch over HTTPS on the bare domain, and Stalwart answers both.
+      - "traefik.http.routers.$PROJECT_NAME-stalwart-rtr.rule=
+        Host(`${STALWART_SERVICE_NAME}.${DOMAIN_NAME}`) ||
+        Host(`autoconfig.${DOMAIN_NAME}`) ||
+        Host(`mta-sts.${DOMAIN_NAME}`) ||
+        Host(`${STALWART_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${STALWART_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${STALWART_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+        ## Middlewares
+        # Stalwart does its own authentication. JMAP, SCIM, and OAuth clients
+        # cannot follow a browser sign-in redirect, so forward-auth would break them.
+      - "traefik.http.routers.$PROJECT_NAME-stalwart-rtr.middlewares=chain-no-auth@file"
+        ## HTTP Services
+        # 8080 is Stalwart's plain HTTP listener. Traefik terminates TLS in front of it.
+      - "traefik.http.services.$PROJECT_NAME-stalwart-svc.loadbalancer.server.port=8080"
+
+      ## Traefik-KOP Labels
+      - "kop-public.traefik.enable=true"
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-stalwart-kop-rtr.rule=
+        Host(`${STALWART_SERVICE_NAME}.${DOMAIN_NAME}`) ||
+        Host(`autoconfig.${DOMAIN_NAME}`) ||
+        Host(`mta-sts.${DOMAIN_NAME}`) ||
+        Host(`${STALWART_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${STALWART_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${STALWART_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-stalwart-kop-rtr.middlewares=chain-no-auth@file"
+      - "kop-public.traefik.http.services.$PROJECT_NAME-stalwart-kop-svc.loadbalancer.server.url=https://${STALWART_SERVICE_NAME}"
+      - "kop.bind.ip=${STALWART_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## DockNS Labels
+      ### Internal (UniFi gateway, via dockns). The public names are tunnel routes on bh01.
+      - "dockns.technitium.0.record=CNAME" # NOTE: rename to dockns' UniFi record type once confirmed (see root README)
+      - "dockns.technitium.0.name=${STALWART_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      # frontend publishes the mail ports, and is the way out to other mail
+      # servers and to Authentik's public issuer.
+      - proxy
+      - frontend
+    healthcheck:
+      # The image's own fallback check, against the plain HTTP listener. The
+      # X-Forwarded-For header keeps the probe from counting against auto-ban.
+      test: ["CMD", "curl", "-fsS", "-H", "X-Forwarded-For: 127.0.0.1", "http://127.0.0.1:8080/healthz/live"]
+      <<: *default_healthcheck

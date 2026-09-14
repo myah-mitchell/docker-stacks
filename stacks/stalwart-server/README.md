@@ -1,0 +1,78 @@
+# Initial Deployment Requirements
+## Prerequisites for using stalwart
+
+A Stalwart Enterprise license for the domain, stored in a Komodo Secret named `STALWART_LICENSE_KEY`.
+
+## Prerequisites for using bulwark
+
+An Authentik OAuth2 application for Bulwark to sign in through. Its client ID and secret go in the Komodo Secrets `MAIL_OIDC_CLIENT_ID` and `MAIL_OIDC_CLIENT_SECRET`, and a 96-character random `BULWARK_SESSION_SECRET_KEY` goes beside them.
+
+# Create and Setup Required Folders
+## Create Stack Folders
+
+```bash
+projectName="mail"
+mkdir -p /opt/docker/logs/$projectName
+sudo chmod 750 /opt/docker/logs/$projectName/
+sudo chown $USER:101000 /opt/docker/logs/$projectName
+
+mkdir -p /opt/docker/volumes/$projectName
+sudo chmod 750 /opt/docker/volumes/$projectName/
+sudo chown $USER:101000 /opt/docker/volumes/$projectName
+```
+
+## Create needed folders for stalwart
+
+```bash
+mkdir -p /opt/docker/volumes/$projectName/stalwart-config
+mkdir -p /opt/docker/volumes/$projectName/stalwart-data
+sudo chown 102000:102000 /opt/docker/volumes/$projectName/stalwart-*
+```
+
+Stalwart runs as the image's own UID 2000, so its directories belong to host UID `102000` rather than `101000`.
+
+## Open the mail ports
+
+```bash
+sudo ufw allow 25/tcp comment 'Stalwart SMTP'
+sudo ufw allow 465/tcp comment 'Stalwart submissions'
+sudo ufw allow 587/tcp comment 'Stalwart submission'
+sudo ufw allow 993/tcp comment 'Stalwart IMAPS'
+```
+
+## First start
+
+With no `config.json`, Stalwart starts in bootstrap mode and prints a one-time admin password:
+
+```bash
+docker logs ${projectName}-stalwart 2>&1 | grep -A8 'bootstrap mode'
+```
+
+Sign in at `https://${STALWART_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}/admin` and run the setup wizard. The password changes on every bootstrap start.
+
+## Recovery
+
+Stop the container, then start a one-off copy in recovery mode against the same volumes. It serves only the admin UI, on `127.0.0.1:8080`:
+
+```bash
+docker run --rm -it --name ${projectName}-stalwart-recovery \
+  --volumes-from ${projectName}-stalwart \
+  -e STALWART_RECOVERY_MODE=1 \
+  -e STALWART_RECOVERY_ADMIN=recovery:<recovery-password> \
+  -p 127.0.0.1:8080:8080 \
+  stalwartlabs/stalwart:v0.16.22
+```
+
+Never add either variable to the stack itself.
+
+## Create needed folders for bulwark
+
+```bash
+mkdir -p /opt/docker/volumes/$projectName/bulwark-data/settings
+mkdir -p /opt/docker/volumes/$projectName/bulwark-data/admin
+mkdir -p /opt/docker/volumes/$projectName/bulwark-data/admin-state
+mkdir -p /opt/docker/volumes/$projectName/bulwark-data/telemetry
+sudo chown -R 101001:101001 /opt/docker/volumes/$projectName/bulwark-data
+```
+
+Bulwark runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.

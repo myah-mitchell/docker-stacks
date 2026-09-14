@@ -2,6 +2,8 @@
 
 bh01 is the DMZ edge, and the only host in the fleet reachable from the internet. It reaches the internet outbound-only, through a Cloudflare Tunnel, so no port is ever forwarded to it and no WAN address points at it.
 
+The optional mx01 is the one exception. Mail cannot travel through a Cloudflare Tunnel, so mx01 takes its mail ports by port forward, and publishes its web side through this tunnel like everything else. See [mx01 bootstrap](mx01-bootstrap.md).
+
 Its stack is traefik-dmz: the same traefik-agent bundle tf01 runs, plus a Redis replica of tf01's master and the cloudflared connector. Eleven services.
 
 bh01 does not get traefik-bootstrap. Like tf01, it is a real Traefik.

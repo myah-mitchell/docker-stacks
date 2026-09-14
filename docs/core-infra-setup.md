@@ -6,6 +6,8 @@ ntfy is the destination. It takes a push over HTTP and delivers it to a phone or
 
 mailrise is an SMTP server that only speaks ntfy. Proxmox Backup Server and Proxmox VE can send mail and cannot send push notifications, so mailrise takes their mail on the LAN and re-emits it as an ntfy push.
 
+Postfix is the fleet's outgoing mail relay. Services on the LAN hand it their mail with no login, and it passes that mail on to a real mail provider. Mailpit keeps a copy of every message Postfix relays, so you can see exactly what a service sent.
+
 blackbox-exporter probes URLs from outside the service being probed, which is the one thing a metrics agent running next to a service cannot do. uptime-kuma is the glanceable red and green version of the same question.
 
 Read [Conventions](conventions.md) first. This doc assumes its naming and secrets rules.
@@ -15,12 +17,13 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [Prerequisites](#prerequisites)
 - [Placeholders](#placeholders)
 - [1. Create the runtime folders](#1-create-the-runtime-folders)
-- [2. Open the SMTP port](#2-open-the-smtp-port)
+- [2. Open the SMTP ports](#2-open-the-smtp-ports)
 - [3. Create the Stack resource](#3-create-the-stack-resource)
 - [4. Verify](#4-verify)
 - [5. Create the ntfy accounts](#5-create-the-ntfy-accounts)
 - [6. Finish mailrise and point Proxmox at it](#6-finish-mailrise-and-point-proxmox-at-it)
 - [7. First access to Uptime Kuma](#7-first-access-to-uptime-kuma)
+- [8. Send a test message through Postfix](#8-send-a-test-message-through-postfix)
 - [After system-agent: subscribe your phone](#after-system-agent-subscribe-your-phone)
 - [What's next](#whats-next)
 
@@ -29,6 +32,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - ci01 is provisioned and shows connected and healthy in Komodo, through step 2 of [ci01 bootstrap](ci01-bootstrap.md). traefik-bootstrap on ci01 is what makes any of these reachable.
 - The VictoriaMetrics backend is deployed, through [VictoriaMetrics setup](victoriametrics-setup.md). blackbox-exporter has nothing scraping it until vmagent is there.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md).
+- An account with an SMTP relay for Postfix to send through, such as your mail provider's submission service. Step 3 covers running without one.
 
 ## Placeholders
 
@@ -38,6 +42,10 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 | `<internal-subnet>` | The internal VLAN in CIDR form, from the same place `<ci-ip>` came from |
 | `<ntfy-user>` | The account name you sign in to the ntfy apps with, your choice, created in step 5 |
 | `<ntfy-token>` | The publish token printed by step 5 |
+| `<relay-host>` | Your SMTP relay's hostname, from the provider |
+| `<relay-port>` | That relay's submission port, usually `587` |
+| `<relay-user>` | The relay account's username |
+| `<test-recipient>` | A mailbox outside the fleet that you can read, for step 8 |
 
 ## 1. Create the runtime folders
 
@@ -58,14 +66,23 @@ mkdir -p /opt/docker/volumes/$projectName/ntfy-data
 mkdir -p /opt/docker/volumes/$projectName/uptime-kuma-data
 mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
 mkdir -p /opt/docker/volumes/$projectName/mailrise-secrets
+mkdir -p /opt/docker/volumes/$projectName/mailpit-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/ntfy-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/uptime-kuma-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailpit-data
 sudo chmod 700 /opt/docker/volumes/$projectName/mailrise-secrets
 ```
 
-ntfy and uptime-kuma keep state. mailrise and blackbox-exporter each read one config file that is not in git, so those two directories hold the files rather than the repo checkout does. Periphery re-clones over its run directory, and anything written inside that directory goes with it.
+Postfix is the one exception. It runs as the image's own root, so its queue directory belongs to `100000` rather than `101000`:
+
+```bash
+mkdir -p /opt/docker/volumes/$projectName/postfix-data
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postfix-data
+```
+
+ntfy, uptime-kuma, and Mailpit keep state. Postfix keeps its mail queue there, so mail waiting on an unreachable relay survives a redeploy. mailrise and blackbox-exporter each read one config file that is not in git, so those two directories hold the files rather than the repo checkout does. Periphery re-clones over its run directory, and anything written inside that directory goes with it.
 
 Seed both files now, from the examples this repo serves publicly, so nothing has to be cloned first:
 
@@ -85,18 +102,19 @@ The mailrise copy is not, because it carries two `REPLACE_WITH_NTFY_TOKEN` place
 
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-## 2. Open the SMTP port
+## 2. Open the SMTP ports
 
-mailrise publishes port 8025 on the host, because Proxmox has to reach it directly rather than through Traefik. Base provisioning enables UFW with a default-deny inbound policy, so nothing opens it for you:
+mailrise publishes port 8025 on the host and Postfix publishes port 25, because whatever sends to them has to reach them directly rather than through Traefik. Base provisioning enables UFW with a default-deny inbound policy, so nothing opens them for you:
 
 ```bash
 sudo ufw allow from <internal-subnet> to any port 8025 proto tcp comment 'Mailrise SMTP'
+sudo ufw allow from <internal-subnet> to any port 25 proto tcp comment 'Postfix SMTP'
 sudo ufw status
 ```
 
-Scope it to the internal subnet. mailrise accepts anything that arrives on that port with no authentication, which is fine for a LAN-only relay and not fine for anything wider.
+Scope both to the internal subnet. Neither asks for a login: mailrise accepts anything that arrives, and Postfix relays for any private address. That is fine for a LAN-only relay and not fine for anything wider.
 
-The other three services are reached through Traefik on 443, already open from traefik-bootstrap.
+The other four services are reached through Traefik on 443, already open from traefik-bootstrap.
 
 ## 3. Create the Stack resource
 
@@ -128,23 +146,43 @@ Four keys in the pasted text need a value from you:
 | `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
 | `TRAEFIK_AUTH_CHAIN` | `chain-no-auth@file`, so it routes through traefik-bootstrap |
 
-blackbox-exporter and uptime-kuma both fall back to `chain-authentik@file`, which still has nothing behind it, hence the override. Clear it once id01 is live. ntfy is hardcoded to `chain-no-auth@file` and ignores the setting, because publishers authenticate to ntfy itself rather than through a browser sign-in.
+blackbox-exporter, uptime-kuma, and Mailpit all fall back to `chain-authentik@file`, which still has nothing behind it, hence the override. Clear it once id01 is live. ntfy is hardcoded to `chain-no-auth@file` and ignores the setting, because publishers authenticate to ntfy itself rather than through a browser sign-in.
 
 Leave every `[[GLOBAL_...]]` reference exactly as it is.
+
+### Choose where Postfix sends mail
+
+Postfix needs somewhere to hand mail on to. Set these three keys for your relay:
+
+| Key | Value |
+| --- | --- |
+| `POSTFIX_RELAYHOST` | `[<relay-host>]:<relay-port>` |
+| `POSTFIX_RELAYHOST_USERNAME` | `<relay-user>` |
+| `POSTFIX_RELAYHOST_PASSWORD` | Leave as the pasted `[[POSTFIX_RELAYHOST_PASSWORD]]` |
+
+Then go to *Settings > Secrets* and create `POSTFIX_RELAYHOST_PASSWORD`, with the relay account's password as its value.
+
+Keep the square brackets. They tell Postfix to connect to that host directly instead of looking up MX records for it.
+
+`POSTFIX_ALLOWED_SENDER_DOMAINS` is blank, which means `DOMAIN_NAME`. Postfix relays only mail whose From address is in that domain, matched exactly. To send from other domains or a sub-domain, list every one of them, separated by spaces.
+
+If you have no relay yet, leave `POSTFIX_RELAYHOST` and `POSTFIX_RELAYHOST_USERNAME` blank and clear `POSTFIX_RELAYHOST_PASSWORD` to blank as well. Postfix then delivers straight to each recipient's mail server, and most providers junk or refuse mail sent that way from a home address. Mailpit still gets its copy, so the relay is useful for debugging until you add a real one.
 
 ### Deploy
 
 Save the Stack resource, then click **Deploy**.
 
-All four services should come up. Both config files were put in place in step 1, so there is nothing to fix up afterwards and nothing to redeploy for.
+All six services should come up. The two config files were put in place in step 1, so there is nothing to fix up afterwards and nothing to redeploy for.
 
 ## 4. Verify
 
-Confirm all four services show running and healthy, in Komodo's container view for the resource:
+Confirm all six services show running and healthy, in Komodo's container view for the resource:
 
 ```text
 ntfy
 mailrise
+postfix
+mailpit
 blackbox-exporter
 uptime-kuma
 ```
@@ -282,6 +320,51 @@ Once the test lands, click **Save**.
 
 Real events look different from the test. A monitor going down arrives titled `<monitor> Down [Uptime-Kuma]` with a red circle, the check's error as the message, and an *Open <monitor>* button linking to the monitored URL. Recovery arrives as `<monitor> Up [Uptime-Kuma]` with a green circle.
 
+## 8. Send a test message through Postfix
+
+This proves the whole path a service's mail takes: the port, the firewall, the sender check, the relay, and the copy to Mailpit.
+
+From an admin machine on the internal subnet, write a short message. The From address has to be in `DOMAIN_NAME`:
+
+```bash
+printf 'From: test@myah-mitchell.com\r\nTo: <test-recipient>\r\nSubject: core-infra test\r\n\r\nSent through Postfix on ci01.\r\n' > core-infra-test.eml
+```
+
+Send it to ci01 with curl, which speaks SMTP:
+
+```bash
+curl --url smtp://<ci-ip>:25 \
+  --mail-from test@myah-mitchell.com \
+  --mail-rcpt <test-recipient> \
+  --upload-file core-infra-test.eml
+```
+
+curl prints nothing when Postfix accepts the message. If it reports an error instead, run it again with `-v` to see Postfix's reply.
+
+### Check the copy and the delivery
+
+Browse to `https://mailpit.ci01.home.myah-mitchell.com`, substituting whatever `SUB_DOMAIN_NAME` and `DOMAIN_NAME` you actually set. Accept the certificate warning, as in step 7. The test message should be at the top of the inbox.
+
+Then check what happened to the original, on ci01:
+
+```bash
+docker logs core-postfix 2>&1 | grep 'status='
+```
+
+Expect two lines for the message, both with `status=sent`. One shows `relay=mailpit` for the copy, and the other names your relay. Finally, confirm the message reached `<test-recipient>`, checking its spam folder too.
+
+If it failed:
+
+| Symptom | Cause |
+| --- | --- |
+| curl times out connecting | Port 25 is not open from your address. Check step 2 |
+| `Client host rejected: Access denied` | You are sending from an address outside the private ranges Postfix relays for |
+| `Recipient address rejected: Access denied` | The From domain is not in `POSTFIX_ALLOWED_SENDER_DOMAINS`. Postfix reports a failed sender check against the recipient |
+| `status=deferred` with `SASL authentication failed` | The relay username or password is wrong |
+| `status=bounced` with a reply from the relay | The relay refused the sender. Most relays only send for domains set up on your account there |
+
+Delete `core-infra-test.eml` once it works.
+
 ## After system-agent: subscribe your phone
 
 Come back to this once [system-agent](system-agent-setup.md) has run on ci01. That is the point where dockns publishes a DNS record for ntfy and traefik-bootstrap's self-signed certificate is replaced.
@@ -304,8 +387,8 @@ Send another **Test** from Proxmox and confirm it arrives on the phone with the 
 
 ## What's next
 
-ci01 is finished. It runs Semaphore, the VictoriaMetrics backend, and the notification and uptime services, and every VM built after this one reports to it from its first deploy.
+ci01 is finished. It runs Semaphore, the VictoriaMetrics backend, and the notification, mail relay, and uptime services, and every VM built after this one reports to it from its first deploy.
 
 blackbox-exporter is deployed but nothing probes anything yet. It is a multi-target proxy, so it needs a vmagent scrape job that rewrites each target into a `/probe` query parameter, and a vmalert rule on `probe_success` to notify through ntfy. The [generated README for core-infra](../stacks/core-infra/README.md) has the scrape job to copy. Both belong with the rest of the alerting work rather than here.
 
-id01 is the next VM, in [id01 bootstrap](id01-bootstrap.md). See [Running order](README.md#running-order) for the rest.
+id01 is the next VM, in [id01 bootstrap](id01-bootstrap.md). Its email settings point at the Postfix relay you tested in step 8. See [Running order](README.md#running-order) for the rest.

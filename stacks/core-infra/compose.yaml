@@ -31,6 +31,17 @@ services:
       ntfy:
         condition: service_healthy
 
+## Service Mail
+  postfix:
+    extends:
+      file: ../../containers/postfix/compose.yaml
+      service: .postfix
+
+  mailpit:
+    extends:
+      file: ../../containers/mailpit/compose.yaml
+      service: .mailpit
+
 ## Uptime and Probe Services
   blackbox-exporter:
     extends:

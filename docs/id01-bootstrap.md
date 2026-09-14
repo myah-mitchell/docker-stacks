@@ -40,6 +40,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for id01, on the internal VLAN |
 | `<gateway-ip>` | The internal VLAN's gateway |
+| `<ci-ip>` | ci01's LAN address, where Postfix listens |
 
 ## 1. Provision the VM
 
@@ -91,7 +92,7 @@ There is a real ordering trap here. traefik-bootstrap is what makes Authentik re
 
 ## 4. Create the Komodo Secrets and Variables
 
-`stacks/authentik-server/komodo.env` carries twelve references that no earlier runbook creates.
+`stacks/authentik-server/komodo.env` carries twelve references that no earlier runbook creates. This step creates ten of them, and step 5 clears the other two.
 
 In Komodo's UI on km01, go to *Settings > Secrets* and create these three. They are real credentials.
 
@@ -122,22 +123,21 @@ Without them, geoipupdate starts, fails to authenticate, and reports unhealthy, 
 
 ### The email settings
 
-Go to *Settings > Variables* and create these six. They are configuration rather than credentials.
+Authentik sends its mail through Postfix on ci01, which you tested in [step 8 of Core infrastructure setup](core-infra-setup.md#8-send-a-test-message-through-postfix). Go to *Settings > Variables* and create these five. They are configuration rather than credentials.
 
 | Variable | Value |
 | --- | --- |
-| `GLOBAL_EMAIL_HOST` | Your SMTP relay's hostname |
-| `GLOBAL_EMAIL_PORT` | That relay's port |
-| `GLOBAL_EMAIL_USER` | The relay account, if it needs one |
-| `GLOBAL_EMAIL_TLS` | `true` or `false` |
-| `GLOBAL_EMAIL_SSL` | `true` or `false` |
-| `GLOBAL_EMAIL_FROM` | The address Authentik sends as |
+| `GLOBAL_EMAIL_HOST` | `<ci-ip>` |
+| `GLOBAL_EMAIL_PORT` | `25` |
+| `GLOBAL_EMAIL_TLS` | `false` |
+| `GLOBAL_EMAIL_SSL` | `false` |
+| `GLOBAL_EMAIL_FROM` | The address Authentik sends as, such as `authentik@myah-mitchell.com` |
 
-The seventh, `GLOBAL_EMAIL_PASS`, goes on *Settings > Secrets* instead. It is that account's password.
+The From address has to be in a domain ci01's `POSTFIX_ALLOWED_SENDER_DOMAINS` lists, which is `DOMAIN_NAME` unless you changed it. Postfix refuses mail from any other domain.
 
-Authentik reads these at startup and does not test the connection, so an unreachable relay surfaces only when a flow actually tries to send, such as a password recovery. Create them with real values if you have a relay today. If you do not, give `GLOBAL_EMAIL_PORT` a real number and `GLOBAL_EMAIL_TLS` and `GLOBAL_EMAIL_SSL` a real boolean anyway, because those three are typed and a blank is not the same as a default.
+Postfix asks nothing on the LAN for a login, so there is no `GLOBAL_EMAIL_USER` or `GLOBAL_EMAIL_PASS` to create. TLS stays off for the same reason: the connection never leaves the LAN, and Postfix applies TLS itself when it hands the mail on to your relay.
 
-mailrise is the relay this fleet uses. It deploys on ci01 as part of [Core infrastructure setup](core-infra-setup.md), which comes before this page in the running order, so it is already there to point at.
+Authentik reads these at startup and does not test the connection, so a mistake surfaces only when a flow actually tries to send, such as a password recovery. Every message it sends also lands in Mailpit on ci01, which is the quickest place to look.
 
 ## 5. Create the Stack resource for authentik-server
 
@@ -172,7 +172,7 @@ Three more are blank and stay that way: `POSTGRES_BACKUP_DB`, `POSTGRES_BACKUP_U
 
 Leave `PROJECT_NAME` as the committed `authentik`, and leave the hostname keys alone. `AUTHENTIK_SERVICE_NAME` is `auth`, which is the short public hostname Authentik answers on once bh01's tunnel exists.
 
-Leave every `[[...]]` reference as pasted. All twelve now resolve, from step 4 and from km01's step 14.
+Clear `AUTHENTIK_EMAIL__USERNAME` and `AUTHENTIK_EMAIL__PASSWORD` to blank, because Postfix takes no login. Leave every other `[[...]]` reference as pasted. They all resolve now, from step 4 and from km01's step 14.
 
 ### Deploy
 

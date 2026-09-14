@@ -1,0 +1,138 @@
+###############################################################################
+#region Default configs
+###############################################################################
+
+  #####################################
+  # Container base defaults
+  #####################################
+  # Max Usage Limits
+x-limits: &limits
+  mem_limit: ${MEM_LIMIT:-2G} # Override per container if necessary
+  memswap_limit: ${MEM_SWAP_LIMIT:-2.5G}
+  mem_reservation: ${MEM_RESERVATION:-64M}
+  pids_limit: ${PIDS_LIMIT:-200}
+  cpus: ${CPUS_LIMIT:-2} # Set below the total number of cores, for example 3.5 for 4 cores
+
+  # Restart Settings
+x-restart: &restart
+  stop_grace_period: ${RESTART_GRACE:-1m}
+  restart: ${RESTART_MODE:-unless-stopped}
+
+  # Configure security
+x-security: &security
+  security_opt:
+    - no-new-privileges=${NO_NEW_PRIVILEGES:-true}
+
+  # Configure User
+x-user: &user
+  user: ${PUID:-1000}:${PGID:-1000}
+
+  # Configure Logging
+x-logging: &logging
+  logging:
+    options:
+      max-size: ${LOG_MAX_SIZE:-10m}
+      max-file: ${LOG_MAX_FILE:-3}
+
+  ## All base defaults in one
+x-base: &default-base
+  <<: [*limits, *restart, *security, *user, *logging]
+
+  #####################################
+  # Container healthcheck defaults
+  #####################################
+x-healthcheck: &default_healthcheck
+  interval: ${HEALTH_INTERVAL:-60s}
+  timeout: ${HEALTH_TIMEOUT:-10s}
+  retries: ${HEALTH_RETRIES:-5}
+  start_period: ${HEALTH_START:-10s}
+
+  #####################################
+  # Container environment defaults
+  #####################################
+x-environment-tz: &environment_tz
+  TZ: ${TZ:-America/Chicago}
+
+x-environment-user: &environment_user
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+
+  ## All environment defaults in one
+x-environment: &default_environment
+  <<: [*environment_tz, *environment_user]
+
+#endregion
+###############################################################################
+#region Stack config
+###############################################################################
+
+services:
+
+  .bulwark:
+    # No *user here. The image runs as its own nextjs user, UID 1001, which
+    # owns everything under /app/data.
+    <<: [*limits, *restart, *security, *logging]
+    image: ghcr.io/bulwarkmail/webmail:1.9.2
+    hostname: ${PROJECT_NAME}-${BULWARK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
+    container_name: "${PROJECT_NAME}-${BULWARK_HOSTNAME}"
+    environment:
+      <<: [*environment_tz]
+      # Stalwart's public URL. Setting it also skips Bulwark's setup wizard.
+      JMAP_SERVER_URL: ${BULWARK_JMAP_SERVER_URL:-https://mail.${DOMAIN_NAME}}
+      # Encrypts remember-me sessions and synced settings.
+      SESSION_SECRET: ${BULWARK_SESSION_SECRET_KEY:-}
+      SETTINGS_SYNC_ENABLED: "true"
+      # Sign in through Authentik. Stalwart accepts the resulting token because
+      # its OIDC directory trusts the same Authentik application.
+      OAUTH_ENABLED: "true"
+      OAUTH_ISSUER_URL: ${BULWARK_OAUTH_ISSUER_URL:-}
+      OAUTH_CLIENT_ID: ${BULWARK_OAUTH_CLIENT_ID:-}
+      OAUTH_CLIENT_SECRET: ${BULWARK_OAUTH_CLIENT_SECRET:-}
+      # Setting this at all locks the admin UI's telemetry toggle.
+      BULWARK_TELEMETRY: "off"
+    volumes:
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/bulwark-data/settings:/app/data/settings
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/bulwark-data/admin:/app/data/admin
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/bulwark-data/admin-state:/app/data/admin-state
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/bulwark-data/telemetry:/app/data/telemetry
+    labels: ## Traefik Labels
+      - "traefik.enable=true"
+      - "traefik.docker.network=${PROXY_NETWORK}"
+        ## HTTP Routers
+      - "traefik.http.routers.$PROJECT_NAME-bulwark-rtr.rule=
+        Host(`${BULWARK_SERVICE_NAME}.${DOMAIN_NAME}`) ||
+        Host(`${BULWARK_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${BULWARK_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${BULWARK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+        ## Middlewares
+        # Bulwark signs users in through Authentik itself, with OAuth.
+      - "traefik.http.routers.$PROJECT_NAME-bulwark-rtr.middlewares=chain-no-auth@file"
+        ## HTTP Services
+      - "traefik.http.services.$PROJECT_NAME-bulwark-svc.loadbalancer.server.port=3000"
+
+      ## Traefik-KOP Labels
+      - "kop-public.traefik.enable=true"
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-bulwark-kop-rtr.rule=
+        Host(`${BULWARK_SERVICE_NAME}.${DOMAIN_NAME}`) ||
+        Host(`${BULWARK_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${BULWARK_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
+        Host(`${BULWARK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
+      - "kop-public.traefik.http.routers.$PROJECT_NAME-bulwark-kop-rtr.middlewares=chain-no-auth@file"
+      - "kop-public.traefik.http.services.$PROJECT_NAME-bulwark-kop-svc.loadbalancer.server.url=https://${BULWARK_SERVICE_NAME}"
+      - "kop.bind.ip=${BULWARK_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## DockNS Labels
+      ### Internal (UniFi gateway, via dockns). The public name is a tunnel route on bh01.
+      - "dockns.technitium.0.record=CNAME" # NOTE: rename to dockns' UniFi record type once confirmed (see root README)
+      - "dockns.technitium.0.name=${BULWARK_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
+
+      ## Komodo Labels
+      - "komodo.skip" # Prevent Komodo from stopping with StopAllContainers
+    networks:
+      # frontend is the way out to Authentik and to Stalwart's public URL.
+      - proxy
+      - frontend
+    healthcheck:
+      # The check from Bulwark's own compose file. busybox wget is in the image.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      <<: *default_healthcheck

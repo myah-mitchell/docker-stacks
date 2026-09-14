@@ -183,4 +183,4 @@ Grafana sets no admin credentials in its environment, so the first login is the 
 
 The fleet now has somewhere to send metrics, logs, and traces. Every host built after this one ships from its first deploy, with no keys to come back and fill in.
 
-ci01 has one stack left. [Core infrastructure setup](core-infra-setup.md) deploys ntfy, mailrise, blackbox-exporter, and uptime-kuma, which are what turn those metrics into notifications.
+ci01 has one stack left. [Core infrastructure setup](core-infra-setup.md) deploys ntfy, mailrise, Postfix, Mailpit, blackbox-exporter, and uptime-kuma, which turn those metrics into notifications and give the fleet a mail relay.

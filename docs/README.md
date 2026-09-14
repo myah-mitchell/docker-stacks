@@ -33,6 +33,7 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | [bh01 bootstrap](bh01-bootstrap.md) | Written, not yet run |
 | 7 | any | system-agent, the per-VM stack every VM runs once 2 through 5 are done | [system-agent](system-agent-setup.md) | Written, not yet run |
 | 8 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
+| 9 | mx01 | Stalwart and Bulwark, optional mailboxes | [mx01 bootstrap](mx01-bootstrap.md) | Written, not yet run |
 
 Row 1.1 is not a VM of its own. It is the provisioning procedure every host from ci01 down runs before anything else, listed here because it is the first thing you do on each of them.
 
@@ -44,15 +45,17 @@ Row 2.1 is not only ci01's. id01 and pk01 deploy the same stack on their own hos
 
 Row 7 is not a VM either. It is the per-VM stack that replaces traefik-bootstrap everywhere, and it comes last because it needs ci01, id01, and pk01 all live. Run it once per VM, including on ci01 itself.
 
-"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those eight as needing confirmation on the first real run, and correct the page as you go.
+"Written, not yet run" means the page was assembled from the compose files, the `komodo.env` keys, and the generated stack README, and then checked against them. No part of it has been followed against a real host. Treat every UI label and every wait time in those pages as needing confirmation on the first real run, and correct the page as you go.
 
 ap01 is the exception in more than status. Vaultwarden has no directory under `containers/`, so there is no stack to point a runbook at. Building the container comes first.
+
+Row 9 is optional, and no other host depends on it. mx01 gives the domain real mailboxes with accounts from Authentik, while the service mail every other stack needs already goes through Postfix on ci01. Its runbook assumes a paid Stalwart Enterprise license.
 
 tf01 comes after id01 and pk01 because nothing before bh01 needs it. Its Redis stays empty until system-agent puts traefik-kop on each VM, and its dashboard defaults to `chain-authentik@file`, which only resolves once id01 exists. bh01 is the one host that needs tf01 first, because its Redis replicates tf01's.
 
 tf01 and bh01 are also the first hosts to use the Redis provider and the Let's Encrypt resolver in the base Traefik service. See [What tf01 turns on in the base Traefik service](tf01-bootstrap.md#what-tf01-turns-on-in-the-base-traefik-service).
 
-Pre-existing hosts (bk01, mx01, vh01, and the PVE hosts themselves) are not covered here. They predate this plan and are not provisioned by these runbooks.
+Pre-existing hosts (bk01, vh01, and the PVE hosts themselves) are not covered here. They predate this plan and are not provisioned by these runbooks.
 
 ## Reaching a stack before pk01 and id01 exist
 

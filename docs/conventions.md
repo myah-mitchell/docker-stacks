@@ -36,14 +36,14 @@ The two-letter prefix in `SERVER_NAME`.
 | --- | --- |
 | `km` | Komodo GitOps engine |
 | `tf` | Traefik hub |
-| `ci` | Core infra: VictoriaMetrics, Semaphore, ntfy, mailrise, blackbox-exporter, uptime-kuma |
+| `ci` | Core infra: VictoriaMetrics, Semaphore, ntfy, mailrise, Postfix, Mailpit, blackbox-exporter, uptime-kuma |
 | `id` | Authentik, identity |
 | `pk` | step-ca, internal PKI |
 | `bh` | Bastion and edge, in the DMZ |
 | `ap` | Apps, Vaultwarden and future replacements |
 | `md` | Media |
 | `bk` | Backup, PBS (pre-existing) |
-| `mx` | Mail gateway (pre-existing) |
+| `mx` | Mail: Stalwart and Bulwark, optional |
 | `vh` | Hypervisor, PVE (pre-existing) |
 
 ### Worked examples
@@ -56,7 +56,7 @@ The two-letter prefix in `SERVER_NAME`.
 | `ntfy.home.myah-mitchell.com` | A service on ci01, resolvable only inside the home site |
 | `vault.myah-mitchell.com` | Vaultwarden, public, no `SUB_DOMAIN_NAME` at all |
 
-A handful of services are reached from the internet through a Cloudflare Tunnel rather than a site sub-domain. Those use the bare domain, with `SUB_DOMAIN_NAME` empty, and they reach the internet through cloudflared plus traefik-dmz on bh01. Vaultwarden is the only one today.
+A handful of services are reached from the internet through a Cloudflare Tunnel rather than a site sub-domain. Those use the bare domain, with `SUB_DOMAIN_NAME` empty, and they reach the internet through cloudflared plus traefik-dmz on bh01. Vaultwarden is the only one today, plus Stalwart and Bulwark on mx01 if you follow that optional runbook.
 
 ## Secrets
 

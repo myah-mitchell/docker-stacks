@@ -1,0 +1,33 @@
+###############################################################################
+# Start of stack config
+###############################################################################
+# Project Name: "mail"
+name: ${PROJECT_NAME}
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
+  frontend:
+    name: ${PROJECT_NAME}_frontend
+    internal: false
+#  backend:
+#    name: ${PROJECT_NAME}_backend
+#    internal: true
+
+services:
+
+## Mail Server
+  stalwart:
+    extends:
+      file: ../../containers/stalwart/compose.yaml
+      service: .stalwart
+
+## Webmail
+  bulwark:
+    extends:
+      file: ../../containers/bulwark/compose.yaml
+      service: .bulwark
+    depends_on:
+      stalwart:
+        condition: service_healthy

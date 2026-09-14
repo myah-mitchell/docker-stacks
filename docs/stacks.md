@@ -21,11 +21,14 @@ These are the stacks that define what a specific VM is for.
 | step-ca-server | step-ca | pk01 | Not deployed |
 | traefik-dmz | traefik-agent plus redis (replicating from traefik-server) and cloudflared | bh01 | Not deployed |
 | victoriametrics-server | victoriametrics-agent plus victoriametrics, victorialogs, victoriatraces, vmauth, vmalert, grafana, alertmanager | ci01, later | Not deployed |
-| core-infra | ntfy, mailrise, blackbox-exporter, uptime-kuma | ci01 | Not deployed |
+| core-infra | ntfy, mailrise, postfix, mailpit, blackbox-exporter, uptime-kuma | ci01 | Not deployed |
+| stalwart-server | stalwart, bulwark | mx01, optional | Not deployed |
 
 traefik-dmz is the public edge. Only port 443 outbound to the internal Traefik hosts and 6379 outbound to traefik-server's Redis need to leave the DMZ.
 
-core-infra is the odd one out in this table. It is not what ci01 is for, it is where the fleet's alerts and uptime checks land, and ci01 is simply the host with the rest of the observability stack on it already. See [Core infrastructure setup](core-infra-setup.md).
+core-infra is the odd one out in this table. It is not what ci01 is for, it is where the fleet's alerts and uptime checks land and its outgoing mail is relayed, and ci01 is simply the host with the rest of the observability stack on it already. See [Core infrastructure setup](core-infra-setup.md).
+
+stalwart-server is optional. It gives the domain real mailboxes with accounts from Authentik, and nothing else in the fleet depends on it. See [mx01 bootstrap](mx01-bootstrap.md).
 
 ## One stack per VM
 

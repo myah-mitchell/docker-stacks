@@ -62,11 +62,13 @@ Follow [VictoriaMetrics setup](victoriametrics-setup.md), which is seven steps f
 
 ## 5. Deploy core-infra
 
-VictoriaMetrics collects and stores. core-infra is what does something with it. ntfy delivers push notifications, mailrise turns Proxmox's mail into those notifications, blackbox-exporter probes services from outside, and uptime-kuma is the at-a-glance version of the same question.
+VictoriaMetrics collects and stores. core-infra is what does something with it, and it is also where the fleet's outgoing mail goes.
+
+ntfy delivers push notifications, and mailrise turns Proxmox's mail into those notifications. Postfix relays every other service's mail to a real provider, and Mailpit keeps a copy of each message for debugging. blackbox-exporter probes services from outside, and uptime-kuma is the at-a-glance version of the same question.
 
 It goes last on ci01 because blackbox-exporter has nothing scraping it until the previous step is done.
 
-Follow [Core infrastructure setup](core-infra-setup.md), eight steps from runtime folders to a working notification path out of Proxmox.
+Follow [Core infrastructure setup](core-infra-setup.md), eight steps from runtime folders to a working notification path out of Proxmox and a test message through Postfix.
 
 ## What's next
 

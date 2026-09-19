@@ -49,6 +49,23 @@ pk01 is internal-only and mesh-only. It is never published through bh01's tunnel
 
 ## 2. Create the runtime folders
 
+The ansible `stacks` role creates these from `stacks/step-ca-server/setup.yaml`.
+
+In ansible-private's `hosts.yml`, add pk01 to the `docker_host` group if it is not there yet, and add the `traefik-bootstrap` and `step-ca-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+Run **provision-stacks** with *Target* answered `pk01`. Listing both stacks means this one run also covers the folders and ports for step 3's traefik-bootstrap.
+
+Check the result on pk01:
+
+```bash
+sudo ls -ln /opt/docker/volumes/step-ca
+```
+
+Both folders are owned by `101000`, and `step-ca-secrets` is mode `700`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 projectName="step-ca"
 
@@ -67,6 +84,8 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets
 sudo chmod 700 /opt/docker/volumes/$projectName/step-ca-secrets
 ```
 
+</details>
+
 `101000` here is the same rule every other stack follows, and it is worth checking rather than assuming: the service runs as its own `PUID`, so the container's UID 1000 is host UID 101000. See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000).
 
 `step-ca-data` is the CA's entire state: its configuration, its database of issued certificates, and the encrypted intermediate key. Back it up.
@@ -76,9 +95,9 @@ sudo chmod 700 /opt/docker/volumes/$projectName/step-ca-secrets
 ```bash
 head -c32 /dev/urandom \
   | base64 \
-  | sudo tee /opt/docker/volumes/$projectName/step-ca-secrets/password > /dev/null
-sudo chmod 600 /opt/docker/volumes/$projectName/step-ca-secrets/password
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets/password
+  | sudo tee /opt/docker/volumes/step-ca/step-ca-secrets/password > /dev/null
+sudo chmod 600 /opt/docker/volumes/step-ca/step-ca-secrets/password
+sudo chown 101000:101000 /opt/docker/volumes/step-ca/step-ca-secrets/password
 ```
 
 Store a copy in Vaultwarden, and a second copy in the same offline location as the root key backups from step 5. This password encrypts both the root and intermediate private keys at rest. Losing it after the root key is offline means the backup can never be unlocked again, which defeats the point of keeping one.

@@ -95,6 +95,21 @@ tf01 is on the internal VLAN, not the DMZ, so it takes the same gateway ci01 did
 
 ## 2. Create the runtime folders
 
+The ansible `stacks` role creates these from `stacks/traefik-server/setup.yaml`, and opens step 3's ports in the same run.
+
+In ansible-private's `hosts.yml`, add tf01 to the `docker_host` group if it is not there yet, and add the `traefik-server` stack to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+Run **provision-stacks** with *Target* answered `tf01`, then check the result on tf01:
+
+```bash
+sudo ls -ln /opt/docker/logs/traefik /opt/docker/volumes/traefik
+```
+
+Every folder is owned by `101000`, and the `traefik` log folder is mode `755`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 projectName="traefik"
 
@@ -122,15 +137,28 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-*
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-*
 ```
 
+This list mirrors the [generated README for traefik-server](../stacks/traefik-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
+
+</details>
+
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-The explicit `chmod 755` on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
+The `755` mode on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
 
 `traefik-certs` is the one to back up. It holds `acme.json`, the Let's Encrypt account key and every issued certificate. Losing it means re-registering and re-issuing, and Let's Encrypt rate-limits both.
 
-This list mirrors the [generated README for traefik-server](../stacks/traefik-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
-
 ## 3. Open the firewall
+
+Step 2's run opened these. Confirm them on tf01:
+
+```bash
+sudo ufw status
+```
+
+`80/tcp`, `443/tcp`, and `8443/tcp` show `ALLOW` from `Anywhere`, and `6379/tcp` from `<internal-subnet>`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 sudo ufw allow 80/tcp comment 'Traefik HTTP'
@@ -139,6 +167,8 @@ sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 sudo ufw allow from <internal-subnet> to any port 6379 proto tcp comment 'traefik-kop Redis'
 sudo ufw status
 ```
+
+</details>
 
 The first three are the ports the Traefik container publishes, the same three every VM's Traefik needs.
 

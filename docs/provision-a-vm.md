@@ -18,6 +18,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [4. Verify base provisioning](#4-verify-base-provisioning)
 - [5. Give the host an onboarding key](#5-give-the-host-an-onboarding-key)
 - [6. Confirm the host shows as a Komodo Server](#6-confirm-the-host-shows-as-a-komodo-server)
+- [Run the stacks role without Semaphore](#run-the-stacks-role-without-semaphore)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -156,6 +157,31 @@ sudo -u komodo grep -A1 'core_address\|connect_as' /home/komodo/.config/komodo/p
 Step 5's onboarding key created the Server resource the moment Periphery made its first outbound connection. There is nothing to add by hand.
 
 In Komodo's UI on km01, check *Resources > Servers* and confirm the host shows connected and healthy before continuing. Re-check step 5 if it is not listed at all.
+
+## Run the stacks role without Semaphore
+
+The ansible `stacks` role sets a host up for a docker-stacks stack: it creates the stack's folders, seeds its config files, and opens its ports. It reads all three from the stack's generated `setup.yaml`, the same file every runbook's manual commands come from. Once Semaphore is up, hosts get this from the **provision-stacks** Template in [step 12 of Semaphore setup](semaphore-setup.md#create-the-provision-stacks-template).
+
+km01, and the first two stacks on ci01, come before Semaphore exists. Those run the role on the host itself, from the `/tmp/ansible` checkout cloud-init left there. If that checkout is gone, re-create it as in [step 5](#re-run-provisioning-with-the-key) first.
+
+The checkout can predate the role. Update everything in it except the two overlay files, which a pull would revert:
+
+```bash
+cd /tmp/ansible
+git fetch origin
+git checkout origin/main -- . ':(exclude)hosts.yml' ':(exclude)group_vars/all/private.yml'
+```
+
+Then run the role. Use the four identity values [recovered in step 5](#recover-the-original-provisioning-arguments), and set `<stack>` to the stack's directory name under `stacks/`, such as `komodo-server`:
+
+```bash
+ansible-playbook -i hosts.yml -c local provision.yml \
+  -e '{"target":"ubuntu_docker","server_password":"","short_name":"<same>","abbr_name":"<same>","location_abbr":"<same>","domain_name":"<same>"}' \
+  -e '{"docker_stacks":"<stack>"}' \
+  --tags stacks
+```
+
+A stack that opens a port to the internal subnet also needs `docker_stacks_internal_subnet` in the second `-e`, set to that subnet in CIDR form. The role stops and says so when it is missing. None of the stacks run this way open one.
 
 ## What's next
 

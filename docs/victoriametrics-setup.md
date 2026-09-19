@@ -24,7 +24,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 ## Prerequisites
 
 - ci01 is provisioned and shows connected and healthy in Komodo, through step 2 of [ci01 bootstrap](ci01-bootstrap.md). Step 2 in particular: this stack's routers need traefik-bootstrap on ci01 to be reachable at all.
-- Semaphore is deployed and wired to the ansible repo, through [Semaphore setup](semaphore-setup.md). Step 1 below runs one of its Templates.
+- Semaphore is deployed and wired to the ansible repo, through [Semaphore setup](semaphore-setup.md). Steps 1 and 2 below run two of its Templates.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md).
 
 ## Placeholders
@@ -54,7 +54,20 @@ There is no password to collect. Each host's is generated on that host and never
 
 ## 2. Open the syslog port
 
-vector's host variant publishes 5140 on TCP and UDP so it can take syslog from the network:
+vector's host variant publishes 5140 on TCP and UDP so it can take syslog from the network. The ansible `stacks` role opens both, scoped to the internal subnet, in the same run that creates step 3's folders.
+
+In ansible-private's `hosts.yml`, add the `victoriametrics-server` stack to ci01's `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+Run **provision-stacks** with *Target* answered `ci01`, then confirm the rules on ci01:
+
+```bash
+sudo ufw status
+```
+
+`5140/tcp` and `5140/udp` show `ALLOW` from `<internal-subnet>`, with the comment `Vector syslog`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 sudo ufw allow from <internal-subnet> to any port 5140 proto tcp comment 'Vector syslog'
@@ -62,11 +75,24 @@ sudo ufw allow from <internal-subnet> to any port 5140 proto udp comment 'Vector
 sudo ufw status
 ```
 
-The generated README opens this with a named UFW application and no source restriction. Scope it to the internal subnet instead. Only fleet hosts ship syslog here, and an open syslog port is an easy way to fill a disk from off the network.
+</details>
+
+Only fleet hosts ship syslog here, and an open syslog port is an easy way to fill a disk from off the network.
 
 ## 3. Create the runtime folders
 
 Same rule as everywhere else. Neither Periphery nor Compose creates host bind-mount directories, so these have to exist with the right ownership before the first deploy.
+
+Step 2's run created them. Check the result on ci01:
+
+```bash
+sudo ls -ln /opt/docker/volumes/victoriametrics
+```
+
+All seven data folders are owned by `101000`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 projectName="victoriametrics"
@@ -88,6 +114,8 @@ mkdir -p /opt/docker/volumes/$projectName/vlagent-data
 mkdir -p /opt/docker/volumes/$projectName/vector-data
 sudo chown -R 101000:101000 /opt/docker/volumes/$projectName/
 ```
+
+</details>
 
 Every service here runs as `PUID`, so all seven data folders take 101000. There is no Postgres in this stack and nothing owned by 100000. See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 

@@ -52,6 +52,23 @@ id01 is on the internal VLAN. Authentik is reached from the internet through bh0
 
 ## 2. Create the runtime folders
 
+The ansible `stacks` role creates these from `stacks/authentik-server/setup.yaml`.
+
+In ansible-private's `hosts.yml`, add id01 to the `docker_host` group if it is not there yet, and add the `traefik-bootstrap` and `authentik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+Run **provision-stacks** with *Target* answered `id01`. Listing both stacks means this one run also covers the folders and ports for step 3's traefik-bootstrap.
+
+Check the result on id01:
+
+```bash
+sudo ls -ln /opt/docker/volumes/authentik
+```
+
+`postgres-data` and `postgres-backup-data` are owned by `100000`, and the other four folders by `101000`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 projectName="authentik"
 
@@ -75,6 +92,8 @@ mkdir -p /opt/docker/volumes/$projectName/postgres-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 ```
+
+</details>
 
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 

@@ -49,6 +49,7 @@ Every host after ci01 is built with it in place, so it never has to be retrofitt
 | --- | --- |
 | `<km-ip>` | km01's address, from its own runbook |
 | `<ci-ip>` | ci01's address, from its own runbook |
+| `<internal-subnet>` | The internal VLAN's CIDR, the one every fleet VM but bh01 and mx01 sits on |
 | `<short_name>` | Fleet identity value, the organisation short name |
 | `<abbr_name>` | Fleet identity value, its abbreviation |
 | `<location_abbr>` | Fleet identity value, the site letter |
@@ -56,6 +57,19 @@ Every host after ci01 is built with it in place, so it never has to be retrofitt
 | `<same>` | The value that host was already provisioned with, recovered rather than guessed |
 
 ## 1. Create the runtime folders
+
+The ansible `stacks` role creates these from `stacks/semaphore-server/setup.yaml`. Semaphore is what later runs that role for every host, so this once, run it on ci01 itself. Follow [Run the stacks role without Semaphore](provision-a-vm.md#run-the-stacks-role-without-semaphore) with `<stack>` set to `semaphore-server`.
+
+Check the result:
+
+```bash
+sudo ls -ln /opt/docker/volumes/semaphore
+```
+
+The three `semaphore-` folders are owned by `101001`, and `postgres-data` and `postgres-backup-data` by `100000`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 On ci01, as the user Periphery runs as:
 
@@ -80,11 +94,13 @@ mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
 ```
 
+This list mirrors the [generated README for semaphore-server](../stacks/semaphore-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
+
+</details>
+
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary. Semaphore is hardwired to use user 1001 so we use 101001 for that container.
 
 Unlike km01, you do not clone docker-stacks onto ci01 yourself. Periphery clones it into `/opt/docker/stacks/<stack-name>/` the first time you point a Stack resource at it, a separate clone per Stack rather than one checkout they share. `/opt/docker/repos/` stays empty: that is for standalone Repo resources, and this repo is never registered as one. The folders above still have to exist with the right ownership before that first deploy, because neither Periphery nor Compose creates host bind-mount directories. These are Semaphore's. The other stack on ci01 has its own set, in step 3 of [VictoriaMetrics setup](victoriametrics-setup.md).
-
-This list mirrors the [generated README for semaphore-server](../stacks/semaphore-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
 
 ## 2. Generate Semaphore's three encryption keys
 
@@ -268,10 +284,17 @@ docker_host:
     km01:
       ansible_host: <km-ip>
       serverHostname: "km01"
+      docker_stacks:
+        - komodo-server
     ci01:
       ansible_host: <ci-ip>
       serverHostname: "ci01"
+      docker_stacks:
+        - traefik-bootstrap
+        - semaphore-server
   vars:
+    docker_stacks_internal_subnet: "<internal-subnet>"
+
     ntp_service: "chrony"
 
     FIREWALL: true
@@ -292,6 +315,8 @@ Those uppercase flags are what gate each role in `provision.yml`. They are copie
 `serverHostname` is optional. It falls back to the live `ansible_facts.hostname`, but pinning it documents intent and is what `komodo_connect_as` keys off.
 
 Do not set `ansible_user` here. Step 3's Key Store entry supplies it.
+
+`docker_stacks` lists the stacks each host runs, by their directory names under docker-stacks' `stacks/` rather than their Komodo Stack names. The `stacks` role reads it, and scopes firewall rules for fleet-only ports to `docker_stacks_internal_subnet`. Each later runbook adds its stack to a host's list before running the Template from [step 12](#create-the-provision-stacks-template).
 
 Add each new VM to this group as you build it. tf01, id01, pk01, and the rest all belong here.
 
@@ -430,6 +455,19 @@ Do this now, before moving on. km01 and ci01 were both built before this Templat
 The role generates each host's own random Node Exporter password on its first run and reuses it forever after, so a host that predates that behaviour still has the old committed default. Running the Template replaces it, and every host built after this one gets the right thing from cloud-init with nothing to come back for.
 
 `docker_host` covers every Docker VM in one run.
+
+### Create the provision-stacks Template
+
+Create a second Template the same way, with the same `target` Survey Variable. Only these two fields differ:
+
+| Field | Value |
+| --- | --- |
+| *Name* | `provision-stacks` |
+| *Tags* | `stacks` |
+
+It runs the `stacks` role for every stack in the target host's `docker_stacks` list, creating the stack's folders, seeding its config files, and opening its ports. Running it again is safe. A config file already on the host is left alone, and a folder that already exists keeps its contents.
+
+Run it once now with *Target* answered `ci01`, to confirm it works. Both of ci01's stacks so far were already set up from ci01 itself, so it has nothing to add.
 
 ## 13. Replace this key once step-ca is live
 

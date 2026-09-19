@@ -76,6 +76,21 @@ The VM still provisions the same way, still runs Periphery, and still dials out 
 
 ## 3. Create the runtime folders and install the tunnel config
 
+The ansible `stacks` role creates these from `stacks/traefik-dmz/setup.yaml`, seeds cloudflared's ingress config, and opens step 4's ports in the same run. The tunnel credentials stay a manual step, because they come from your admin machine rather than from this repo.
+
+In ansible-private's `hosts.yml`, add bh01 to the `docker_host` group if it is not there yet, and add the `traefik-dmz` stack to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+Run **provision-stacks** with *Target* answered `bh01`, then check the result on bh01:
+
+```bash
+sudo ls -ln /opt/docker/logs/traefik /opt/docker/volumes/traefik
+```
+
+Every folder is owned by `101000`. The `traefik` log folder is mode `755`, and `cloudflared-secrets` is mode `700`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 projectName="traefik"
 
@@ -108,9 +123,11 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-*
 sudo chmod 700 /opt/docker/volumes/$projectName/cloudflared-secrets
 ```
 
+</details>
+
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-The explicit `chmod 755` on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
+The `755` mode on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
 
 cloudflared's two directories are host volumes for the same reason every other one is. Periphery re-clones over its run directory, so a credential written inside the checkout does not survive.
 
@@ -120,20 +137,25 @@ Copy the credentials file from step 1 onto bh01, then put it in place as `<tunne
 
 ```bash
 sudo install -m 600 <tunnel-id>.json \
-  /opt/docker/volumes/$projectName/cloudflared-secrets/<tunnel-id>.json
+  /opt/docker/volumes/traefik/cloudflared-secrets/<tunnel-id>.json
 sudo chown 101000:101000 \
-  /opt/docker/volumes/$projectName/cloudflared-secrets/<tunnel-id>.json
+  /opt/docker/volumes/traefik/cloudflared-secrets/<tunnel-id>.json
 ```
 
 ### Write the ingress config
 
-Seed it from the example this repo serves publicly, so nothing has to be cloned first:
+The `stacks` run above seeded it from the example this repo serves publicly. A copy already on the host is never replaced, so your edits survive later runs.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
-sudo curl -fsSL -o /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
+sudo curl -fsSL -o /opt/docker/volumes/traefik/cloudflared-config/config.yml \
   https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/cloudflared/config/config.yml.example
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config/config.yml
+sudo chown 101000:101000 /opt/docker/volumes/traefik/cloudflared-config/config.yml
 ```
+
+</details>
 
 Edit that copy and fill in the real tunnel ID in both the `tunnel:` and `credentials-file:` lines. The example ships one ingress rule and a catch-all:
 
@@ -153,6 +175,17 @@ This list mirrors the [generated README for traefik-dmz](../stacks/traefik-dmz/R
 
 ## 4. Open the firewall
 
+Step 3's run opened these. Confirm them on bh01:
+
+```bash
+sudo ufw status
+```
+
+`80/tcp`, `443/tcp`, and `8443/tcp` show `ALLOW` from `Anywhere`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 sudo ufw allow 80/tcp comment 'Traefik HTTP'
 sudo ufw allow 443/tcp comment 'Traefik HTTPS'
@@ -160,9 +193,11 @@ sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 sudo ufw status
 ```
 
+</details>
+
 Those three are the ports the Traefik container publishes, and they are reachable only from inside the DMZ. Nothing on the internet reaches them, because nothing forwards to bh01.
 
-Do not open `6379` here. bh01's Redis is a replica and publishes no port, unlike tf01's master. It connects outbound to tf01 instead.
+The role does not open `6379` here, and neither should you. bh01's Redis is a replica and publishes no port, unlike tf01's master. It connects outbound to tf01 instead.
 
 ## 5. Create the Stack resource for traefik-dmz
 

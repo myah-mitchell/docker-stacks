@@ -110,6 +110,21 @@ git clone https://github.com/myah-mitchell/docker-stacks /opt/docker/stacks/dock
 
 ## 6. Create the runtime folders
 
+Periphery does not create host bind-mount directories, and neither does Compose, so these have to exist with the right ownership before the first deploy. The ansible `stacks` role creates them from `stacks/komodo-server/setup.yaml`, which `scripts/build.py` generates from the container fragments. The same run seeds step 8's config file and opens step 10's port.
+
+There is no Semaphore to run it from yet, so run it on km01 itself. Follow [Run the stacks role without Semaphore](provision-a-vm.md#run-the-stacks-role-without-semaphore) with `<stack>` set to `komodo-server`.
+
+Check the result:
+
+```bash
+sudo ls -ln /opt/docker/volumes/komodo
+```
+
+`postgres-data` and `postgres-backup-data` are owned by `100000`, and the other six folders by `101000`. `komodo-secrets` is mode `700`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 projectName="komodo"
 
@@ -137,9 +152,9 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-*
 sudo chmod 700 /opt/docker/volumes/$projectName/komodo-secrets
 ```
 
-Periphery does not create host bind-mount directories, and neither does Compose, so these have to exist with the right ownership before the first deploy.
-
 This list mirrors the [generated README for komodo-server](../stacks/komodo-server/README.md), which `scripts/build.py` rebuilds from the container fragments. If the two ever disagree, that file is correct and this one is stale.
+
+</details>
 
 ### Why 100000 and 101000
 
@@ -198,7 +213,16 @@ python3 scripts/build.py
 - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-secrets/core.config.toml:/config/config.toml:ro
 ```
 
-It has to exist before the first start, or Docker creates an empty directory at that path and Komodo fails at startup. Create it from the committed template:
+It has to exist before the first start, or Docker creates an empty directory at that path and Komodo fails at startup. Step 6's run already copied it from the committed template, with mode `600`. Confirm it is there:
+
+```bash
+sudo ls -l /opt/docker/volumes/komodo/komodo-secrets/
+```
+
+A copy that is already there is never replaced, so running the role again keeps any change you make to it.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 projectName="komodo"
@@ -210,6 +234,8 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-secrets/core.co
 ```
 
 km01's checkout at `/opt/docker/stacks/docker-stacks` is the one that is hand-made and permanent, so copying from it is fine. Every other host gets its checkout from Periphery, which re-clones over it, which is why this file lives under `/opt/docker/volumes` like every other piece of state.
+
+</details>
 
 Leave it as it is. The repo is public, so Komodo needs no `[[git_provider]]` credential to clone it. Add one, using the commented-out example already in the file, only if you later point Komodo at a private repo.
 
@@ -229,12 +255,25 @@ docker network create proxy
 
 ## 10. Open the firewall for Core
 
+Step 6's run opened port 9120 for Core. Confirm it:
+
+```bash
+sudo ufw status
+```
+
+`9120/tcp` shows `ALLOW` from `Anywhere`, with the comment `Komodo Core`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 sudo ufw allow 9120/tcp comment 'Komodo Core'
 sudo ufw status
 ```
 
-Every Periphery agent in the fleet dials out to Core, so km01 is the only host that needs an inbound allowance. Nothing provisions it: km01 is a plain `ubuntu_docker` host as far as ansible is concerned, and Core is this hand-built Compose stack rather than anything ansible manages.
+</details>
+
+Every Periphery agent in the fleet dials out to Core, so km01 is the only host that needs an inbound allowance.
 
 This also covers reaching `http://<km-ip>:9120` from your own browser in step 12.
 

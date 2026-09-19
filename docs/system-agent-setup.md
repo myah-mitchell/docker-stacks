@@ -85,6 +85,23 @@ There is no password to collect and nothing to paste into Komodo. Each host's pa
 
 Neither Periphery nor Compose creates host bind-mount directories, so these have to exist with the right ownership before the first deploy.
 
+The ansible `stacks` role creates them from `stacks/system-agent/setup.yaml`, and opens step 3's ports in the same run.
+
+In ansible-private's `hosts.yml`, add `<host>` to the `docker_host` group if it is not there yet, and add the `system-agent` stack to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+Run **provision-stacks** with *Target* answered `<host>`, then check the result on the VM:
+
+```bash
+sudo ls -ln /opt/docker/logs/system /opt/docker/volumes/system
+```
+
+Every folder but one is owned by `101000`, and the `traefik` log folder is mode `755`.
+
+dockns is the one exception. It is the only service here that does not pick up the shared `user:` override, so it runs as the image's own root and its directory belongs to `100000` rather than `101000`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
+
 ```bash
 projectName="system"
 
@@ -102,27 +119,37 @@ mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
 mkdir -p /opt/docker/volumes/$projectName/vmagent-data
 mkdir -p /opt/docker/volumes/$projectName/vlagent-data
 mkdir -p /opt/docker/volumes/$projectName/vector-data
-mkdir -p /opt/docker/volumes/$projectName/cadvisor-data
 sudo chown -R 101000:101000 /opt/docker/logs/$projectName/traefik
 sudo chmod 755 /opt/docker/logs/$projectName/traefik
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/*-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
 ```
 
-dockns is the one exception. It is the only service here that does not pick up the shared `user:` override, so it runs as the image's own root and its directory belongs to `100000` rather than `101000`:
-
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/dockns-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/dockns-data
 ```
 
+</details>
+
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-The explicit `chmod 755` on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
+The `755` mode on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
 
 ## 3. Open the firewall
 
-Base provisioning enables UFW with a default-deny inbound policy and opens only what each host's own roles need. None of these ports are part of that, so nothing opens them for you.
+Base provisioning enables UFW with a default-deny inbound policy and opens only what each host's own roles need. None of these ports are part of that, which is why the `stacks` role opens them.
+
+Step 2's run opened all six rules. Confirm them on the VM:
+
+```bash
+sudo ufw status
+```
+
+`80/tcp`, `443/tcp`, and `8443/tcp` show `ALLOW` from `Anywhere`. `7007/tcp`, `5140/tcp`, and `5140/udp` show `ALLOW` from `<internal-subnet>`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 Traefik's three, open to anything that can reach the VM:
 
@@ -140,6 +167,8 @@ sudo ufw allow from <internal-subnet> to any port 5140 proto tcp comment 'Vector
 sudo ufw allow from <internal-subnet> to any port 5140 proto udp comment 'Vector syslog'
 sudo ufw status
 ```
+
+</details>
 
 Scope those two rather than opening them outright. Only the central Dozzle reads 7007, and an unrestricted syslog port is an easy way for anything on the network to fill a disk.
 

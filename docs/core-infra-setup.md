@@ -32,6 +32,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - ci01 is provisioned and shows connected and healthy in Komodo, through step 2 of [ci01 bootstrap](ci01-bootstrap.md). traefik-bootstrap on ci01 is what makes any of these reachable.
 - The VictoriaMetrics backend is deployed, through [VictoriaMetrics setup](victoriametrics-setup.md). blackbox-exporter has nothing scraping it until vmagent is there.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md).
+- Semaphore is running ansible against ci01, through step 12 of [Semaphore setup](semaphore-setup.md). Step 1 runs the `stacks` role from it.
 - An account with an SMTP relay for Postfix to send through, such as your mail provider's submission service. Step 3 covers running without one.
 
 ## Placeholders
@@ -49,7 +50,28 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 
 ## 1. Create the runtime folders
 
-Neither Periphery nor Compose creates host bind-mount directories, so these have to exist with the right ownership before the first deploy.
+Neither Periphery nor Compose creates host bind-mount directories, so these have to exist with the right ownership before the first deploy. The ansible `stacks` role creates them from `stacks/core-infra/setup.yaml`, and opens step 2's ports in the same run.
+
+ntfy, uptime-kuma, and Mailpit keep state. Postfix keeps its mail queue there, so mail waiting on an unreachable relay survives a redeploy. mailrise and blackbox-exporter each read one config file that is not in git, so those two directories hold the files rather than the repo checkout does, because Periphery re-clones over its run directory and anything written inside it goes with it.
+
+### Tell ansible which stacks ci01 runs
+
+Add `core-infra` to ci01's `docker_stacks` list in ansible-private's `hosts.yml`, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+### Run it
+
+Run the **provision-stacks** Template from [step 12 of Semaphore setup](semaphore-setup.md#create-the-provision-stacks-template) with *Target* answered `ci01`. It creates `/opt/docker/logs/core` and `/opt/docker/volumes/core`, the six service folders inside the volumes one, and the two config files. A config file already on the host is left alone, so running it again never overwrites a filled-in `mailrise.conf`.
+
+Check the result on ci01:
+
+```bash
+sudo ls -ln /opt/docker/volumes/core
+```
+
+`postfix-data` is owned by `100000`, and the other five folders by `101000`. Postfix runs as the image's own root, which is why it is the exception.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 projectName="core"
@@ -67,24 +89,17 @@ mkdir -p /opt/docker/volumes/$projectName/uptime-kuma-data
 mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
 mkdir -p /opt/docker/volumes/$projectName/mailrise-secrets
 mkdir -p /opt/docker/volumes/$projectName/mailpit-data
+mkdir -p /opt/docker/volumes/$projectName/postfix-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/ntfy-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/uptime-kuma-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailpit-data
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postfix-data
 sudo chmod 700 /opt/docker/volumes/$projectName/mailrise-secrets
 ```
 
-Postfix is the one exception. It runs as the image's own root, so its queue directory belongs to `100000` rather than `101000`:
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/postfix-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postfix-data
-```
-
-ntfy, uptime-kuma, and Mailpit keep state. Postfix keeps its mail queue there, so mail waiting on an unreachable relay survives a redeploy. mailrise and blackbox-exporter each read one config file that is not in git, so those two directories hold the files rather than the repo checkout does. Periphery re-clones over its run directory, and anything written inside that directory goes with it.
-
-Seed both files now, from the examples this repo serves publicly, so nothing has to be cloned first:
+Seed both config files from the examples this repo serves publicly, so nothing has to be cloned first:
 
 ```bash
 sudo curl -fsSL -o /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
@@ -96,15 +111,26 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-conf
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
 ```
 
+</details>
+
 The blackbox copy is usable as it stands. It defines probe modules and nothing host-specific.
 
-The mailrise copy is not, because it carries two `REPLACE_WITH_NTFY_TOKEN` placeholders and the token does not exist until step 5. Leave them for now. mailrise starts and accepts mail with a placeholder token, it just cannot deliver. It gets mode `600` because that is the file the real token ends up in.
+The mailrise copy is not, because it carries two `REPLACE_WITH_NTFY_TOKEN` placeholders and the token does not exist until step 5. Leave them for now. mailrise starts and accepts mail with a placeholder token, it just cannot deliver, and the file gets mode `600` because the real token ends up in it.
 
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
 ## 2. Open the SMTP ports
 
-mailrise publishes port 8025 on the host and Postfix publishes port 25, because whatever sends to them has to reach them directly rather than through Traefik. Base provisioning enables UFW with a default-deny inbound policy, so nothing opens them for you:
+mailrise publishes port 8025 on the host and Postfix publishes port 25, because whatever sends to them has to reach them directly rather than through Traefik. Base provisioning enables UFW with a default-deny inbound policy, and step 1's run added a rule for each port. Confirm them on ci01:
+
+```bash
+sudo ufw status
+```
+
+Both `8025/tcp` and `25/tcp` show `ALLOW` from `<internal-subnet>`, with the comments `Mailrise SMTP` and `Postfix SMTP`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 sudo ufw allow from <internal-subnet> to any port 8025 proto tcp comment 'Mailrise SMTP'
@@ -112,7 +138,9 @@ sudo ufw allow from <internal-subnet> to any port 25 proto tcp comment 'Postfix 
 sudo ufw status
 ```
 
-Scope both to the internal subnet. Neither asks for a login: mailrise accepts anything that arrives, and Postfix relays for any private address. That is fine for a LAN-only relay and not fine for anything wider.
+</details>
+
+Both rules are scoped to the internal subnet. Neither service asks for a login: mailrise accepts anything that arrives, and Postfix relays for any private address. That is fine for a LAN-only relay and not fine for anything wider.
 
 The other four services are reached through Traefik on 443, already open from traefik-bootstrap.
 

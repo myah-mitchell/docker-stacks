@@ -114,7 +114,18 @@ On the router, forward these WAN ports to `<ip>`, TCP only:
 
 Do not forward 80, 443, or 8080. The web side reaches the internet through bh01's tunnel, never through a port forward.
 
-Then on mx01:
+Then let the ansible `stacks` role open them on mx01. In ansible-private's `hosts.yml`, add mx01 to the `docker_host` group if it is not there yet, and add the `stalwart-server` stack to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+
+Run **provision-stacks** with *Target* answered `mx01`. The same run creates step 5's folders. Confirm the ports:
+
+```bash
+sudo ufw status
+```
+
+`25/tcp`, `465/tcp`, `587/tcp`, and `993/tcp` show `ALLOW` from `Anywhere`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 sudo ufw allow 25/tcp comment 'Stalwart SMTP'
@@ -123,6 +134,8 @@ sudo ufw allow 587/tcp comment 'Stalwart submission'
 sudo ufw allow 993/tcp comment 'Stalwart IMAPS'
 sudo ufw status
 ```
+
+</details>
 
 ## 4. Deploy system-agent onto mx01
 
@@ -133,6 +146,17 @@ Follow [system-agent](system-agent-setup.md), with Stack name `system-agent-mx01
 Clear the four Cloudflare dockns keys to blank in its step 5, even though mx01 hosts public services. The public names come from tunnel routes in step 11 and from Stalwart in step 12, and a dockns record for the same name would fight both.
 
 ## 5. Create the runtime folders
+
+Step 3's run created these. Check them on mx01:
+
+```bash
+sudo ls -ln /opt/docker/volumes/mail /opt/docker/volumes/mail/bulwark-data
+```
+
+The two `stalwart-` folders are owned by `102000`, and `bulwark-data` and the four folders inside it by `101001`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 projectName="mail"
@@ -155,6 +179,8 @@ mkdir -p /opt/docker/volumes/$projectName/bulwark-data/admin-state
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data/telemetry
 sudo chown -R 101001:101001 /opt/docker/volumes/$projectName/bulwark-data
 ```
+
+</details>
 
 Neither service uses the fleet's shared `PUID`. Each runs as its own image's user, so the owners are that user's ID plus Docker's `100000` offset: `102000` for Stalwart's UID 2000, and `101001` for Bulwark's UID 1001. See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000).
 

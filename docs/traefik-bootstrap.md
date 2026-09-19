@@ -31,7 +31,22 @@ The target VM must already be a connected Komodo Server resource, and must alrea
 
 ### 1. Create the runtime folders
 
-On the target VM:
+The ansible `stacks` role creates these from `stacks/traefik-bootstrap/setup.yaml`, and opens step 2's ports in the same run.
+
+On ci01, which deploys this stack before Semaphore exists, follow [Run the stacks role without Semaphore](provision-a-vm.md#run-the-stacks-role-without-semaphore) with `<stack>` set to `traefik-bootstrap`.
+
+On any later host, add `traefik-bootstrap` to its `docker_stacks` in ansible-private, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private), and load the change into Semaphore's Inventory. Then run the **provision-stacks** Template from [step 12](semaphore-setup.md#create-the-provision-stacks-template) with *Target* answered with that host.
+
+Check the result on the target VM:
+
+```bash
+sudo ls -ln /opt/docker/logs/traefik /opt/docker/volumes/traefik
+```
+
+The `traefik` log folder and both `traefik-` volume folders are owned by `101000`, and the log folder is mode `755`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 projectName="traefik"
@@ -53,11 +68,24 @@ mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
 ```
 
+</details>
+
 See [Why 100000 and 101000](komodo-bootstrap.md#why-100000-and-101000) if those owners look arbitrary.
 
-The explicit `chmod 755` on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
+The `755` mode on the Traefik log directory matters. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so a directory left group-writable by the default umask makes the logrotate container exit 1 every five minutes and access.log grows forever.
 
 ### 2. Open the firewall
+
+Step 1's run opened these. Confirm them on the target VM:
+
+```bash
+sudo ufw status
+```
+
+`80/tcp`, `443/tcp`, and `8443/tcp` show `ALLOW` from `Anywhere`.
+
+<details>
+<summary>Manual steps, instead of ansible</summary>
 
 ```bash
 sudo ufw allow 80/tcp comment 'Traefik HTTP'
@@ -66,7 +94,9 @@ sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 sudo ufw status
 ```
 
-Those three are the ports `containers/traefik/compose.yaml` publishes. Base provisioning enables UFW with a default-deny inbound policy and opens only what each host's own roles need. Traefik is not part of base provisioning, so nothing opens these for you.
+</details>
+
+Those three are the ports `containers/traefik/compose.yaml` publishes. Base provisioning enables UFW with a default-deny inbound policy and opens only what each host's own roles need. Traefik is not part of base provisioning, which is why the `stacks` role opens them.
 
 ### 3. Create the Stack resource
 

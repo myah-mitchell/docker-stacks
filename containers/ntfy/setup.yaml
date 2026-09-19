@@ -1,0 +1,6 @@
+# Host setup for ntfy. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - path: ntfy-data
+    owner: 101000
+    group: 101000

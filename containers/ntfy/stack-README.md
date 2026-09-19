@@ -2,13 +2,6 @@
 ## Prerequisites for using ntfy
 
 # Create and Setup Required Folders
-## Create needed folders for ntfy
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/ntfy-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/ntfy-*
-```
-
 ## Post-deploy: create your account and a publish-only token
 
 `NTFY_AUTH_DEFAULT_ACCESS=deny-all` means nothing can publish or subscribe until you explicitly grant access. Run once, inside the container, after first boot:

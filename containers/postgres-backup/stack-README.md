@@ -2,13 +2,6 @@
 ## Prerequisites for using postgres-backup
 
 # Create and Setup Required Folders
-## Create needed folders for postgres-backup
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-*
-```
-
 ## Restore from a dump
 
 List available dumps (daily/weekly/monthly subfolders, gzip-compressed SQL):

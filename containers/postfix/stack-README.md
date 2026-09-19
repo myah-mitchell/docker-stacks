@@ -6,18 +6,9 @@ A relay to send through, unless this host's public address can deliver mail itse
 # Create and Setup Required Folders
 ## Create needed folders for postfix
 
-```bash
-mkdir -p /opt/docker/volumes/$projectName/postfix-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postfix-data
-```
-
 Postfix runs as the image's own root, so its queue directory belongs to host UID `100000` rather than `101000`. Postfix creates the queue's subdirectories itself on first start.
 
-## Open the SMTP port
-
-```bash
-sudo ufw allow from <internal-subnet> to any port 25 proto tcp comment 'Postfix SMTP'
-```
+## Open the firewall for postfix
 
 Scope it to the internal subnet. Postfix relays for any private address with no login, which is fine for a LAN-only relay and not fine for anything wider.
 

@@ -14,12 +14,18 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for semaphore
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/semaphore-data
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-data
 mkdir -p /opt/docker/volumes/$projectName/semaphore-config
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-config
 mkdir -p /opt/docker/volumes/$projectName/semaphore-tmp
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/semaphore-*
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-tmp
 ```
+
+Semaphore runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.
 
 ## Generate the cookie/encryption secrets once
 
@@ -43,16 +49,20 @@ Semaphore reaches every host with a static SSH key trusted by the `ansible` serv
 
 ## Create needed folders for postgres
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/postgres-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-data
 ```
 
 ## Create needed folders for postgres-backup
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-*
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-data
 ```
 
 ## Restore from a dump

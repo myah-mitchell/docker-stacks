@@ -1,0 +1,8 @@
+# Host setup for dozzle. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+firewall:
+  - port: 7007
+    proto: tcp
+    allow_from: internal
+    comment: Dozzle agent
+    services: [dozzle-agent]

@@ -1,0 +1,11 @@
+# Host setup for blackbox-exporter. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - path: blackbox-exporter-config
+    owner: 101000
+    group: 101000
+files:
+  - path: blackbox-exporter-config/blackbox.yml
+    source: containers/blackbox-exporter/config/blackbox.yml.example
+    owner: 101000
+    group: 101000

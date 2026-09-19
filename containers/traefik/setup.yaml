@@ -1,0 +1,27 @@
+# Host setup for traefik. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - root: logs
+    path: traefik
+    owner: 101000
+    group: 101000
+    mode: "0755"
+  - path: traefik-certs
+    owner: 101000
+    group: 101000
+  - path: traefik-plugins
+    owner: 101000
+    group: 101000
+firewall:
+  - port: 80
+    proto: tcp
+    allow_from: any
+    comment: Traefik HTTP
+  - port: 443
+    proto: tcp
+    allow_from: any
+    comment: Traefik HTTPS
+  - port: 8443
+    proto: tcp
+    allow_from: any
+    comment: Traefik HTTPS (alt)

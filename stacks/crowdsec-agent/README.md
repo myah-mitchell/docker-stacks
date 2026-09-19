@@ -18,8 +18,11 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for crowdsec
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/crowdsec-data
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/crowdsec-data
 mkdir -p /opt/docker/volumes/$projectName/crowdsec-config
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/crowdsec-*
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/crowdsec-config
 ```

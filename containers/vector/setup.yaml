@@ -1,0 +1,17 @@
+# Host setup for vector. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - path: vector-data
+    owner: 101000
+    group: 101000
+firewall:
+  - port: 5140
+    proto: tcp
+    allow_from: internal
+    comment: Vector syslog
+    services: [vector-host, vector-system]
+  - port: 5140
+    proto: udp
+    allow_from: internal
+    comment: Vector syslog
+    services: [vector-host, vector-system]

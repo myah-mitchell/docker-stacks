@@ -29,11 +29,3 @@ the role again. To rotate every host's, delete `/etc/node-exporter/password` and
 
 The role also opens port 9100 in UFW as the `Node-Exporter` application, so
 vmagent can reach it.
-
-# Create and Setup Required Folders
-## Create needed folders for vmagent
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/vmagent-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-*
-```

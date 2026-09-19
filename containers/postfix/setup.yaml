@@ -1,0 +1,13 @@
+# Host setup for postfix. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  # The image runs as its own root, so the queue belongs to host UID 100000.
+  - path: postfix-data
+    owner: 100000
+    group: 100000
+firewall:
+  # The default POSTFIX_SMTP_PORT. Change both together.
+  - port: 25
+    proto: tcp
+    allow_from: internal
+    comment: Postfix SMTP

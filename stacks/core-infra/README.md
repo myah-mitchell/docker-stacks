@@ -19,9 +19,11 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for ntfy
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/ntfy-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/ntfy-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/ntfy-data
 ```
 
 ## Post-deploy: create your account and a publish-only token
@@ -46,23 +48,32 @@ Use the resulting token as the `Authorization: Bearer <token>` header (or `ntfy:
 
 ## Create needed folders for mailrise
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/mailrise-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
-```
-
-Seed the config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
-
-```bash
-sudo curl -fsSL -o /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
+sudo chmod 700 /opt/docker/volumes/$projectName/mailrise-secrets
+sudo test -e /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
+  || sudo curl -fsSL -o /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
   https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/mailrise/config/mailrise.conf.example
-sudo chmod 600 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
+sudo chmod 600 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
 ```
+
+The config is copied from the tracked example only when it is not already there, so a filled-in token is never overwritten.
 
 Fill in the `token` value with the ntfy publish-only token created in ntfy's own post-deploy step.
 
 Do all of this before the first deploy. Docker creates an empty directory in place of a missing bind-mount file, which makes mailrise fail at startup with nothing obvious to point at. The file lives here rather than in the repo checkout because Periphery re-clones over its run directory, which would take any file written inside it along with it.
+
+## Open the firewall for mailrise
+
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
+```bash
+sudo ufw allow from <internal-subnet> to any port 8025 proto tcp comment 'Mailrise SMTP'
+```
 
 ## Point PBS and PVE at it
 
@@ -72,6 +83,8 @@ Burn in rather than cutting over instantly. Leave PBS/PVE's previous (broken, sp
 
 ## Create needed folders for postfix
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/postfix-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postfix-data
@@ -79,7 +92,9 @@ sudo chown 100000:100000 /opt/docker/volumes/$projectName/postfix-data
 
 Postfix runs as the image's own root, so its queue directory belongs to host UID `100000` rather than `101000`. Postfix creates the queue's subdirectories itself on first start.
 
-## Open the SMTP port
+## Open the firewall for postfix
+
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
 
 ```bash
 sudo ufw allow from <internal-subnet> to any port 25 proto tcp comment 'Postfix SMTP'
@@ -103,6 +118,8 @@ Postfix also refuses a recipient whose domain has no DNS record, so a typo in a 
 
 ## Create needed folders for mailpit
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/mailpit-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailpit-data
@@ -122,18 +139,18 @@ docker logs ${projectName}-postfix 2>&1 | grep 'status='
 
 ## Create needed folders for blackbox-exporter
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
-```
-
-Seed the config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
-
-```bash
-sudo curl -fsSL -o /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
+sudo test -e /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
+  || sudo curl -fsSL -o /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
   https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/blackbox-exporter/config/blackbox.yml.example
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml
 ```
+
+The config is copied from the tracked example only when it is not already there, so local edits are never overwritten.
 
 Edit that copy to add or adjust probe modules. It is usable unchanged, defining probe modules and nothing host-specific.
 
@@ -165,9 +182,11 @@ Pair with a `vmalert` rule (`probe_success == 0`) notifying through `ntfy` (Phas
 
 ## Create needed folders for uptime-kuma
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/uptime-kuma-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/uptime-kuma-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/uptime-kuma-data
 ```
 
 ## Post-deploy

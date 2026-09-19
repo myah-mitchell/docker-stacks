@@ -33,33 +33,6 @@ the role again. To rotate every host's, delete `/etc/node-exporter/password` and
 The role also opens port 9100 in UFW as the `Node-Exporter` application, so
 vmagent can reach it.
 
-## Prerequisites for using vector
-
-### Setting Up Syslog Collection
-
-#### Open Port in UFW for Syslog
-
-We need to create a UFW application so that we can let vector collect syslog
-
-```bash
-sudo vi /etc/ufw/applications.d/vector-syslog
-```
-
-```bash
-[Vector-Syslog]
-title=Vector Syslog
-description=Allows incoming traffic for vector syslog on port 5140
-ports=5140/udp|5140/tcp
-```
-
-We then can enable this new application
-
-```bash
-sudo ufw app update Vector-Syslog
-sudo ufw app list
-sudo ufw allow Vector-Syslog
-```
-
 # Create and Setup Required Folders
 ## Create Stack Folders
 
@@ -76,56 +49,72 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for vlagent
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/vlagent-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-data
 ```
 
 ## Create needed folders for vmagent
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/vmagent-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-data
 ```
 
 ## Create needed folders for vector
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/vector-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-data
 ```
 
-## Create needed folders for cadvisor
+## Open the firewall for vector
+
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
 
 ```bash
-mkdir -p /opt/docker/volumes/$projectName/cadvisor-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/cadvisor-*
+sudo ufw allow from <internal-subnet> to any port 5140 proto tcp comment 'Vector syslog'
+sudo ufw allow from <internal-subnet> to any port 5140 proto udp comment 'Vector syslog'
 ```
 
 ## Create needed folders for victoriametrics
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/victoriametrics-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/victoriametrics-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/victoriametrics-data
 ```
 
 ## Create needed folders for victorialogs
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/victorialogs-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/victorialogs-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/victorialogs-data
 ```
 
 ## Create needed folders for victoriatraces
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/victoriatraces-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/victoriatraces-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/victoriatraces-data
 ```
 
 ## Create needed folders for grafana
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/grafana-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/grafana-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/grafana-data
 ```

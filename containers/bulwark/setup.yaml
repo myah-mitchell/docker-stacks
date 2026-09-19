@@ -1,0 +1,18 @@
+# Host setup for bulwark. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - path: bulwark-data
+    owner: 101001
+    group: 101001
+  - path: bulwark-data/settings
+    owner: 101001
+    group: 101001
+  - path: bulwark-data/admin
+    owner: 101001
+    group: 101001
+  - path: bulwark-data/admin-state
+    owner: 101001
+    group: 101001
+  - path: bulwark-data/telemetry
+    owner: 101001
+    group: 101001

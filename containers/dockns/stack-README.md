@@ -31,11 +31,3 @@ dockns drives two DNS providers per VM:
 Set `DOCKNS_CF_API_KEY`/`DOCKNS_CF_ACCOUNT_ID`/`DOCKNS_CF_ZONE_ID`/`DOCKNS_WAN_IP`,
 see [dockns' Cloudflare provider docs](https://codeberg.org/BrenekH/DockNS/src/branch/main/docs/name-servers/cloudflare.md)
 for what each value is and where to find it in the Cloudflare dashboard.
-
-# Create and Setup Required Folders
-## Create needed folders for dockns
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/dockns-data
-sudo chown 100000:100000 /opt/docker/volumes/$projectName/dockns-*
-```

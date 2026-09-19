@@ -2,13 +2,6 @@
 ## Prerequisites for using mailpit
 
 # Create and Setup Required Folders
-## Create needed folders for mailpit
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/mailpit-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailpit-data
-```
-
 ## Reading the copies
 
 Browse to `https://${MAILPIT_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`. The UI is behind `chain-authentik@file` by default, because the copies include password reset and sign-in links.

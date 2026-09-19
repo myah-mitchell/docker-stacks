@@ -18,7 +18,9 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for technitium
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/technitium-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/technitium-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/technitium-data
 ```

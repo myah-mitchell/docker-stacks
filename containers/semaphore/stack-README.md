@@ -4,12 +4,7 @@
 # Create and Setup Required Folders
 ## Create needed folders for semaphore
 
-```bash
-mkdir -p /opt/docker/volumes/$projectName/semaphore-data
-mkdir -p /opt/docker/volumes/$projectName/semaphore-config
-mkdir -p /opt/docker/volumes/$projectName/semaphore-tmp
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/semaphore-*
-```
+Semaphore runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.
 
 ## Generate the cookie/encryption secrets once
 

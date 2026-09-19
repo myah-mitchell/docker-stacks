@@ -4,21 +4,7 @@
 # Create and Setup Required Folders
 ## Create needed folders for cloudflared
 
-```bash
-mkdir -p /opt/docker/volumes/$projectName/cloudflared-config
-mkdir -p /opt/docker/volumes/$projectName/cloudflared-secrets
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-secrets
-sudo chmod 700 /opt/docker/volumes/$projectName/cloudflared-secrets
-```
-
-Seed the ingress config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
-
-```bash
-sudo curl -fsSL -o /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
-  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/cloudflared/config/config.yml.example
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config/config.yml
-```
+The ingress config is copied from the tracked example only when it is not already there, so a filled-in `config.yml` is never overwritten.
 
 The tunnel credentials file goes in `cloudflared-secrets/`, covered below, so the config directory never needs to hold anything sensitive. Both live on the host rather than in the repo checkout because Periphery re-clones over its run directory, which would take any file written inside it along with it.
 

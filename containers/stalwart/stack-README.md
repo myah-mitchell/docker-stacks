@@ -6,22 +6,7 @@ A Stalwart Enterprise license for the domain, stored in a Komodo Secret named `S
 # Create and Setup Required Folders
 ## Create needed folders for stalwart
 
-```bash
-mkdir -p /opt/docker/volumes/$projectName/stalwart-config
-mkdir -p /opt/docker/volumes/$projectName/stalwart-data
-sudo chown 102000:102000 /opt/docker/volumes/$projectName/stalwart-*
-```
-
 Stalwart runs as the image's own UID 2000, so its directories belong to host UID `102000` rather than `101000`.
-
-## Open the mail ports
-
-```bash
-sudo ufw allow 25/tcp comment 'Stalwart SMTP'
-sudo ufw allow 465/tcp comment 'Stalwart submissions'
-sudo ufw allow 587/tcp comment 'Stalwart submission'
-sudo ufw allow 993/tcp comment 'Stalwart IMAPS'
-```
 
 ## First start
 

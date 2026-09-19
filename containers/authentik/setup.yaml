@@ -1,0 +1,12 @@
+# Host setup for authentik. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - path: authentik-media
+    owner: 101000
+    group: 101000
+  - path: authentik-templates
+    owner: 101000
+    group: 101000
+  - path: authentik-certs
+    owner: 101000
+    group: 101000

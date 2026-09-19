@@ -4,11 +4,4 @@
 # Create and Setup Required Folders
 ## Create needed folders for traefik
 
-```bash
-mkdir -p /opt/docker/logs/$projectName/traefik
-sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
-
-mkdir -p /opt/docker/volumes/$projectName/traefik-certs
-mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
-```
+The log folder is mode 755 rather than group-writable. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so it would exit 1 every five minutes and access.log would grow forever.

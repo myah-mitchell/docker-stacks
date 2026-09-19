@@ -11,6 +11,7 @@ docker-stacks
     * komodo.env - _Only contains items specific to this container_
     * README.md - _Container-level documentation (not used by build.py)_
     * stack-README.md - _Sections to merge into stack README.md files_
+    * setup.yaml - _Optional host setup: folders, seeded config files, and firewall ports. Rendered into stack README.md files and applied by the ansible `stacks` role_
     * testing.env - _Container-specific non-sensitive testing defaults in KEY: VALUE format_
 * **stacks** - _Folder containing all stacks_
   * **\<stackName>** - _Friendly name of stack_
@@ -19,9 +20,10 @@ docker-stacks
     * komodo.env - _This file is created by build.py_
     * .env - _This file is created by build.py (gitignored, for local testing)_
     * README.md - _This file is created by build.py_
+    * setup.yaml - _This file is created by build.py from the setup.yaml of each container the stack uses. Read by the ansible `stacks` role_
 * **scripts**
     * project-layout.md - _This file_
-    * build.py - _Script that will build/update the komodo.env, README.md, and testing .env files for each stack._
+    * build.py - _Script that will build/update the komodo.env, README.md, setup.yaml, and testing .env files for each stack._
     * base-komodo.env - _All sections in this file should be included in every stack's komodo.env_
     * base-README.md - _All sections in this file should be included in every stack's README.md_
     * base-testing.env - _Non-sensitive testing defaults safe to commit (KEY=VALUE format)_
@@ -218,3 +220,50 @@ The .env file is a standard Docker Compose environment file using `KEY=VALUE` fo
 - Stack-only H1 headings (manually created) persist across rebuilds.
 - Container _stack-README.md_ files should ideally use H1 headings that exist in _base-README.md_. If a container introduces a unique H1 and is later removed from the stack, that H1 will not be cleaned up on the next build since it is would no longer be treated as shared.
 - _base-README.md_ is always applied as a source, so global README content can be updated centrally and will propagate to all stacks on the next build.
+
+## setup.yaml
+
+A container's _setup.yaml_ lists what a host needs before that container's first deploy. It is the single source for those steps: build.py renders it into the manual commands in every stack README that uses the container, and the ansible `stacks` role applies it to a host.
+
+```yaml
+folders:
+  - path: mailrise-secrets
+    owner: 101000
+    group: 101000
+    mode: "0700"
+files:
+  - path: mailrise-secrets/mailrise.conf
+    source: containers/mailrise/config/mailrise.conf.example
+    owner: 101000
+    group: 101000
+    mode: "0600"
+firewall:
+  - port: 8025
+    proto: tcp
+    allow_from: internal
+    comment: Mailrise SMTP
+```
+
+| Key | Meaning |
+| --- | --- |
+| `folders[].path` | Folder under the root below, inside `<projectName>/`. Created if missing, never recursively re-owned |
+| `folders[].root` | Optional, `volumes` (the default) for `${DOCKER_VOLUMES}` or `logs` for `${DOCKER_LOGS}` |
+| `folders[].owner`, `group` | Numeric host IDs. A container's own UID 1000 is `101000` under userns-remap |
+| `folders[].mode` | Optional, a quoted octal string such as `"0700"` |
+| `files[].path` | File under `${DOCKER_VOLUMES}/<projectName>/`, inside one of the `volumes` folders above |
+| `files[].source` | Repo-relative file to copy there. Copied only when the destination does not exist yet |
+| `files[].owner`, `group`, `mode` | As for folders, with `mode` optional |
+| `firewall[].port`, `proto` | Port number, and `tcp` or `udp` |
+| `firewall[].allow_from` | `internal`, scoped to the internal subnet, or `any` |
+| `firewall[].comment` | UFW rule comment |
+| `services` | Optional on any entry, a list of service names. The entry applies only to stacks that run one of them, such as `redis-public` but not `redis-replica` |
+
+build.py rejects unknown keys, missing keys, paths containing `..`, and sources that do not exist. It needs PyYAML to read these files.
+
+In a stack README, the rendered commands go under `# Create and Setup Required Folders`, as `## Create needed folders for <imageName>` and `## Open the firewall for <imageName>`. A container's own _stack-README.md_ can use either heading to add prose, which follows the generated commands.
+
+Each stack's own logs and volumes folders come from _base-README.md_, and the `stacks` role creates those too.
+
+build.py also writes a stack's _setup.yaml_, next to its _README.md_. It holds the stack's project name and the entries from every container the stack uses, following `include`, with `services` already applied and dropped. Entries two containers share, such as `postgres-data`, appear once, and build.py stops if the two disagree on owner, group, mode, or source.
+
+The `stacks` role reads only this generated file, from a docker-stacks checkout on the control node. CI fails when it is out of date, so commit it together with the container change that produced it.

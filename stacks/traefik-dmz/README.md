@@ -14,53 +14,74 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for traefik
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/logs/$projectName/traefik
 sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
-
+sudo chmod 755 /opt/docker/logs/$projectName/traefik
 mkdir -p /opt/docker/volumes/$projectName/traefik-certs
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-certs
 mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-plugins
+```
+
+The log folder is mode 755 rather than group-writable. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so it would exit 1 every five minutes and access.log would grow forever.
+
+## Open the firewall for traefik
+
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
+```bash
+sudo ufw allow 80/tcp comment 'Traefik HTTP'
+sudo ufw allow 443/tcp comment 'Traefik HTTPS'
+sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 ```
 
 ## Create needed folders for vmagent
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/vmagent-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-data
 ```
 
 ## Create needed folders for vlagent
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/vlagent-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-data
 ```
 
 ## Create needed folders for vector
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/vector-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-*
+sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-data
 ```
 
 ## Create needed folders for cloudflared
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/cloudflared-config
-mkdir -p /opt/docker/volumes/$projectName/cloudflared-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config
+mkdir -p /opt/docker/volumes/$projectName/cloudflared-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-secrets
 sudo chmod 700 /opt/docker/volumes/$projectName/cloudflared-secrets
-```
-
-Seed the ingress config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
-
-```bash
-sudo curl -fsSL -o /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
+sudo test -e /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
+  || sudo curl -fsSL -o /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
   https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/cloudflared/config/config.yml.example
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config/config.yml
 ```
+
+The ingress config is copied from the tracked example only when it is not already there, so a filled-in `config.yml` is never overwritten.
 
 The tunnel credentials file goes in `cloudflared-secrets/`, covered below, so the config directory never needs to hold anything sensitive. Both live on the host rather than in the repo checkout because Periphery re-clones over its run directory, which would take any file written inside it along with it.
 

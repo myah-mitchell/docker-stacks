@@ -1,0 +1,20 @@
+# Host setup for mailrise. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - path: mailrise-secrets
+    owner: 101000
+    group: 101000
+    mode: "0700"
+files:
+  # Holds the ntfy token once filled in, hence 0600.
+  - path: mailrise-secrets/mailrise.conf
+    source: containers/mailrise/config/mailrise.conf.example
+    owner: 101000
+    group: 101000
+    mode: "0600"
+firewall:
+  # The default MAILRISE_SMTP_PORT. Change both together.
+  - port: 8025
+    proto: tcp
+    allow_from: internal
+    comment: Mailrise SMTP

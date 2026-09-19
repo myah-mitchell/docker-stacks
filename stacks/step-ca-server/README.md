@@ -14,10 +14,12 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for step-ca
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/step-ca-data
-mkdir -p /opt/docker/volumes/$projectName/step-ca-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-data
+mkdir -p /opt/docker/volumes/$projectName/step-ca-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets
 sudo chmod 700 /opt/docker/volumes/$projectName/step-ca-secrets
 ```

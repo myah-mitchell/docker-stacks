@@ -1,0 +1,26 @@
+# Host setup for imageName. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+#
+# Delete this file if the container needs no folders, config files, or ports.
+#
+# folders:
+#   - root: logs              # optional, volumes (the default) or logs
+#     path: imageName
+#     owner: 101000           # host ID: container UID 1000 under userns-remap
+#     group: 101000
+#   - path: imageName-data
+#     owner: 101000
+#     group: 101000
+#     mode: "0700"            # optional, quoted octal
+# files:
+#   - path: imageName-data/config.yml
+#     source: containers/imageName/config/config.yml.example
+#     owner: 101000
+#     group: 101000
+#     mode: "0600"
+# firewall:
+#   - port: 8080
+#     proto: tcp              # tcp or udp
+#     allow_from: internal    # internal or any
+#     comment: imageName
+#     services: [imageName]   # optional on any entry: only for these variants

@@ -1,16 +1,9 @@
 # Initial Deployment Requirements
 ## Prerequisites for using komodo
 
-Seed the config before the first start. Docker silently creates an empty directory in place of a missing bind-mount file, which makes Komodo fail at startup.
+The generated folder commands for komodo seed `core.config.toml` from the tracked example before the first start, and only when it is not already there. Docker silently creates an empty directory in place of a missing bind-mount file, which makes Komodo fail at startup.
 
-```bash
-sudo cp config/core.config.toml.example \
-        /opt/docker/volumes/$projectName/komodo-secrets/core.config.toml
-sudo chmod 600 /opt/docker/volumes/$projectName/komodo-secrets/core.config.toml
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-secrets/core.config.toml
-```
-
-It lives on the host rather than in the checkout so the checkout stays disposable, the same rule every other stack follows. Unlike the rest, km01's checkout is one you cloned by hand and Komodo never re-clones it, so the `cp` above can read straight out of it.
+It lives on the host rather than in the checkout so the checkout stays disposable, the same rule every other stack follows.
 
 Leave the copy as it is for this repo. docker-stacks is public, so Komodo needs no `[[git_provider]]` credential to clone it.
 
@@ -30,15 +23,5 @@ The checkout only ever holds the `.example`. The filled-in copy stays under `/op
 
 # Create and Setup Required Folders
 ## Create needed folders for komodo
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/komodo-keys
-mkdir -p /opt/docker/volumes/$projectName/komodo-backups
-mkdir -p /opt/docker/volumes/$projectName/komodo-sync
-mkdir -p /opt/docker/volumes/$projectName/komodo-cache
-mkdir -p /opt/docker/volumes/$projectName/komodo-secrets
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-*
-sudo chmod 700 /opt/docker/volumes/$projectName/komodo-secrets
-```
 
 `komodo-keys` holds the Ed25519 keypair Core generates on first boot. Losing that volume breaks trust with every Periphery agent in the fleet, and each one then has to be re-onboarded by hand. Back it up like the database directories, not like the disposable `komodo-cache`.

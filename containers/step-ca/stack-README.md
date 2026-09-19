@@ -4,14 +4,6 @@
 # Create and Setup Required Folders
 ## Create needed folders for step-ca
 
-```bash
-mkdir -p /opt/docker/volumes/$projectName/step-ca-data
-mkdir -p /opt/docker/volumes/$projectName/step-ca-secrets
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/step-ca-secrets
-sudo chmod 700 /opt/docker/volumes/$projectName/step-ca-secrets
-```
-
 The service runs as `user: ${PUID:-1000}`, and Docker here is configured with `userns-remap: default`, so the container's UID 1000 is host UID 101000. Owning this folder as `1000:1000` gives it to your own login account instead, and step-ca cannot then write to `/home/step`.
 
 ## Generate the CA password once

@@ -4,19 +4,7 @@
 # Create and Setup Required Folders
 ## Create needed folders for mailrise
 
-```bash
-mkdir -p /opt/docker/volumes/$projectName/mailrise-secrets
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
-```
-
-Seed the config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
-
-```bash
-sudo curl -fsSL -o /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
-  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/mailrise/config/mailrise.conf.example
-sudo chmod 600 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
-```
+The config is copied from the tracked example only when it is not already there, so a filled-in token is never overwritten.
 
 Fill in the `token` value with the ntfy publish-only token created in ntfy's own post-deploy step.
 

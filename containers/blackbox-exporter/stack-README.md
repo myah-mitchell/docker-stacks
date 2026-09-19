@@ -4,18 +4,7 @@
 # Create and Setup Required Folders
 ## Create needed folders for blackbox-exporter
 
-```bash
-mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
-```
-
-Seed the config from the tracked example, which this repo serves publicly, so no checkout has to exist yet:
-
-```bash
-sudo curl -fsSL -o /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
-  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/blackbox-exporter/config/blackbox.yml.example
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml
-```
+The config is copied from the tracked example only when it is not already there, so local edits are never overwritten.
 
 Edit that copy to add or adjust probe modules. It is usable unchanged, defining probe modules and nothing host-specific.
 

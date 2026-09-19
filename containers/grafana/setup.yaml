@@ -1,0 +1,6 @@
+# Host setup for grafana. scripts/build.py renders it into each stack README, and
+# the ansible stacks role applies it. See scripts/project-layout.md.
+folders:
+  - path: grafana-data
+    owner: 101000
+    group: 101000

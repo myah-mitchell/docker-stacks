@@ -23,15 +23,20 @@ sudo chown $USER:101000 /opt/docker/volumes/$projectName
 
 ## Create needed folders for stalwart
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
 mkdir -p /opt/docker/volumes/$projectName/stalwart-config
+sudo chown 102000:102000 /opt/docker/volumes/$projectName/stalwart-config
 mkdir -p /opt/docker/volumes/$projectName/stalwart-data
-sudo chown 102000:102000 /opt/docker/volumes/$projectName/stalwart-*
+sudo chown 102000:102000 /opt/docker/volumes/$projectName/stalwart-data
 ```
 
 Stalwart runs as the image's own UID 2000, so its directories belong to host UID `102000` rather than `101000`.
 
-## Open the mail ports
+## Open the firewall for stalwart
+
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
 
 ```bash
 sudo ufw allow 25/tcp comment 'Stalwart SMTP'
@@ -67,12 +72,19 @@ Never add either variable to the stack itself.
 
 ## Create needed folders for bulwark
 
+Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+
 ```bash
+mkdir -p /opt/docker/volumes/$projectName/bulwark-data
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data/settings
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data/settings
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data/admin
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data/admin
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data/admin-state
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data/admin-state
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data/telemetry
-sudo chown -R 101001:101001 /opt/docker/volumes/$projectName/bulwark-data
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data/telemetry
 ```
 
 Bulwark runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.

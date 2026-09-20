@@ -19,13 +19,14 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Placeholders
 
-The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+The first seven are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists five more that are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | `ci01` |
 | `<cores>` | `4` |
 | `<memory>` | `8192` |
+| `<data-size>` | `100` |
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for ci01, on the internal VLAN |
 | `<gateway-ip>` | The internal VLAN's gateway |
@@ -34,7 +35,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 Follow [Provisioning a VM](provision-a-vm.md), six steps ending with ci01 connected and healthy under *Resources > Servers*.
 
-Four cores and 8 GB is a floor rather than a target. Semaphore, Postgres, and postgres-backup are light on their own, but victoriametrics-server adds twelve more services, including Grafana and three VictoriaMetrics databases. Both metrics and log retention grow on disk, so watch `/opt/docker/volumes/victoriametrics` once it exists.
+Four cores and 8 GB is a floor rather than a target. Semaphore, Postgres, and postgres-backup are light on their own, but victoriametrics-server adds twelve more services, including Grafana and three VictoriaMetrics databases. Both metrics and log retention grow on disk, so watch `/opt/docker/volumes/victoriametrics` once it exists. That is why ci01 gets a 100 GB data disk. It is thin provisioned, so the pool only holds what those services actually write.
 
 ci01 sits on the internal VLAN. It is not in the DMZ.
 

@@ -47,13 +47,14 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Placeholders
 
-The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+The first seven are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists five more that are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | `mx01` |
 | `<cores>` | `2` |
 | `<memory>` | `4096` |
+| `<data-size>` | `40` |
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for mx01, on the DMZ VLAN |
 | `<gateway-ip>` | The DMZ VLAN's gateway |
@@ -73,7 +74,7 @@ Follow [Provisioning a VM](provision-a-vm.md), six steps ending with mx01 connec
 > [!IMPORTANT]
 > At step 2 there, set the VLAN tag to the DMZ one, and take both `<ip>` and `<gateway-ip>` from the DMZ network, the same as bh01.
 
-Two cores and 4 GB is enough for a household's mail. Stalwart is a single binary with an embedded store, and Bulwark is one Node process.
+Two cores and 4 GB is enough for a household's mail. Stalwart is a single binary with an embedded store, and Bulwark is one Node process. The store holds the mail itself, so this is the one data disk that grows with use. Start at 40 GB and grow it as the mailboxes fill.
 
 mx01 sits in the DMZ because, unlike every other host, it takes connections straight from the internet on its mail ports.
 

@@ -28,13 +28,14 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Placeholders
 
-The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+The first seven are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists five more that are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | `pk01` |
 | `<cores>` | `2` |
 | `<memory>` | `2048` |
+| `<data-size>` | `10` |
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for pk01, on the internal VLAN |
 | `<gateway-ip>` | The internal VLAN's gateway |
@@ -43,7 +44,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 Follow [Provisioning a VM](provision-a-vm.md), six steps ending with pk01 connected and healthy under *Resources > Servers*.
 
-Two cores and 2 GB because there is one service and no database, so this is the smallest VM in the fleet.
+Two cores and 2 GB because there is one service and no database, so this is the smallest VM in the fleet. Its data disk is 10 GB for the same reason: the CA's whole state is its configuration, its record of issued certificates, and the intermediate key.
 
 pk01 is internal-only and mesh-only. It is never published through bh01's tunnel. A CA that issues for the internal zone has no reason to answer from the internet.
 

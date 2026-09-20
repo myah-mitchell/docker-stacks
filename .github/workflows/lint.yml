@@ -44,8 +44,11 @@ jobs:
             echo "::group::${dir}"
             if [ -f "${dir}/.env" ]; then
               docker compose --env-file "${dir}/.env" -f "$f" config -q || status=1
+            elif [ "$dir" = "stacks/template" ]; then
+              echo "stacks/template references no containers, nothing to validate"
             else
-              echo "No .env generated for ${dir} (template/no containers referenced) — skipping"
+              echo "::error::No .env generated for ${dir}. build.py should emit one for every stack that uses containers."
+              status=1
             fi
             echo "::endgroup::"
           done

@@ -67,7 +67,7 @@ x-environment: &default_environment
 ###############################################################################
 
 services:
-  .traefik:
+  .traefik: &traefik_service
     <<: [*limits, *restart, *security, *user, *logging]
     image: traefik:latest
     hostname: ${PROJECT_NAME}-${TRAEFIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
@@ -114,42 +114,51 @@ services:
       - --entrypoints.http.http.redirections.entrypoint.to=https
       - --entrypoints.http.http.redirections.entrypoint.scheme=https
         # Trusted IPs (Cloudflare + Local)
-      - --entrypoints.http.forwardedheaders.trustedips=
-          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
-          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+      - "--entrypoints.http.forwardedheaders.trustedips=\
+          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,\
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
           # Middlewares
-      - --entrypoints.http.http.middlewares=
-          middlewares-rate-limit@file,
-          middlewares-secure-headers@file
+      - "--entrypoints.http.http.middlewares=\
+          middlewares-rate-limit@file,\
+          middlewares-secure-headers@file"
           #middlewares-bouncer@file
 
       # HTTPS
       - --entrypoints.https.address=:443
       - --entrypoints.https.asdefault=true
-      - --entrypoints.https.http.tls.options=tls-opts@file
+      # tls-opts@file sets sniStrict, which refuses any handshake whose SNI has
+      # no matching real certificate. A stack with no cert resolver sets
+      # TRAEFIK_TLS_OPTIONS to tls-opts-selfsigned@file instead: the same options
+      # with sniStrict off, so the generated default certificate still answers.
+      - --entrypoints.https.http.tls.options=${TRAEFIK_TLS_OPTIONS:-tls-opts@file}
       #- --entrypoints.https.http.tls.certresolver=letsencrypt
       #- --entrypoints.https.http.tls.domains[0].main=${DOMAIN_NAME}
       #- --entrypoints.https.http.tls.domains[0].sans=*.${DOMAIN_NAME},*.${SUB_DOMAIN_NAME}${DOMAIN_NAME},*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
         # Trusted IPs (Cloudflare + Local)
-      - --entrypoints.https.forwardedheaders.trustedips=
-          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
-          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+      - "--entrypoints.https.forwardedheaders.trustedips=\
+          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,\
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
           # Middlewares
-      - --entrypoints.https.http.middlewares=
-          middlewares-rate-limit@file,
-          middlewares-secure-headers@file,
-          middlewares-compress@file
+      - "--entrypoints.https.http.middlewares=\
+          middlewares-rate-limit@file,\
+          middlewares-secure-headers@file,\
+          middlewares-compress@file"
           #middlewares-bouncer@file,
 
       # Dashboard
       - --entrypoints.dashboard.address=:8443
-      #- --entrypoints.dashboard.http.tls.options=tls-opts@file
-      - --entrypoints.dashboard.http.tls.certresolver=letsencrypt
+      - --entrypoints.dashboard.http.tls.options=${TRAEFIK_TLS_OPTIONS:-tls-opts@file}
+      # Blank TRAEFIK_CERT_RESOLVER leaves this argument's value empty, which
+      # Traefik reads as no resolver at all: TLS stays on for the entrypoint and
+      # the default certificate answers. Note the single dash, so a key that is
+      # present but blank keeps its blank value. The two domains below are only
+      # read by a resolver, so they are inert when there is none.
+      - --entrypoints.dashboard.http.tls.certresolver=${TRAEFIK_CERT_RESOLVER-letsencrypt}
       - --entrypoints.dashboard.http.tls.domains[0].main=${DOMAIN_NAME}
       - --entrypoints.dashboard.http.tls.domains[0].sans=*.${DOMAIN_NAME},*.${SUB_DOMAIN_NAME}${DOMAIN_NAME},*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}
           # Trusted IPs (Local)
-      - --entrypoints.dashboard.forwardedheaders.trustedips=
-          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
+      - "--entrypoints.dashboard.forwardedheaders.trustedips=\
+          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
 
       ################################################################
       # Healthcheck / Ping
@@ -177,12 +186,6 @@ services:
       - --providers.docker.exposedbydefault=false
       - --providers.docker.endpoint=tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
 
-      # Redis provider for the routers traefik-kop publishes from other hosts.
-      # Both lines expand to an empty argument unless TRAEFIK_REDIS_ENDPOINTS is
-      # set, which build.py only does for stacks running a Redis master or replica.
-      - ${TRAEFIK_REDIS_ENDPOINTS:+--providers.redis.endpoints=${TRAEFIK_REDIS_ENDPOINTS}}
-      - ${TRAEFIK_REDIS_ENDPOINTS:+--providers.redis.password=${REDIS_PASSWORD}}
-
       ################################################################
       # Plugins
       ################################################################
@@ -193,6 +196,10 @@ services:
       ################################################################
       # Certificates Resolvers (ACME)
       ################################################################
+      # Defined even when nothing points at it. Traefik only requires a storage
+      # location to accept a resolver, and a resolver that no entrypoint and no
+      # certificate store names is never asked for a certificate, so a stack with
+      # a blank TRAEFIK_CERT_RESOLVER and a blank LE_EMAIL carries it harmlessly.
       - --certificatesresolvers.letsencrypt.acme.email=${LE_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/certs/acme.json
       # Uncomment the following line to use LetsEncrypt Staging
@@ -202,9 +209,20 @@ services:
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
 
       ################################################################
-      # Extra Commands from Env Vars
+      # Optional arguments, last on purpose
       ################################################################
-      - ${TRAEFIK_EXTRA_COMMAND:-}
+      # Traefik stops reading its arguments at the first empty one and silently
+      # ignores every argument after it, so anything that can expand to nothing
+      # belongs at the end of this list. TRAEFIK_EXTRA_COMMAND falls back to a
+      # repeat of --ping=true above rather than to nothing, so that leaving it
+      # blank cannot swallow the two Redis arguments behind it.
+      - ${TRAEFIK_EXTRA_COMMAND:---ping=true}
+
+      # Redis provider for the routers traefik-kop publishes from other hosts.
+      # Both lines disappear unless TRAEFIK_REDIS_ENDPOINTS is set, which only the
+      # stacks running a Redis master or replica do.
+      - ${TRAEFIK_REDIS_ENDPOINTS:+--providers.redis.endpoints=${TRAEFIK_REDIS_ENDPOINTS}}
+      - ${TRAEFIK_REDIS_ENDPOINTS:+--providers.redis.password=${REDIS_PASSWORD}}
     ports:
       - "80:80"
       - "443:443"
@@ -235,7 +253,11 @@ services:
       - "traefik.http.routers.traefik.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"
 
       ## Default TLS Cert
-      - "traefik.tls.stores.default.defaultGeneratedCert.resolver=letsencrypt"
+      # Blank TRAEFIK_CERT_RESOLVER leaves this empty, and an empty resolver name
+      # matches no resolver, so Traefik never tries to mint this certificate and
+      # falls back to its own self-signed one. The two domain hints below are
+      # only read once a resolver claims the store.
+      - "traefik.tls.stores.default.defaultGeneratedCert.resolver=${TRAEFIK_CERT_RESOLVER-letsencrypt}"
       - "traefik.tls.stores.default.defaultGeneratedCert.domain.main=$DOMAIN_NAME"
       - "traefik.tls.stores.default.defaultGeneratedCert.domain.sans=*.$DOMAIN_NAME,*.$SUB_DOMAIN_NAME$DOMAIN_NAME,*.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
 
@@ -252,3 +274,10 @@ services:
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       <<: *default_healthcheck
+
+  # Same service, deployed by traefik-bootstrap. It differs only in the values
+  # build.py puts in that stack's komodo.env: self-signed TLS options, no cert
+  # resolver, and chain-no-auth@file for the dashboard. See
+  # docs/traefik-bootstrap.md.
+  .traefik-bootstrap:
+    <<: *traefik_service

@@ -1,6 +1,6 @@
 # traefik-bootstrap
 
-traefik-bootstrap is a temporary, per-VM Traefik for the window before pk01 and id01 exist. Deploy it on a VM, use it, and tear it down once that VM's real system-agent stack is ready. It is not meant to be long-lived.
+traefik-bootstrap is a temporary, per-VM Traefik for the window before pk01 and id01 exist. Deploy it on a VM, use it, and tear it down once that VM's real [traefik-agent](traefik-agent-setup.md) stack is ready. It is not meant to be long-lived.
 
 Read [Conventions](conventions.md) first. This page assumes its naming and secrets rules.
 
@@ -15,9 +15,19 @@ traefik-bootstrap is a real Traefik on the real `proxy` network, serving real ho
 | ACME or step-ca cert resolver | Traefik's own auto-generated self-signed certificate |
 | `chain-authentik@file` | `chain-no-auth@file`, which is rate-limit, secure-headers, and compress with no Authentik dependency |
 
-Its `compose.yaml` overrides the base Traefik service's `command` wholesale rather than diffing it, because Compose `extends` replaces list keys instead of merging them. The list stays as close to the base as it can. It drops the four ACME resolver directives and the three that ask for a real certificate on the dashboard entrypoint, and it makes one substitution.
+Its `compose.yaml` runs the same Traefik service as every other stack, with no `command` or `labels` override of its own. Both substitutions come from three variables:
 
-That substitution is the TLS options, and it is the part that makes this stack work at all. The base service uses `tls-opts@file`, which sets `sniStrict: true` and rejects any handshake whose SNI has no matching real certificate. This stack has no resolver, so its self-signed default never matches the hostname being asked for, and `sniStrict` would refuse every request. It uses `tls-opts-selfsigned@file` instead: the same options with `sniStrict` off.
+| Variable | Here | Everywhere else |
+| --- | --- | --- |
+| `TRAEFIK_TLS_OPTIONS` | `tls-opts-selfsigned@file` | `tls-opts@file` |
+| `TRAEFIK_CERT_RESOLVER` | blank | `letsencrypt` |
+| `TRAEFIK_AUTH_CHAIN` | `chain-no-auth@file` | blank, which takes `chain-authentik@file` |
+
+`build.py` fills those three from whichever `komodo.env` block matches the service variant a stack extends: `.traefik-bootstrap` here, `.traefik` everywhere else. The two variants are the same service under two names, so there is no second copy of the command list to keep in step.
+
+The TLS options are the part that makes this stack work at all. `tls-opts@file` sets `sniStrict: true` and rejects any handshake whose SNI has no matching real certificate. This stack has no resolver, so its self-signed default never matches the hostname being asked for, and `sniStrict` would refuse every request. `tls-opts-selfsigned@file` is the same options with `sniStrict` off.
+
+A blank `TRAEFIK_CERT_RESOLVER` reaches Traefik as an empty resolver name on the dashboard entrypoint and on the default certificate store. An empty name matches no resolver, so neither ever asks for a certificate and both fall back to the self-signed one. The `letsencrypt` resolver is still defined, because Traefik accepts a resolver it never uses as long as it has a storage location, and nothing here points at it.
 
 Every other stack picks up its auth chain from `${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}`, so deploying a stack behind this one means setting that single variable to `chain-no-auth@file`. Nothing else about that stack changes.
 
@@ -35,7 +45,7 @@ The ansible `stacks` role creates these from `stacks/traefik-bootstrap/setup.yam
 
 On ci01, which deploys this stack before Semaphore exists, follow [Run the stacks role without Semaphore](provision-a-vm.md#run-the-stacks-role-without-semaphore) with `<stack>` set to `traefik-bootstrap`.
 
-On any later host, add `traefik-bootstrap` to its `docker_stacks` in ansible-private, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private), and load the change into Semaphore's Inventory. Then run the **provision-stacks** Template from [step 12](semaphore-setup.md#create-the-provision-stacks-template) with *Target* answered with that host.
+On any later host, you do not list this stack at all. Run the **provision-stacks** Template from [step 12](semaphore-setup.md#create-the-provision-stacks-template) with *Target* answered with that host and *Bootstrap* answered `true`. The role then prepares this stack in place of the ones it leaves out, on any host where something still needs a Traefik and nothing left provides one.
 
 Check the result on the target VM:
 
@@ -146,10 +156,12 @@ Seven keys come across in the paste that this stack has no working use for. Clea
 | `CF_API_EMAIL`, `CF_DNS_API_TOKEN` | They reach the Traefik container, but there is no ACME resolver to use them |
 | `AUTHENTIK_HOST` | Also reaches the container, but nothing here forwards auth to Authentik |
 | `CROWDSEC_LAPI_KEY`, `CROWDSEC_LAPI_HOST` | The base Traefik service keeps its CrowdSec lines commented out |
-| `TRAEFIK_EXTRA_COMMAND` | Sits at the end of the command list and expands to nothing unless you set it |
-| `LE_EMAIL` | Only the ACME resolver reads it, and this stack's command list leaves the resolver out |
+| `TRAEFIK_EXTRA_COMMAND` | An escape hatch for one extra Traefik argument, and blank is the normal answer |
+| `LE_EMAIL` | Only the ACME resolver reads it, and nothing here points at that resolver |
 
-The first three are worth clearing rather than ignoring. This stack overrides the base service's `command` and `labels` but not its `environment`, so all three are still passed into the container.
+Leave `TRAEFIK_TLS_OPTIONS`, `TRAEFIK_CERT_RESOLVER`, and `TRAEFIK_AUTH_CHAIN` exactly as pasted. They already carry this stack's values, including the deliberately blank resolver, and they are what make it a bootstrap Traefik rather than a real one.
+
+The first three keys in the table are worth clearing rather than ignoring: they are all still passed into the container.
 
 `AUTHENTIK_HOST` and `CROWDSEC_LAPI_HOST` are the two exceptions to leaving `[[GLOBAL_...]]` alone. They arrive as references that step 14 does not create, so clearing them is what keeps an unresolved `[[...]]` string out of the container's environment.
 
@@ -168,7 +180,7 @@ logrotate
 ```
 
 > [!NOTE]
-> Omitting the cert-resolver directives entirely, rather than setting them blank, is expected to make Traefik fall back to its own self-signed certificate. That follows Traefik's documented behaviour, but this stack has not been run against a live Traefik yet. Check it first if the stack does not come up cleanly.
+> Naming no cert resolver, by leaving `TRAEFIK_CERT_RESOLVER` blank, is expected to make Traefik fall back to its own self-signed certificate. That follows Traefik's documented behaviour, but this stack has not been run against a live Traefik yet. Check it first if the stack does not come up cleanly.
 
 ## Putting a stack behind it
 
@@ -178,13 +190,13 @@ Then browse to the stack's normal hostname over HTTPS, for example `https://sema
 
 Your browser will warn about the certificate. That is expected: it is self-signed, not issued by a CA your browser trusts. Accept it and continue.
 
-The hostname does not change when system-agent replaces this stack later. Only the certificate and the auth chain do.
+The hostname does not change when traefik-agent replaces this stack later. Only the certificate and the auth chain do.
 
 ## Tearing it down
 
-Do this per VM, once that VM's system-agent stack is deployable for real. [system-agent](system-agent-setup.md) does it as its step 7, so follow that page rather than this section if you are deploying the replacement now.
+Do this per VM, once that VM's traefik-agent stack is deployable for real. [traefik-agent](traefik-agent-setup.md) does it as its step 6, so follow that page rather than this section if you are deploying the replacement now.
 
 Delete the VM's `traefik-bootstrap-<host>` Stack resource in Komodo, or `docker compose down` it directly on the VM. Then clear the `TRAEFIK_AUTH_CHAIN` override on every stack that was set to `chain-no-auth@file`, so each falls back to `chain-authentik@file` on its next deploy.
 
 > [!WARNING]
-> Do not run traefik-bootstrap and system-agent on the same VM at once. Both publish `:80`, `:443`, and `:8443` on the host and will fight over them.
+> Do not run traefik-bootstrap and traefik-agent on the same VM at once. Both publish `:80`, `:443`, and `:8443` on the host and will fight over them.

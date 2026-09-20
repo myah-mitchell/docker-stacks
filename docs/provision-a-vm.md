@@ -19,28 +19,31 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [5. Give the host an onboarding key](#5-give-the-host-an-onboarding-key)
 - [6. Confirm the host shows as a Komodo Server](#6-confirm-the-host-shows-as-a-komodo-server)
 - [Run the stacks role without Semaphore](#run-the-stacks-role-without-semaphore)
+- [Growing the persistent disk](#growing-the-persistent-disk)
 - [What's next](#whats-next)
 
 ## Prerequisites
 
 - km01 is finished, through step 14 of [km01 bootstrap](komodo-bootstrap.md). Its four containers are healthy, its admin account exists, its firewall allows inbound 9120, and its global `[[GLOBAL_...]]` Variables are created.
 - The real Komodo Core address and public key are committed and pushed in ansible-private's `group_vars/all/private.yml`. That is step 13 of the km01 runbook, and the new host reads both at first boot.
-- The `ubuntu-server-2604` cloud-init template exists on the target PVE host, the same one km01 was cloned from.
+- The cloud-init template exists on the target PVE host, the same one km01 was cloned from. Its name follows the Ubuntu version, so `ubuntu-server-2604` at 26.04.
 - You can open Komodo's UI when you reach step 5. The onboarding key is single-use and short-lived, so there is nothing to prepare ahead of time.
 
 ## Placeholders
 
-The first six are in the Placeholders table of the host runbook that sent you here. The last four are the same for every host.
+The first seven are in the Placeholders table of the host runbook that sent you here. The last five are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | The hostname being built, for example `ci01` |
 | `<cores>` | Core count, sized for the stacks that host carries |
 | `<memory>` | Memory in MB, sized the same way |
+| `<data-size>` | Size in GB of the disk that holds the host's stack data, sized the same way |
 | `<gateway-ip>` | Gateway for the VLAN that host sits on |
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for it, on the VLAN the host runbook names |
 | `<template-vmid>` | VMID of the cloud-init template, the same one km01 used |
+| `<vm-storage>` | The Proxmox storage that holds VM disks, `local-zfs` on a host built with the pve role's defaults |
 | `<km-ip>` | km01's address, from its own runbook |
 | `<same>` | The value cloud-init already used, recovered in step 5 rather than guessed |
 | `<ansible-private-url>` | Clone URL for ansible-private, from the ansible repo's README |
@@ -60,9 +63,14 @@ qm clone <template-vmid> <vmid> --name <host> --full
 ```bash
 qm set <vmid> --cores <cores> --memory <memory>
 qm set <vmid> --ipconfig0 ip=<ip>/24,gw=<gateway-ip>
+qm set <vmid> --scsi2 <vm-storage>:<data-size>,discard=on,ssd=1,iothread=1
 ```
 
-Size for every stack the host will end up carrying, rather than resizing later. Each host's runbook gives the numbers and says what drives them.
+The last line adds the disk the template does not carry. It is the persistent disk, mounted at `/srv/persist`, and it is the one disk on this VM worth keeping. Its `volumes` folder is bind mounted onto `/opt/docker/volumes`, where every stack keeps its state, its `logs` folder onto `/opt/docker/logs`, and its `host` folder holds what makes this VM itself: the SSH host keys and Periphery's private key. The template's own second disk becomes `/var/lib/docker` and holds only images, so it is thrown away with the VM. Add the data disk before the first boot: the ansible docker role stops when it cannot find it.
+
+Size cores and memory for every stack the host will end up carrying, rather than resizing later. Each host's runbook gives the numbers and says what drives them. The data disk is the exception. It is thin provisioned and grows while the VM runs, so start with the size the runbook gives, and see [Growing the persistent disk](#growing-the-persistent-disk) when it fills. Container log files now share that disk with the data, so a stack that logs heavily counts against the same size.
+
+Replacing an existing host instead of adding a new one? Skip the `--scsi2` line and follow [Rebuilding a VM](rebuild-a-vm.md), which moves the old host's data disk across.
 
 Confirm the VLAN tag the template carries is the one that host belongs on, and that `<gateway-ip>` is that VLAN's gateway. The template comes tagged for the internal VLAN, which is right for every host except bh01.
 
@@ -97,11 +105,27 @@ The docker role also creates the `proxy` network. Every deployable stack's `comp
 
 The last two lines check the monitoring role. On its first run it generates this host's own Node Exporter password and publishes a copy to `scrape-password` for the host's vmagent, so nothing needs running from Semaphore afterwards. A missing file means the role failed during cloud-init. Re-run it from the `/tmp/ansible` checkout, the same way step 5 re-runs the docker role but with `--tags monitoring` and no onboarding key, rather than finding out later as a missing `node` series in system-agent.
 
+Then check the two disks:
+
+```bash
+findmnt /var/lib/docker
+findmnt /srv/persist
+findmnt /opt/docker/volumes
+findmnt /opt/docker/logs
+sudo ls /srv/persist/host /srv/persist/host/komodo
+lsblk -D
+systemctl is-enabled fstrim.timer
+```
+
+Each `findmnt` should print a mount, and `/opt/docker/volumes` and `/opt/docker/logs` should show the `volumes` and `logs` folders of `/srv/persist` as their sources. The `host` folder should hold `ssh` and `komodo`. The `komodo` folder stays empty until step 5, when Periphery writes its key there. `lsblk -D` should show a nonzero `DISC-GRAN` on both disks, and the timer should print `enabled`. Discard and that timer are what hand deleted space back to the Proxmox pool. A VM without them keeps the space on the pool after its files are deleted, so a thin disk only ever grows.
+
+Docker will not start if any of these mounts is missing. The docker role installs a systemd drop-in that requires them, because otherwise a missing data disk would send every container's data to the root disk without any error. SSH is deliberately not held back the same way. The docker role keeps a copy of the host keys on the persistent disk and restores them into `/etc/ssh`, so sshd never reads from the disk and a detached one cannot lock you out.
+
 ## 5. Give the host an onboarding key
 
-This is the one manual step, and it is permanent. Every future host needs its own fresh onboarding key at provision time, the same way every new host needs its own SSH host key accepted.
+This is the one manual step, and it is permanent. Every new host needs its own fresh onboarding key at provision time, the same way every new host needs its own SSH host key accepted. A host that is being rebuilt does not. It keeps Periphery's private key on its persistent disk and reconnects as it was, see [Rebuilding a VM](rebuild-a-vm.md#7-check-it-reconnected).
 
-The ansible repo ships `komodo_onboarding_key` blank in the docker role's defaults, because a real value is single-use and must never be committed. Periphery needs one to make its first outbound connection to Core. After that, Core and the new host trust each other by their own Ed25519 keypairs and the onboarding key is discarded.
+The ansible repo ships `komodo_onboarding_key` blank in the docker role's defaults, because a real value is single-use and must never be committed. Periphery needs one to make its first outbound connection to Core. After that, Core and the new host trust each other by their own Ed25519 keypairs and the onboarding key is discarded. Periphery's private key is written to `/srv/persist/host/komodo/periphery.key`, on the persistent disk rather than the OS disk, so it survives a rebuild.
 
 In Komodo's UI on km01, at `http://<km-ip>:9120`, go to *Settings > Onboarding* and click **New Onboarding Key**.
 
@@ -182,6 +206,23 @@ ansible-playbook -i hosts.yml -c local provision.yml \
 ```
 
 A stack that opens a port to the internal subnet also needs `docker_stacks_internal_subnet` in the second `-e`, set to that subnet in CIDR form. The role stops and says so when it is missing. None of the stacks run this way open one.
+
+## Growing the persistent disk
+
+The disk grows while the VM runs. On the PVE host:
+
+```bash
+qm resize <vmid> scsi2 +20G
+```
+
+Then on the VM, grow the filesystem into the new space:
+
+```bash
+sudo resize2fs /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi2
+df -h /srv/persist
+```
+
+The device path is the docker role's `docker_persist_device`. A disk only grows this way. Proxmox cannot shrink one, and thin provisioning makes that unnecessary, since the pool only holds what the filesystem is using once trim has run.
 
 ## What's next
 

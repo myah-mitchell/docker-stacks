@@ -75,13 +75,14 @@ That label is live, and it covers the domain and its wildcards. `TRAEFIK_CERT_RE
 
 ## Placeholders
 
-The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+The first seven are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists five more that are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | `tf01` |
 | `<cores>` | `4` |
 | `<memory>` | `8192` |
+| `<data-size>` | `20` |
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for tf01, on the internal VLAN |
 | `<gateway-ip>` | The internal VLAN's gateway |
@@ -91,7 +92,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 Follow [Provisioning a VM](provision-a-vm.md), six steps ending with tf01 connected and healthy under *Resources > Servers*. There is no tf01-specific variation in any of them.
 
-Four cores and 8 GB because ten services run here, and Traefik is the path every other host's traffic takes.
+Four cores and 8 GB because ten services run here, and Traefik is the path every other host's traffic takes. The data disk stays small at 20 GB, since nothing here stores more than routing entries, certificates, and the shippers' buffers.
 
 tf01 is on the internal VLAN, not the DMZ, so it takes the same gateway ci01 did. bh01 is the host that faces the internet, and it reaches tf01 over the internal network.
 

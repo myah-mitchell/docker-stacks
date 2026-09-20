@@ -36,13 +36,14 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Placeholders
 
-The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+The first seven are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists five more that are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | `bh01` |
 | `<cores>` | `4` |
 | `<memory>` | `8192` |
+| `<data-size>` | `10` |
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for bh01, on the DMZ VLAN |
 | `<gateway-ip>` | The DMZ VLAN's gateway, not the internal one every host before this used |

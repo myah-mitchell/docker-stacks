@@ -6,7 +6,7 @@ Read [Conventions](conventions.md) first if you have not. Every runbook here ass
 
 ## The pattern every VM follows
 
-Each VM gets its base OS the same way: cloned from the shared `ubuntu-server-2604` cloud-init template, which self-provisions on first boot by running ansible's `provision.yml` against `target: ubuntu_docker`. That installs Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery with no manual step. Periphery is gated behind `KOMODO: true`, already set on the `ubuntu_docker` inventory entry every Docker VM provisions against.
+Each VM gets its base OS the same way: cloned from the shared cloud-init template (`ubuntu-server-2604` at 26.04, named for its Ubuntu version), which self-provisions on first boot by running ansible's `provision.yml` against `target: ubuntu_docker`. That installs Docker, the firewall, NTP, swap, node_exporter, and Komodo Periphery with no manual step. Periphery is gated behind `KOMODO: true`, already set on the `ubuntu_docker` inventory entry every Docker VM provisions against.
 
 From that shared starting point, a VM's stack gets deployed one of two ways.
 
@@ -14,7 +14,7 @@ km01 is the one deliberate exception, provisioned and started entirely by hand, 
 
 Every other VM is registered as a Komodo Server resource and deployed through Komodo's GitOps flow. Provision the base OS, generate that VM's own Komodo onboarding key, then let Komodo do the rest. That half is the same for every host and is written once, in [Provisioning a VM](provision-a-vm.md). Each host runbook's first step is a pointer to it.
 
-The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each host proves itself to Core once with a single-use key, the same way a new SSH host key gets accepted once, and Core and that host trust each other by their own keypairs from then on.
+The onboarding key is a permanent step for every new host. Under Komodo's PKI auth, each host proves itself to Core once with a single-use key, the same way a new SSH host key gets accepted once, and Core and that host trust each other by their own keypairs from then on. A rebuilt host keeps its Periphery key on its persistent disk, so it reconnects without a new key.
 
 ## Running order
 
@@ -72,7 +72,7 @@ Anything identical across hosts lives in its own doc, and each host runbook poin
 
 Split a step out into its own doc when a second host will run it, or when a stack has real work after its deploy. Keep it inline when neither is true. ci01 is all pointers because all five of its steps qualify. The other four host runbooks point out for provisioning and again for the two per-VM stacks, and deploy and verify their own stack in place, because that part is one-host-only and has no second reader.
 
-The onboarding key in step 5 of provisioning is required for every future host, permanently. The traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
+The onboarding key in step 5 of provisioning is required for every new host, permanently, though not for a rebuild of one that already has it. The traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
 
 [system-agent](system-agent-setup.md) is the third shared doc. It is written once because every VM runs the same stack, and only the Stack name, `SERVER_NAME`, and the dockns values differ between them. [traefik-agent](traefik-agent-setup.md) is the fourth, and the one that ends the bootstrap phase. It goes only on the VMs that publish something, and tf01 and bh01 get the same services through their own stacks instead.
 
@@ -82,9 +82,10 @@ A page written before its VM exists is a draft, however carefully it was checked
 
 ## The rest of the docs
 
-Every runbook, stack doc, and shared procedure is in [Running order](#running-order) above. These two are not tied to any host or stack.
+Every runbook, stack doc, and shared procedure is in [Running order](#running-order) above. These three are not tied to any host or stack.
 
 | Page | What it covers |
 | --- | --- |
 | [Conventions](conventions.md) | Naming and secrets rules every other page assumes |
 | [Stacks](stacks.md) | What every stack in this repo deploys, independent of bootstrap order |
+| [Rebuilding a VM](rebuild-a-vm.md) | Replacing a host with a fresh VM on a newer Ubuntu release, keeping its data disk. Written, not yet run |

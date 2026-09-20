@@ -30,13 +30,14 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Placeholders
 
-The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists four more that are the same for every host.
+The first seven are the ones [Provisioning a VM](provision-a-vm.md) takes from this page. It lists five more that are the same for every host.
 
 | Placeholder | Value |
 | --- | --- |
 | `<host>` | `id01` |
 | `<cores>` | `4` |
 | `<memory>` | `8192` |
+| `<data-size>` | `20` |
 | `<vmid>` | VMID to give the new VM, yours to pick |
 | `<ip>` | Static address for id01, on the internal VLAN |
 | `<gateway-ip>` | The internal VLAN's gateway |
@@ -46,7 +47,7 @@ The first six are the ones [Provisioning a VM](provision-a-vm.md) takes from thi
 
 Follow [Provisioning a VM](provision-a-vm.md), six steps ending with id01 connected and healthy under *Resources > Servers*.
 
-Four cores and 8 GB because Authentik's worker is the memory-hungry part, and Postgres sits alongside it.
+Four cores and 8 GB because Authentik's worker is the memory-hungry part, and Postgres sits alongside it. That Postgres holds every user, group, application, and flow, and 20 GB is plenty for it.
 
 id01 is on the internal VLAN. Authentik is reached from the internet through bh01's tunnel later, never by exposing id01 directly.
 

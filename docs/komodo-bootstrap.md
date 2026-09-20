@@ -28,7 +28,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Prerequisites
 
-- The `ubuntu-server-2604` cloud-init template exists on the target PVE host. The ansible repo's pve role builds it.
+- The cloud-init template exists on the target PVE host. The ansible repo's pve role builds it, and its name follows the Ubuntu version, so `ubuntu-server-2604` at 26.04.
 - That host's cloud-init vendor snippet has been installed at least once, so it carries real identity values rather than blanks. The pve role's cloud-init task installs it.
 - You can reach the PVE web UI and get a shell on the host.
 
@@ -42,6 +42,8 @@ Replace these as you go. Never commit a real value back into this file.
 | `<km-vmid>` | VMID to give the new VM |
 | `<km-ip>` | Static address for km01 |
 | `<gateway-ip>` | Gateway for that subnet |
+| `<vm-storage>` | The Proxmox storage that holds VM disks, `local-zfs` on a host built with the pve role's defaults |
+| `<km-data-size>` | Size in GB of km01's data disk. `20` is enough to start, see step 2 |
 
 ## 1. Clone the template into a VM
 
@@ -64,6 +66,14 @@ Give it a static address rather than the template's DHCP default. km01 is long-l
 ```bash
 qm set <km-vmid> --ipconfig0 ip=<km-ip>/24,gw=<gateway-ip>
 ```
+
+Add km01's data disk, which the template does not carry:
+
+```bash
+qm set <km-vmid> --scsi2 <vm-storage>:<km-data-size>,discard=on,ssd=1,iothread=1
+```
+
+It is the persistent disk, mounted at `/srv/persist`, with its `volumes` and `logs` folders bind mounted onto `/opt/docker/volumes` and `/opt/docker/logs`. Volumes is where Komodo's databases, keys, and secrets live, so it is the disk to keep if km01 is ever rebuilt. Add it before the first boot, because the docker role stops when it cannot find it. Twenty GB is enough to start with: Komodo Core, FerretDB, Postgres, and the dumps postgres-backup keeps are all small. The disk grows while the VM runs, so see [Growing the persistent disk](provision-a-vm.md#growing-the-persistent-disk) if it ever fills.
 
 Confirm the template's VLAN tag is the internal-only one. km01 is not in the DMZ.
 
@@ -92,9 +102,13 @@ SSH in once cloud-init finishes:
 ```bash
 docker version
 systemctl status ufw
+findmnt /var/lib/docker
+findmnt /srv/persist
+findmnt /opt/docker/volumes
+findmnt /opt/docker/logs
 ```
 
-Both should be up and running. Stop here and fix it if not: everything below assumes Docker works.
+Docker and ufw should be up and running, and each `findmnt` should print a mount. Stop here and fix it if not: everything below assumes Docker works. Docker refuses to start when a disk is missing, so a `docker version` that cannot connect usually means step 2's `--scsi2` line was skipped. The `lsblk -D` and `fstrim.timer` checks in [step 4 of Provisioning a VM](provision-a-vm.md#4-verify-base-provisioning) apply to km01 as well.
 
 Periphery is installed on this host too, but km01 runs Core, so it is not doing anything useful yet. Ignore it for now.
 
@@ -168,6 +182,16 @@ A directory written by a container running as root takes `100000`. One written b
 ## 7. Generate and fill in the stack's .env
 
 `stacks/komodo-server/.env` does not exist yet. `scripts/build.py` generates it, along with every other stack's, and it is gitignored so it never reaches the repo.
+
+This file holds the database passwords Postgres and FerretDB are initialised with, so it has to survive a rebuild of km01 or Core can no longer open its own database. It lives on the persistent disk with the rest of km01's state, and the checkout gets a symlink to it:
+
+```bash
+envFile=/opt/docker/volumes/komodo/komodo-server.env
+[ -e $envFile ] || install -m 600 /dev/null $envFile
+ln -sfn $envFile /opt/docker/stacks/docker-stacks/stacks/komodo-server/.env
+```
+
+The file is created empty and private, and only when it is not there already, so on a rebuilt km01 this finds the old one and keeps it. `build.py` writes through the link and keeps every value that is already filled in.
 
 From the repo root:
 

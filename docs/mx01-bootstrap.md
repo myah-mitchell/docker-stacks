@@ -20,7 +20,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 - [1. Provision the VM](#1-provision-the-vm)
 - [2. Check the public address can handle mail](#2-check-the-public-address-can-handle-mail)
 - [3. Forward the mail ports and open the firewall](#3-forward-the-mail-ports-and-open-the-firewall)
-- [4. Deploy system-agent onto mx01](#4-deploy-system-agent-onto-mx01)
+- [4. Deploy the two per-VM stacks onto mx01](#4-deploy-the-two-per-vm-stacks-onto-mx01)
 - [5. Create the runtime folders](#5-create-the-runtime-folders)
 - [6. Create the Authentik application](#6-create-the-authentik-application)
 - [7. Create the Komodo Secrets](#7-create-the-komodo-secrets)
@@ -38,11 +38,11 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 
 ## Prerequisites
 
-- system-agent can be deployed on a new VM, meaning ci01, id01, pk01, and tf01 are all live. See [system-agent prerequisites](system-agent-setup.md#prerequisites).
+- traefik-agent can be deployed on a new VM, meaning ci01, id01, pk01, and tf01 are all live. See [traefik-agent prerequisites](traefik-agent-setup.md#prerequisites).
 - bh01 is finished, through [bh01 bootstrap](bh01-bootstrap.md), and Authentik is published on `auth.myah-mitchell.com` through its tunnel. Stalwart and Bulwark both check sign-ins against that public address.
 - A Stalwart Enterprise license key for the domain.
 - A static public IPv4 address, an ISP that will set its reverse DNS record, and inbound port 25 not blocked by that ISP.
-- The same DMZ VLAN bh01 uses, with a firewall that lets mx01 reach the internal services system-agent needs, and lets it out to the internet on TCP 25 and 443.
+- The same DMZ VLAN bh01 uses, with a firewall that lets mx01 reach the internal services these stacks need, and lets it out to the internet on TCP 25 and 443.
 - A Cloudflare API token with DNS edit rights on the zone, for Stalwart's DNS records and certificate.
 
 ## Placeholders
@@ -114,7 +114,7 @@ On the router, forward these WAN ports to `<ip>`, TCP only:
 
 Do not forward 80, 443, or 8080. The web side reaches the internet through bh01's tunnel, never through a port forward.
 
-Then let the ansible `stacks` role open them on mx01. In ansible-private's `hosts.yml`, add mx01 to the `docker_host` group if it is not there yet, and add the `stalwart-server` stack to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+Then let the ansible `stacks` role open them on mx01. In ansible-private's `hosts.yml`, add mx01 to the `docker_host` group if it is not there yet, and add the `system-agent`, `traefik-agent`, and `stalwart-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). mx01 is built after the rest of the fleet, so leave *Bootstrap* blank even if you were still answering it elsewhere. Step 4 deploys the real stacks here rather than traefik-bootstrap. Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
 
 Run **provision-stacks** with *Target* answered `mx01`. The same run creates step 5's folders. Confirm the ports:
 
@@ -137,11 +137,11 @@ sudo ufw status
 
 </details>
 
-## 4. Deploy system-agent onto mx01
+## 4. Deploy the two per-VM stacks onto mx01
 
-mx01 skips traefik-bootstrap. Everything system-agent needs already exists by the time you reach this page, so it can have its real Traefik from the start.
+mx01 skips traefik-bootstrap. Everything both stacks need already exists by the time you reach this page, so it can have its real Traefik from the start.
 
-Follow [system-agent](system-agent-setup.md), with Stack name `system-agent-mx01`. Skip its step 7, since there is no traefik-bootstrap to tear down.
+Follow [system-agent](system-agent-setup.md), with Stack name `system-agent-mx01`, then [traefik-agent](traefik-agent-setup.md), with Stack name `traefik-agent-mx01`. Skip traefik-agent's step 6, since there is no traefik-bootstrap to tear down.
 
 Clear the four Cloudflare dockns keys to blank in its step 5, even though mx01 hosts public services. The public names come from tunnel routes in step 11 and from Stalwart in step 12, and a dockns record for the same name would fight both.
 

@@ -34,16 +34,19 @@ stalwart-server is optional. It gives the domain real mailboxes with accounts fr
 
 | Stack | Deploys | Status |
 | --- | --- | --- |
-| system-agent | traefik, error-pages, logrotate, traefik-kop, vmagent, vlagent, vector, cadvisor, dozzle-agent, dockns, socket-proxy, socket-proxy-rw | Not deployed anywhere yet |
-| traefik-bootstrap | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | The temporary stand-in for system-agent |
+| system-agent | vmagent, vlagent, vector, cadvisor, dozzle-agent, dockns, socket-proxy | Not deployed anywhere yet |
+| traefik-agent | traefik, error-pages, logrotate, traefik-kop, socket-proxy, socket-proxy-rw | Not deployed anywhere yet |
+| traefik-bootstrap | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | The temporary stand-in for traefik-agent |
 
-Komodo requires every Stack name to be unique, so the Stack resource for either of these is named after the stack plus its host, such as `system-agent-ci01` or `traefik-bootstrap-id01`. The one-per-host stacks above keep their plain names. Container and network names are unaffected, because they come from `PROJECT_NAME` rather than the Stack name.
+Komodo requires every Stack name to be unique, so the Stack resource for any of these is named after the stack plus its host, such as `system-agent-ci01` or `traefik-bootstrap-id01`. The one-per-host stacks above keep their plain names. Container and network names are unaffected, because they come from `PROJECT_NAME` rather than the Stack name.
 
-system-agent is the standard per-VM bundle. Every VM's own local Traefik terminates TLS and runs the `chain-authentik@file` auth chain for that VM's services directly, without needing tf01. traefik-kop publishes a router into tf01's shared Redis only when a service also carries a `kop-public.traefik.*` label, so reaching the internet is a per-service opt-in rather than a per-VM setting.
+system-agent is what every VM runs: metrics, logs, container DNS, and a Dozzle agent. It carries no Traefik, so it can go on a host whether or not that host publishes anything, and its vector and vmagent pick up a local Traefik when there is one.
 
-It needs live backends for monitoring (ci01), the auth chain (id01), and internal certs (pk01), so there is no point deploying it before those exist. Until then, [Traefik bootstrap](traefik-bootstrap.md) covers the temporary replacement. Do not run both on one VM: they fight over ports 80, 443, and 8443.
+traefik-agent is the Traefik half, for the VMs that publish something. That VM's own Traefik terminates TLS and runs the `chain-authentik@file` auth chain for its services directly, without needing tf01. traefik-kop publishes a router into tf01's shared Redis only when a service also carries a `kop-public.traefik.*` label, so reaching the internet is a per-service opt-in rather than a per-VM setting. tf01 and bh01 get all of it through traefik-server and traefik-dmz instead, so they do not list traefik-agent separately.
 
-Deploying it is the same eight steps on every VM, written once in [system-agent](system-agent-setup.md).
+system-agent needs the monitoring backends on ci01, and traefik-agent needs the auth chain (id01), internal certs (pk01), and tf01's Redis, so there is no point deploying either before those exist. Until then, [Traefik bootstrap](traefik-bootstrap.md) covers the temporary replacement for traefik-agent. Do not run both on one VM: they fight over ports 80, 443, and 8443.
+
+Deploying them is the same steps on every VM, written once in [system-agent](system-agent-setup.md).
 
 ## Composition layers
 
@@ -51,15 +54,14 @@ These exist so the stacks above can build on each other through Compose `include
 
 | Stack | Deploys | Included by |
 | --- | --- | --- |
-| traefik-basic | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | traefik-monitored |
-| traefik-monitored | traefik-basic plus vmagent, vlagent, vector | traefik-agent |
-| traefik-agent | traefik-monitored plus traefik-kop | traefik-server, traefik-dmz |
+| traefik-basic | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | traefik-agent |
+| traefik-agent | traefik-basic plus traefik-kop | traefik-server, traefik-dmz |
 | victoriametrics-agent | vlagent, vmagent, vector, cadvisor, socket-proxy | victoriametrics-server |
 | dozzle-agent | dozzle-agent, socket-proxy | dozzle-server |
 
-The chain runs traefik-basic to traefik-monitored to traefik-agent to traefik-server or traefik-dmz, each adding one layer. traefik-bootstrap is deliberately outside that chain: it is a standalone copy with the ACME directives removed, so bootstrap-phase config cannot leak into the real per-VM Traefik.
+The chain runs traefik-basic to traefik-agent to traefik-server or traefik-dmz, each adding one layer. traefik-agent is the only one of the three that is also deployed on its own. traefik-bootstrap is deliberately outside that chain. It runs the same Traefik service as the rest, under a second name that changes only the TLS options, the cert resolver, and the auth chain, so there is no second copy of the argument list to keep in step.
 
-system-agent supersedes traefik-agent, victoriametrics-agent, and dozzle-agent for the per-VM role. It bundles the same agents plus dockns.
+system-agent supersedes victoriametrics-agent and dozzle-agent for the per-VM role. It bundles the same agents plus dockns.
 
 ## No host assigned yet
 

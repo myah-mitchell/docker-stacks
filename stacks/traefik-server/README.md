@@ -42,33 +42,6 @@ sudo ufw allow 443/tcp comment 'Traefik HTTPS'
 sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
 ```
 
-## Create needed folders for vmagent
-
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/vmagent-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-data
-```
-
-## Create needed folders for vlagent
-
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/vlagent-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-data
-```
-
-## Create needed folders for vector
-
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
-
-```bash
-mkdir -p /opt/docker/volumes/$projectName/vector-data
-sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-data
-```
-
 ## Open the firewall for redis
 
 Generated from `setup.yaml`, which the ansible `stacks` role also applies.

@@ -10,10 +10,15 @@ scrape_configs:
   static_configs:
   - targets:
     - '%{PROJECT_NAME}-vlagent.%{SERVER_ADDRESS}:9429'
-- job_name: 'traefik-%{PROJECT_NAME}'
-  static_configs:
-  - targets:
-    - '%{PROJECT_NAME}-traefik.%{SERVER_ADDRESS}:8080'
+## Traefik runs in its own stack, only on the hosts that need one, so this job
+## looks the name up instead of assuming it is there. A host without a Traefik
+## has no record, so the job finds no target and nothing fails.
+- job_name: 'traefik-traefik'
+  dns_sd_configs:
+  - names:
+    - 'traefik-traefik.%{SERVER_ADDRESS}'
+    type: A
+    port: 8080
 - job_name: 'cadvisor-%{PROJECT_NAME}'
   static_configs:
   - targets:

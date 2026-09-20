@@ -31,7 +31,8 @@ The onboarding key is a permanent per-host step. Under Komodo's PKI auth, each h
 | 4 | pk01 | step-ca, internal PKI | [pk01 bootstrap](pk01-bootstrap.md) | Written, not yet run |
 | 5 | tf01 | Traefik hub, central Redis and traefik-kop | [tf01 bootstrap](tf01-bootstrap.md) | Written, not yet run |
 | 6 | bh01 | cloudflared and traefik-dmz, DMZ edge | [bh01 bootstrap](bh01-bootstrap.md) | Written, not yet run |
-| 7 | any | system-agent, the per-VM stack every VM runs once 2 through 5 are done | [system-agent](system-agent-setup.md) | Written, not yet run |
+| 7 | any | system-agent, the per-VM stack every VM runs once ci01 is done | [system-agent](system-agent-setup.md) | Written, not yet run |
+| 7.1 | any | traefik-agent, on the VMs that publish something, once 2 through 5 are done | [traefik-agent](traefik-agent-setup.md) | Written, not yet run |
 | 8 | ap01 | Vaultwarden and future replacements | Not written | No stack exists in this repo yet |
 | 9 | mx01 | Stalwart and Bulwark, optional mailboxes | [mx01 bootstrap](mx01-bootstrap.md) | Written, not yet run |
 
@@ -51,7 +52,7 @@ ap01 is the exception in more than status. Vaultwarden has no directory under `c
 
 Row 9 is optional, and no other host depends on it. mx01 gives the domain real mailboxes with accounts from Authentik, while the service mail every other stack needs already goes through Postfix on ci01. Its runbook assumes a paid Stalwart Enterprise license.
 
-tf01 comes after id01 and pk01 because nothing before bh01 needs it. Its Redis stays empty until system-agent puts traefik-kop on each VM, and its dashboard defaults to `chain-authentik@file`, which only resolves once id01 exists. bh01 is the one host that needs tf01 first, because its Redis replicates tf01's.
+tf01 comes after id01 and pk01 because nothing before bh01 needs it. Its Redis stays empty until traefik-agent puts traefik-kop on each VM, and its dashboard defaults to `chain-authentik@file`, which only resolves once id01 exists. bh01 is the one host that needs tf01 first, because its Redis replicates tf01's.
 
 tf01 and bh01 are also the first hosts to use the Redis provider and the Let's Encrypt resolver in the base Traefik service. See [What tf01 turns on in the base Traefik service](tf01-bootstrap.md#what-tf01-turns-on-in-the-base-traefik-service).
 
@@ -67,13 +68,13 @@ This applies to every VM in the list above, which is why it lives here rather th
 
 ## How the host runbooks are shaped
 
-Anything identical across hosts lives in its own doc, and each host runbook points at it. There are three: [Provisioning a VM](provision-a-vm.md), [Traefik bootstrap](traefik-bootstrap.md), and [system-agent](system-agent-setup.md). A host runbook's own pages are spent on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
+Anything identical across hosts lives in its own doc, and each host runbook points at it. There are four: [Provisioning a VM](provision-a-vm.md), [Traefik bootstrap](traefik-bootstrap.md), [system-agent](system-agent-setup.md), and [traefik-agent](traefik-agent-setup.md). A host runbook's own pages are spent on what is actually different: the stack, its folders, its firewall, the Secrets it needs, and how to tell whether it worked.
 
-Split a step out into its own doc when a second host will run it, or when a stack has real work after its deploy. Keep it inline when neither is true. ci01 is all pointers because all five of its steps qualify. The other four host runbooks point out for provisioning and again for system-agent, and deploy and verify their own stack in place, because that part is one-host-only and has no second reader.
+Split a step out into its own doc when a second host will run it, or when a stack has real work after its deploy. Keep it inline when neither is true. ci01 is all pointers because all five of its steps qualify. The other four host runbooks point out for provisioning and again for the two per-VM stacks, and deploy and verify their own stack in place, because that part is one-host-only and has no second reader.
 
 The onboarding key in step 5 of provisioning is required for every future host, permanently. The traefik-bootstrap deploy applies to any VM whose own stack is not itself a Traefik, so id01 and pk01 need it while tf01 and bh01 do not.
 
-[system-agent](system-agent-setup.md) is the third shared doc, and the one that ends the bootstrap phase. It is written once because every VM runs the same stack, and only the Stack name, `SERVER_NAME`, and the dockns values differ between them.
+[system-agent](system-agent-setup.md) is the third shared doc. It is written once because every VM runs the same stack, and only the Stack name, `SERVER_NAME`, and the dockns values differ between them. [traefik-agent](traefik-agent-setup.md) is the fourth, and the one that ends the bootstrap phase. It goes only on the VMs that publish something, and tf01 and bh01 get the same services through their own stacks instead.
 
 Name a runbook after the host once a VM is just "provision, then deploy via Komodo" (`ci01-bootstrap.md`). Name it after the service when something is structurally unique about that bootstrap, which so far means `komodo-bootstrap.md` alone. Name it after the procedure when it is not tied to a host at all (`provision-a-vm.md`).
 

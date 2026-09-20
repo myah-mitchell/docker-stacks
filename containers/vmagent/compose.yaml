@@ -96,11 +96,6 @@ services:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8429/health"]
       <<: *default_healthcheck
 
-  .vmagent-traefik:
-    extends: .vmagent
-    volumes:
-      - ./config/prometheus-traefik.yml:/etc/prometheus/prometheus.yml:ro
-
   .vmagent-host:
     extends: .vmagent
     hostname: ${VMAGENT_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}

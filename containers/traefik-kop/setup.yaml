@@ -1,0 +1,6 @@
+# Host setup for traefik-kop. scripts/build.py rolls it up into each stack's
+# setup.yaml, which the ansible stacks role applies. See scripts/project-layout.md.
+needs_fleet:
+  # Publishes routers by writing them into tf01's Redis, which is a
+  # different role from a plain cache, hence the name.
+  - name: kop-redis

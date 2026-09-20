@@ -1,5 +1,7 @@
 # Host setup for crowdsec. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  - name: socket-proxy
 folders:
   - path: crowdsec-data
     owner: 100000

@@ -1,13 +1,14 @@
 # Initial Deployment Requirements
 ## How to include vector in a stack
 
-For using with a Traefik stack
+For the per-VM system stack, which reads both the host's logs and the access
+log of a Traefik stack on the same host
 ```yaml
 services:
   vector:
     extends:
       file: ../../containers/vector/compose.yaml
-      service: .vector-traefik
+      service: .vector-system
 ```
 
 For using host data colletion

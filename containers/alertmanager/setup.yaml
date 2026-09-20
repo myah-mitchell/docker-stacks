@@ -1,0 +1,4 @@
+# Host setup for alertmanager. scripts/build.py rolls it up into each stack's
+# setup.yaml, which the ansible stacks role applies. See scripts/project-layout.md.
+needs_host:
+  - name: traefik

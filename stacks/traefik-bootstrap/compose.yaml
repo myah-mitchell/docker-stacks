@@ -5,10 +5,15 @@
 name: ${PROJECT_NAME}
 
 # Temporary, per-VM stack for the bootstrap window before pk01 (step-ca) and id01
-# (Authentik) exist — see docs/traefik-bootstrap.md. Self-signed TLS instead of a
-# real cert resolver, chain-no-auth@file instead of chain-authentik@file. Not meant
-# to be long-lived: once a VM's real system-agent stack is ready, tear this one down
-# rather than run both.
+# (Authentik) exist. See docs/traefik-bootstrap.md.
+#
+# It runs the same Traefik as every other stack. The .traefik-bootstrap variant it
+# extends is that same service under a second name, which is how build.py knows to
+# give this stack the tagged komodo.env block instead: self-signed TLS options, no
+# certificate resolver, and chain-no-auth@file on the dashboard.
+#
+# Not meant to be long-lived. Once a VM's real traefik-agent stack is ready, tear
+# this one down rather than run both.
 
 networks:
   proxy:
@@ -29,154 +34,7 @@ services:
   traefik:
     extends:
       file: ../../containers/traefik/compose.yaml
-      service: .traefik
-    # Full override of command/labels, not a diff against the base service — Compose
-    # extends replaces these keys wholesale rather than merging list items. Kept as
-    # close to the base's list as possible; the only real removals are the
-    # ACME/letsencrypt-specific lines, called out below.
-    command:
-      ################################################################
-      # Global configuration
-      ################################################################
-      - --global.checknewversion=true
-      - --global.sendanonymoususage=false
-
-      ################################################################
-      # Logs
-      ################################################################
-      - --log.level=INFO
-      - --log.format=json
-      - --accesslog.format=json
-      - --accesslog.addinternals=false
-      - --accesslog.filepath=/etc/traefik/log/access.log
-      - --accesslog.fields.defaultmode=keep
-      - --accesslog.fields.headers.defaultmode=keep
-      - --accesslog.fields.headers.names.Cookie=redact
-      - --accesslog.fields.headers.names.Set-Cookie=redact
-      - --accesslog.fields.headers.names.Authorization=drop
-
-      ################################################################
-      # Metrics
-      ################################################################
-      - --metrics.prometheus.addrouterslabels=true
-      - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0
-      - --metrics.prometheus.headerlabels.useragent=User-Agent
-
-      ################################################################
-      # API and Dashboard
-      ################################################################
-      - --api.dashboard=true
-
-      ################################################################
-      # Entrypoints
-      ################################################################
-      # HTTP -> HTTPS Redirect
-      - --entrypoints.http.address=:80
-      - --entrypoints.http.http.redirections.entrypoint.to=https
-      - --entrypoints.http.http.redirections.entrypoint.scheme=https
-        # Trusted IPs (Cloudflare + Local)
-      - --entrypoints.http.forwardedheaders.trustedips=
-          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
-          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
-          # Middlewares — chain-no-auth@file, not chain-authentik@file: id01/Authentik
-          # doesn't exist yet during the bootstrap window this stack is for.
-      - --entrypoints.http.http.middlewares=
-          middlewares-rate-limit@file,
-          middlewares-secure-headers@file
-
-      # HTTPS
-      - --entrypoints.https.address=:443
-      - --entrypoints.https.asdefault=true
-      - --entrypoints.https.http.tls.options=tls-opts-selfsigned@file
-      # No certresolver here — same as the base service, already relies on the
-      # default cert store below rather than a per-entrypoint resolver. Uses
-      # tls-opts-selfsigned, not the base service's tls-opts, because sniStrict
-      # (on in tls-opts) rejects any SNI without a matching real cert — this stack
-      # has no resolver, so its default cert never matches, and sniStrict would
-      # reject every real hostname.
-        # Trusted IPs (Cloudflare + Local)
-      - --entrypoints.https.forwardedheaders.trustedips=
-          173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,
-          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
-          # Middlewares
-      - --entrypoints.https.http.middlewares=
-          middlewares-rate-limit@file,
-          middlewares-secure-headers@file,
-          middlewares-compress@file
-
-      # Dashboard — no certresolver/domains here, unlike the base service. Falls
-      # back to the same self-signed default cert as every other entrypoint instead
-      # of requesting a real one.
-      - --entrypoints.dashboard.address=:8443
-      # tls.options is what keeps TLS switched on for this entrypoint. The base
-      # service gets that from its certresolver line, which this stack drops, and
-      # without any http.tls key the entrypoint serves plain HTTP: the dashboard
-      # router stops matching HTTPS requests and Traefik answers 404. Same
-      # tls-opts-selfsigned as the https entrypoint, and for the same reason.
-      - --entrypoints.dashboard.http.tls.options=tls-opts-selfsigned@file
-          # Trusted IPs (Local)
-      - --entrypoints.dashboard.forwardedheaders.trustedips=
-          127.0.0.1/32,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12
-
-      ################################################################
-      # Healthcheck / Ping
-      ################################################################
-      - --ping=true
-
-      ################################################################
-      # Transports
-      ################################################################
-      - --serversTransport.insecureSkipVerify=true
-
-      ################################################################
-      # Providers
-      ################################################################
-      - --providers.providersthrottleduration=2s
-      - --providers.file.directory=/etc/traefik/rules
-      - --providers.file.watch=true
-      - --providers.docker.watch=true
-      - --providers.docker.network=${PROXY_NETWORK}
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.endpoint=tcp://${PROJECT_NAME}-${SOCKET_PROXY_HOSTNAME}:2375
-
-      ################################################################
-      # Plugins
-      ################################################################
-      #- --experimental.plugins.bouncer.version=v1.5.0
-
-      ################################################################
-      # Certificates Resolvers (ACME) — deliberately none. No CF_DNS_API_TOKEN, no
-      # letsencrypt resolver at all; every entrypoint falls back to the default
-      # self-signed cert Traefik generates automatically when nothing else applies.
-      ################################################################
-
-      ################################################################
-      # Extra Commands from Env Vars
-      ################################################################
-      - ${TRAEFIK_EXTRA_COMMAND:-}
-    labels: ## Traefik Labels
-      - "traefik.enable=true"
-
-      ## Traefik Dashboard
-      - "traefik.http.routers.traefik.rule=
-        Host(`${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${TRAEFIK_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
-        Host(`${PROJECT_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-      - "traefik.http.routers.traefik.entrypoints=dashboard"
-      - "traefik.http.routers.traefik.service=api@internal"
-      # chain-no-auth@file, not the chain-authentik@file default the base
-      # service uses: id01/Authentik does not exist during the bootstrap window.
-      - "traefik.http.routers.traefik.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-no-auth@file}"
-
-      ## No defaultGeneratedCert labels here, unlike the base service. Without a
-      ## resolver, domain.main/domain.sans hints don't make Traefik mint a cert for
-      ## those domains — it still falls back to its generic built-in self-signed
-      ## cert, the hints just made Traefik log a confusing "unable to find
-      ## certificate" error on top of it. Plain fallback, no hints, is what actually
-      ## happens either way.
-
-      ## Komodo Labels
-      - "komodo.skip"
+      service: .traefik-bootstrap
     depends_on:
       socket-proxy:
         condition: service_healthy

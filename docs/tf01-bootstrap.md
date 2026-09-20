@@ -38,6 +38,8 @@ Aggregating the routers every other VM's traefik-kop publishes is tf01's entire 
 
 Both lines are gated on `TRAEFIK_REDIS_ENDPOINTS`. When it is blank or absent, each expands to an empty argument and the provider stays off, which is what every Traefik without a local Redis needs.
 
+They are the last two entries in the command list, and they have to be. Traefik stops reading its arguments at the first empty one and silently ignores every argument after it, so an optional flag anywhere but the end takes the rest of the configuration with it when it disappears. That is also why `TRAEFIK_EXTRA_COMMAND`, just above them, falls back to a repeat of `--ping=true` rather than to nothing.
+
 `scripts/build.py` adds `TRAEFIK_REDIS_ENDPOINTS: redis:6379` only to stacks that run the Redis master or a replica, so traefik-server and traefik-dmz get it and nothing else does. Leave it as pasted.
 
 Compose replaces `command:` as a whole list rather than merging it, so a stack cannot append these two flags to the base service on its own. Traefik's `TRAEFIK_PROVIDERS_REDIS_*` environment variables are no way around that either: Traefik reads its install configuration from only one source, and once any flag is on the command line it ignores those variables.
@@ -50,17 +52,17 @@ Compose replaces `command:` as a whole list rather than merging it, so a stack c
 
 `LE_EMAIL` resolves from a Komodo Secret created in [step 4](#4-create-the-five-komodo-secrets), and Let's Encrypt registers the resolver's account under it.
 
-tf01 is the first stack that exercises this. traefik-bootstrap strips the resolver entirely, so no earlier host has asked Let's Encrypt for anything.
+tf01 is the first stack that exercises this. traefik-bootstrap defines the same resolver but points nothing at it, so no earlier host has asked Let's Encrypt for anything.
 
 ### What is already correct
 
 The HTTPS entrypoint's own `certresolver` line is commented out on purpose, and does not need enabling. Certificates reach it through the default TLS store instead:
 
 ```yaml
-- "traefik.tls.stores.default.defaultGeneratedCert.resolver=letsencrypt"
+- "traefik.tls.stores.default.defaultGeneratedCert.resolver=${TRAEFIK_CERT_RESOLVER-letsencrypt}"
 ```
 
-That label is live, and it covers the domain and its wildcards. Leave the entrypoint line alone.
+That label is live, and it covers the domain and its wildcards. `TRAEFIK_CERT_RESOLVER` is already `letsencrypt` in this stack's `komodo.env`, which is what keeps it live. Leave both it and the entrypoint line alone.
 
 ## Prerequisites
 
@@ -97,7 +99,7 @@ tf01 is on the internal VLAN, not the DMZ, so it takes the same gateway ci01 did
 
 The ansible `stacks` role creates these from `stacks/traefik-server/setup.yaml`, and opens step 3's ports in the same run.
 
-In ansible-private's `hosts.yml`, add tf01 to the `docker_host` group if it is not there yet, and add the `traefik-server` stack to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In ansible-private's `hosts.yml`, add tf01 to the `docker_host` group if it is not there yet, and add the `system-agent` and `traefik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). tf01's own stack is a Traefik, so it never gets the traefik-bootstrap stand-in, whatever *Bootstrap* is answered. Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
 
 Run **provision-stacks** with *Target* answered `tf01`, then check the result on tf01:
 

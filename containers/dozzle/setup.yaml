@@ -1,5 +1,15 @@
 # Host setup for dozzle. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  # The server variant reads agents over the network through
+  # DOZZLE_REMOTE_AGENT and touches no local socket.
+  - name: socket-proxy
+    services: [dozzle, dozzle-agent]
+needs_host:
+  # The agent variant is reached by the server over the Docker network,
+  # so only the server needs a way in from outside.
+  - name: traefik
+    services: [dozzle-server]
 firewall:
   - port: 7007
     proto: tcp

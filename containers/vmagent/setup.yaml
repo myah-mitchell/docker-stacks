@@ -1,5 +1,7 @@
 # Host setup for vmagent. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_fleet:
+  - name: vmauth
 folders:
   - path: vmagent-data
     owner: 101000

@@ -1,5 +1,13 @@
 # Host setup for traefik. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  - name: socket-proxy
+provides:
+  # Every variant sits on the external proxy network, so any stack on the
+  # host can put a router behind it. The bootstrap variant is the same
+  # Traefik with a self-signed certificate and stands in for a real one.
+  - name: traefik
+    reach: host
 folders:
   - root: logs
     path: traefik

@@ -1,0 +1,9 @@
+# Host setup for vmalert. scripts/build.py rolls it up into each stack's
+# setup.yaml, which the ansible stacks role applies. See scripts/project-layout.md.
+needs_stack:
+  # Queries go through the vmauth beside it, not straight to the backends.
+  - name: vmauth
+  - name: victoriametrics
+  - name: victorialogs
+needs_host:
+  - name: traefik

@@ -78,7 +78,7 @@ The VM still provisions the same way, still runs Periphery, and still dials out 
 
 The ansible `stacks` role creates these from `stacks/traefik-dmz/setup.yaml`, seeds cloudflared's ingress config, and opens step 4's ports in the same run. The tunnel credentials stay a manual step, because they come from your admin machine rather than from this repo.
 
-In ansible-private's `hosts.yml`, add bh01 to the `docker_host` group if it is not there yet, and add the `traefik-dmz` stack to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In ansible-private's `hosts.yml`, add bh01 to the `docker_host` group if it is not there yet, and add the `system-agent` and `traefik-dmz` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). bh01's own stack is a Traefik, so it never gets the traefik-bootstrap stand-in, whatever *Bootstrap* is answered. Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
 
 Run **provision-stacks** with *Target* answered `bh01`, then check the result on bh01:
 
@@ -284,6 +284,6 @@ Nothing should be published before it is behind `chain-authentik@file`, unless i
 
 ap01 is the last VM in the running order. Its runbook is not written yet, and it cannot be: Vaultwarden has no container directory in this repo, so there is no stack to deploy. See [Running order](README.md#running-order).
 
-The work that unblocks next is not another VM. It is system-agent, which replaces traefik-bootstrap on every VM still running it and puts each host into tf01's routing table. That needs ci01, id01, and pk01 all live, which they now are.
+The work that unblocks next is not another VM. It is traefik-agent, which replaces traefik-bootstrap on every VM still running it and puts each host into tf01's routing table. That needs ci01, id01, and pk01 all live, which they now are.
 
-Run [system-agent](system-agent-setup.md) once per VM, ci01 included. Its step 7 is where each VM's traefik-bootstrap comes down.
+Run [system-agent](system-agent-setup.md) and then [traefik-agent](traefik-agent-setup.md) once per VM, ci01 included. traefik-agent's step 6 is where each VM's traefik-bootstrap comes down.

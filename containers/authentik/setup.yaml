@@ -1,5 +1,14 @@
 # Host setup for authentik. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  # Both the server and the worker use them, not just the base variant.
+  - name: postgres
+  - name: redis
+needs_host:
+  # Only the server variant publishes a router. The worker talks to it
+  # over the Docker network.
+  - name: traefik
+    services: [authentik-server]
 folders:
   - path: authentik-media
     owner: 101000

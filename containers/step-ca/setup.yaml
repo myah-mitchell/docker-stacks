@@ -1,5 +1,7 @@
 # Host setup for step-ca. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_host:
+  - name: traefik
 folders:
   - path: step-ca-data
     owner: 101000

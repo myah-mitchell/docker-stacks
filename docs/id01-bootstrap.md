@@ -4,7 +4,7 @@ id01 runs Authentik, the fleet's identity provider. Nearly every stack in this r
 
 Its stack is authentik-server: the Authentik server and worker, their Postgres and its backup sidecar, a Redis, geoipupdate, and a socket-proxy. Seven services.
 
-Authentik cannot sit behind Authentik, so its own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`. It still needs a Traefik on id01 to be reachable at all, and that is traefik-bootstrap until system-agent is ready.
+Authentik cannot sit behind Authentik, so its own router is hardcoded to `chain-no-auth@file` rather than reading `TRAEFIK_AUTH_CHAIN`. It still needs a Traefik on id01 to be reachable at all, and that is traefik-bootstrap until traefik-agent is ready.
 
 Read [Conventions](conventions.md) first. This runbook assumes its naming and secrets rules, and it assumes you have worked through [ci01 bootstrap](ci01-bootstrap.md).
 
@@ -25,7 +25,7 @@ Read [Conventions](conventions.md) first. This runbook assumes its naming and se
 ## Prerequisites
 
 - km01 is finished through step 14 of [km01 bootstrap](komodo-bootstrap.md), so the nineteen `[[GLOBAL_...]]` Variables exist.
-- ci01 is finished, through [ci01 bootstrap](ci01-bootstrap.md), so this host's metrics and logs have a backend once system-agent replaces traefik-bootstrap here. The Node Exporter password needs nothing from ci01: cloud-init's first run of the monitoring role generates it, and [step 4 of Provisioning a VM](provision-a-vm.md#4-verify-base-provisioning) checks it is there.
+- ci01 is finished, through [ci01 bootstrap](ci01-bootstrap.md), so this host's metrics and logs have a backend once system-agent is deployed here. The Node Exporter password needs nothing from ci01: cloud-init's first run of the monitoring role generates it, and [step 4 of Provisioning a VM](provision-a-vm.md#4-verify-base-provisioning) checks it is there.
 - A MaxMind account, for the free GeoLite2 databases. Signing up is free and takes a few minutes. Step 4 explains what happens if you skip it.
 
 ## Placeholders
@@ -54,9 +54,9 @@ id01 is on the internal VLAN. Authentik is reached from the internet through bh0
 
 The ansible `stacks` role creates these from `stacks/authentik-server/setup.yaml`.
 
-In ansible-private's `hosts.yml`, add id01 to the `docker_host` group if it is not there yet, and add the `traefik-bootstrap` and `authentik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In ansible-private's `hosts.yml`, add id01 to the `docker_host` group if it is not there yet, and add the `system-agent`, `traefik-agent`, and `authentik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
 
-Run **provision-stacks** with *Target* answered `id01`. Listing both stacks means this one run also covers the folders and ports for step 3's traefik-bootstrap.
+Run **provision-stacks** with *Target* answered `id01` and *Bootstrap* answered `true`. The role then leaves out the two stacks that need the rest of the fleet and prepares traefik-bootstrap in their place, so this one run also covers the folders and ports for step 3.
 
 Check the result on id01:
 
@@ -251,7 +251,7 @@ Then, per stack, stop clearing `AUTHENTIK_HOST` and stop overriding `TRAEFIK_AUT
 
 Do this one stack at a time, starting with something you can afford to lock yourself out of. Authentik also needs a Provider and an Application configured for each hostname before forwardAuth returns anything but a redirect loop, and that configuration lives in Authentik's own UI rather than in this repo.
 
-Tearing down each VM's traefik-bootstrap is the last part, and it belongs with system-agent rather than here. See [system-agent](system-agent-setup.md), which does the handover per VM in its step 7.
+Tearing down each VM's traefik-bootstrap is the last part, and it belongs with traefik-agent rather than here. See [traefik-agent](traefik-agent-setup.md), which does the handover per VM in its step 6.
 
 ## What's next
 

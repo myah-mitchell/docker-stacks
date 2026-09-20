@@ -19,7 +19,7 @@ networks:
     internal: true
 
 include:
-  - ../traefik-monitored/compose.yaml
+  - ../traefik-basic/compose.yaml
 
 services:
 

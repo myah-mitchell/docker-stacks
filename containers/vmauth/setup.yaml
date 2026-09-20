@@ -1,0 +1,13 @@
+# Host setup for vmauth. scripts/build.py rolls it up into each stack's
+# setup.yaml, which the ansible stacks role applies. See scripts/project-layout.md.
+needs_stack:
+  - name: victoriametrics
+  - name: victorialogs
+needs_host:
+  - name: traefik
+provides:
+  # The single way into the metrics and logs backends, published through
+  # Traefik at GLOBAL_VMAUTH_HOST, which is what every host's agents write
+  # to.
+  - name: vmauth
+    reach: fleet

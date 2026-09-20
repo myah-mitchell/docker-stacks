@@ -94,16 +94,6 @@ services:
       test: ["CMD", "/usr/bin/vector", "validate", "--skip-healthchecks"]
       <<: *default_healthcheck
 
-  .vector-traefik:
-    extends: .vector
-    <<: [*user]
-    volumes:
-      - ./config/vector-traefik.yml:/etc/vector/vector.yaml:ro
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik/:ro
-    depends_on:
-      traefik:
-        condition: service_healthy
-
   .vector-host:
     extends: .vector
     ports:
@@ -143,15 +133,14 @@ services:
       - /var/log:/var/log:ro
       - /run/log/journal:/run/log/journal:ro
       # Traefik writes its access log to a file rather than stdout, so the
-      # docker_logs source does not see it. host_files excludes this path to
-      # keep it from being read twice.
-      - ${DOCKER_LOGS}/${PROJECT_NAME}/traefik:/var/log/traefik/:ro
+      # docker_logs source does not see it. It runs in its own stack under the
+      # traefik project, and on hosts without one this is simply empty.
+      # host_files excludes the path to keep it from being read twice.
+      - ${DOCKER_LOGS}/traefik/traefik:/var/log/traefik/:ro
     networks:
       - frontend
       - socket_proxy
     depends_on:
       socket-proxy:
-        condition: service_healthy
-      traefik:
         condition: service_healthy
     userns_mode: "host"

@@ -1,5 +1,19 @@
 # Host setup for ferretdb. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  # Not any Postgres: FerretDB stores its collections through the
+  # DocumentDB extension.
+  - name: postgres-documentdb
+    services: [ferretdb]
+provides:
+  # The DocumentDB image is Postgres with an extension, and it is what
+  # the komodo stack's postgres-backup dumps.
+  - name: postgres
+    services: [postgres]
+  # FerretDB needs the extension, postgres-backup only needs a Postgres,
+  # so this variant answers to both names.
+  - name: postgres-documentdb
+    services: [postgres]
 folders:
   - path: ferretdb-data
     owner: 101000

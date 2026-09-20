@@ -1,5 +1,7 @@
 # Host setup for technitium. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_host:
+  - name: traefik
 folders:
   - path: technitium-data
     owner: 101000

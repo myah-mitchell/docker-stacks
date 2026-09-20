@@ -1,8 +1,8 @@
-# Vector config for the system-agent stack, the per-VM bundle that runs both a
-# local Traefik and the host's own log collection. It is the host pipeline and
-# the Traefik access-log pipeline in one file, because one VM runs one vector.
-# vector-host.yml and vector-traefik.yml remain the single-purpose versions for
-# stacks that only need one of the two.
+# Vector config for the system-agent stack, the per-VM bundle every host runs.
+# It is the host pipeline and the Traefik access-log pipeline in one file,
+# because one VM runs one vector. Traefik lives in its own stack, so on a host
+# without one the access-log source simply finds no files. vector-host.yml
+# remains the host-only version for stacks that collect nothing else.
 
 data_dir: "/var/lib/vector"
 

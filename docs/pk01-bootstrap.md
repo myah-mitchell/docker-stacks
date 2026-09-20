@@ -51,9 +51,9 @@ pk01 is internal-only and mesh-only. It is never published through bh01's tunnel
 
 The ansible `stacks` role creates these from `stacks/step-ca-server/setup.yaml`.
 
-In ansible-private's `hosts.yml`, add pk01 to the `docker_host` group if it is not there yet, and add the `traefik-bootstrap` and `step-ca-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In ansible-private's `hosts.yml`, add pk01 to the `docker_host` group if it is not there yet, and add the `system-agent`, `traefik-agent`, and `step-ca-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
 
-Run **provision-stacks** with *Target* answered `pk01`. Listing both stacks means this one run also covers the folders and ports for step 3's traefik-bootstrap.
+Run **provision-stacks** with *Target* answered `pk01` and *Bootstrap* answered `true`. The role then leaves out the two stacks that need the rest of the fleet and prepares traefik-bootstrap in their place, so this one run also covers the folders and ports for step 3.
 
 Check the result on pk01:
 

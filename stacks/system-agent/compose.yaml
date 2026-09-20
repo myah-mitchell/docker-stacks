@@ -5,9 +5,6 @@
 name: ${PROJECT_NAME}
 
 networks:
-  proxy:
-    name: ${PROXY_NETWORK}
-    external: true
   frontend:
     name: ${PROJECT_NAME}_frontend
     internal: false
@@ -19,38 +16,6 @@ networks:
     internal: true
 
 services:
-
-## Traefik Related Services
-  traefik:
-    extends:
-      file: ../../containers/traefik/compose.yaml
-      service: .traefik
-    depends_on:
-      socket-proxy:
-        condition: service_healthy
-      error-pages:
-        condition: service_healthy
-
-  error-pages:
-    extends:
-      file: ../../containers/error-pages/compose.yaml
-      service: .error-pages
-
-  logrotate:
-    extends:
-      file: ../../containers/logrotate/compose.yaml
-      service: .logrotate
-    depends_on:
-      traefik:
-        condition: service_healthy
-      socket-proxy-rw:
-        condition: service_healthy
-
-  traefik-kop:
-    extends:
-      file: ../../containers/traefik-kop/compose.yaml
-      service: .traefik-kop
-
 
 ## VictoriaMetrics Related Services
   vmagent:
@@ -69,8 +34,6 @@ services:
       service: .vector-system
     depends_on:
       socket-proxy:
-        condition: service_healthy
-      traefik:
         condition: service_healthy
       vlagent:
         condition: service_healthy
@@ -114,16 +77,4 @@ services:
       PING: 1 #optional
       SERVICES: 1 #optional
       TASKS: 1 #optional
-      VERSION: 1 #optional
-
-  socket-proxy-rw:
-    extends:
-      file: ../../containers/socket-proxy/compose.yaml
-      service: .socket-proxy-rw
-    environment:
-      CONTAINERS: 1 #optional
-      INFO: 1 #optional
-      LOG_LEVEL: err #optional
-      PING: 1 #optional
-      POST: 1 #optional
       VERSION: 1 #optional

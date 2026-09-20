@@ -76,4 +76,4 @@ ci01 is finished once all five linked docs are, apart from [step 13 of Semaphore
 
 id01 is the next VM. See [Running order](README.md#running-order).
 
-ci01 runs traefik-bootstrap until the whole fleet is up. Come back to it once id01 and pk01 exist, and replace it here with [system-agent](system-agent-setup.md) like every other VM.
+ci01 runs traefik-bootstrap until the whole fleet is up. [system-agent](system-agent-setup.md) can go on as soon as this page is done, since it needs nothing but ci01's own backends. Come back for [traefik-agent](traefik-agent-setup.md) once id01 and pk01 exist, and replace traefik-bootstrap with it here like every other VM.

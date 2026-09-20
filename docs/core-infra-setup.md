@@ -24,7 +24,7 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 - [6. Finish mailrise and point Proxmox at it](#6-finish-mailrise-and-point-proxmox-at-it)
 - [7. First access to Uptime Kuma](#7-first-access-to-uptime-kuma)
 - [8. Send a test message through Postfix](#8-send-a-test-message-through-postfix)
-- [After system-agent: subscribe your phone](#after-system-agent-subscribe-your-phone)
+- [After the Traefik handover: subscribe your phone](#after-the-traefik-handover-subscribe-your-phone)
 - [What's next](#whats-next)
 
 ## Prerequisites
@@ -276,7 +276,7 @@ The from address plays no part in routing. It still matters, because mailrise ti
 
 ### Check delivery from an admin machine
 
-The ntfy phone apps cannot connect yet. At this point in the running order nothing has published a DNS record for ntfy, and traefik-bootstrap serves a self-signed certificate that the apps refuse. Subscribing a phone waits until [after system-agent](#after-system-agent-subscribe-your-phone).
+The ntfy phone apps cannot connect yet. At this point in the running order nothing has published a DNS record for ntfy, and traefik-bootstrap serves a self-signed certificate that the apps refuse. Subscribing a phone waits until [after the Traefik handover](#after-the-traefik-handover-subscribe-your-phone).
 
 Watch the topic from an admin machine instead, forcing the hostname to ci01's address:
 
@@ -346,7 +346,7 @@ If the test fails instead:
 
 Once the test lands, click **Save**.
 
-Real events look different from the test. A monitor going down arrives titled `<monitor> Down [Uptime-Kuma]` with a red circle, the check's error as the message, and an *Open <monitor>* button linking to the monitored URL. Recovery arrives as `<monitor> Up [Uptime-Kuma]` with a green circle.
+Real events look different from the test. A monitor going down arrives titled `<monitor> Down [Uptime-Kuma]` with a red circle, the check's error as the message, and an `Open <monitor>` button linking to the monitored URL. Recovery arrives as `<monitor> Up [Uptime-Kuma]` with a green circle.
 
 ## 8. Send a test message through Postfix
 
@@ -393,9 +393,9 @@ If it failed:
 
 Delete `core-infra-test.eml` once it works.
 
-## After system-agent: subscribe your phone
+## After the Traefik handover: subscribe your phone
 
-Come back to this once [system-agent](system-agent-setup.md) has run on ci01. That is the point where dockns publishes a DNS record for ntfy and traefik-bootstrap's self-signed certificate is replaced.
+Come back to this once ci01 runs both [system-agent](system-agent-setup.md) and [traefik-agent](traefik-agent-setup.md). The first publishes a DNS record for ntfy through dockns, and the second replaces traefik-bootstrap's self-signed certificate.
 
 Before starting, open `https://ntfy.home.myah-mitchell.com` in the phone's browser and confirm it loads without a certificate warning. The apps refuse any certificate the browser would warn about.
 

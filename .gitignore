@@ -11,3 +11,6 @@
 # file bind-mounts it in. See each container's stack-README. This rule stays as
 # a backstop in case one is ever written into a checkout by hand.
 containers/*/secrets/
+
+# Working notes, never meant to be tracked.
+PLAN.md

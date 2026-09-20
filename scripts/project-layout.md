@@ -266,4 +266,66 @@ Each stack's own logs and volumes folders come from _base-README.md_, and the `s
 
 build.py also writes a stack's _setup.yaml_, next to its _README.md_. It holds the stack's project name and the entries from every container the stack uses, following `include`, with `services` already applied and dropped. Entries two containers share, such as `postgres-data`, appear once, and build.py stops if the two disagree on owner, group, mode, or source.
 
+### What a stack provides and needs
+
+Each container also says what it offers and what it expects to find, in the same _setup.yaml_:
+
+```yaml
+needs_stack:
+  - name: socket-proxy
+    services: [dozzle, dozzle-agent]
+needs_host:
+  - name: traefik
+    services: [dozzle-server]
+```
+
+| Key | Meaning |
+| --- | --- |
+| `provides` | What this container is, when that is not its directory name, or how far it can be reached from |
+| `needs_stack` | A service that has to be in the same stack, such as the Postgres an application connects to by container name |
+| `needs_host` | A service another stack on the same host may answer for, such as the Traefik whose router labels it sets |
+| `needs_fleet` | A service anywhere in the fleet, such as the vmauth a vmagent writes through |
+
+A container provides its own directory name without saying so, which is what keeps the vocabulary to names that exist: build.py rejects a need naming a service no container provides. A `provides` entry may name another container, which says this variant stands in for it, as ferretdb's postgres-documentdb does for `postgres`. Each entry takes the same optional `services` list as the rest of the file, so a variant can differ from its container.
+
+The three needs differ in where the answer may come from, and they are not interchangeable. Another stack on the host having a `postgres` says nothing about whether this stack can reach it, so an application's database is `needs_stack` and build.py resolves it there. What survives a `needs_stack` is a container the stack forgot, and the build fails by name rather than leaving it to ansible.
+
+#### Reach
+
+A `provides` entry carries a `reach`, which defaults to `stack` and follows the networks the container sits on:
+
+| Reach | Where it can be reached from | Example |
+| --- | --- | --- |
+| `stack` | Its own stack only | A postgres on `${PROJECT_NAME}_backend`, which is `internal: true` |
+| `host` | Any stack on the same host | A traefik on the external `proxy` network |
+| `fleet` | Anywhere | The `redis-public` that publishes 6379, or a vmauth published through Traefik |
+
+A need must name something provided at its own reach or wider, so `needs_host: postgres` is an error while nothing publishes a Postgres past its own stack. The generated stack file lists only what reaches past the stack, which is what makes matching a neighbour's `needs_host` against it sound: a stack's own Postgres is not in there and can never be mistaken for one another stack could open a socket to.
+
+Reach is declared rather than derived, so build.py checks each declaration against the compose file it describes:
+
+- A `needs_stack` is only answered by a container the needing one shares a network with. A consumer on `proxy` and a Postgres on `backend` sit in the same stack and satisfy the name check, but cannot open a socket, and the build says so.
+- `reach: host` wants a network the stack declares `external`, or a port published to the host. Those are the two ways another stack's containers are on the same wire.
+- `reach: fleet` wants a published port or a Traefik router, which are the only ways in from another host.
+
+Working out a service's networks means following `extends` through the container file, and a variant written that way **adds** to what it extends rather than replacing it. `.authentik-server` declares `networks: [proxy]` on top of `.authentik`'s `[frontend, backend]` and ends up on all three, which is the only reason it can reach its Postgres. Dropping a network from a base variant on the assumption that the child re-declares what it needs will break every variant under it.
+
+Declare every container a container genuinely cannot run without, not only the ones that might live elsewhere. Almost all of them cancel inside their own stack and cost nothing, and that is the point: a new stack that forgets a container it depends on fails the build by name instead of deploying and half working. Its own `depends_on` list is the place to read them off. Leave out what only degrades: dozzle-server works with no agents, and a Traefik works with no Authentik, which is what traefik-bootstrap relies on.
+
+build.py rolls all four up to the stack, then cancels each need the stack satisfies itself, at any reach, because anything in the stack is reachable from inside it. A stack running both halves of something asks for nothing, which is why victoriametrics-server carries the same host agents as system-agent without being held back by them, and traefik-server runs traefik-kop against its own Redis. The generated _setup.yaml_ records the container list beside the result, so a wrong rollup shows in the diff:
+
+```yaml
+project: "traefik"
+containers: ["error-pages", "logrotate", "redis", "socket-proxy", "traefik", "traefik-kop"]
+needs_host: []
+needs_fleet: []
+provides:
+  - name: "kop-redis"
+    reach: "fleet"
+  - name: "traefik"
+    reach: "host"
+```
+
+The `stacks` role uses what is left. On a run with `docker_stacks_bootstrap` true it drops every stack still listing a `needs_fleet` service, then fills any `needs_host` nothing left provides from `docker_stacks_standins`, which maps `traefik` to _traefik-bootstrap_. On any run, a `needs_host` still unmet at the end stops the role, because the host's stack list cannot be right.
+
 The `stacks` role reads only this generated file, from a docker-stacks checkout on the control node. CI fails when it is out of date, so commit it together with the container change that produced it.

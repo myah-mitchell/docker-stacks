@@ -1,0 +1,6 @@
+# Host setup for logrotate. scripts/build.py rolls it up into each stack's
+# setup.yaml, which the ansible stacks role applies. See scripts/project-layout.md.
+needs_stack:
+  # The read-write socket, because it signals containers to reopen
+  # their log files after a rotation.
+  - name: socket-proxy-rw

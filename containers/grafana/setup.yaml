@@ -1,5 +1,10 @@
 # Host setup for grafana. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  - name: victoriametrics
+  - name: victorialogs
+needs_host:
+  - name: traefik
 folders:
   - path: grafana-data
     owner: 101000

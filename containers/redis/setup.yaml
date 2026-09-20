@@ -1,5 +1,17 @@
 # Host setup for redis. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+provides:
+  # These two carry traefik-kop's router table. The plain .redis variant
+  # is an application cache and keeps the default name.
+  #
+  # The master publishes 6379 to the internal subnet, so traefik-kop on
+  # any host in the fleet writes into it. The replica is read-only and
+  # sits on frontend with no published port, so it serves its own stack.
+  - name: kop-redis
+    services: [redis-public]
+    reach: fleet
+  - name: kop-redis
+    services: [redis-replica]
 firewall:
   - port: 6379
     proto: tcp

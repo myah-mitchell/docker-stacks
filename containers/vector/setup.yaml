@@ -1,5 +1,10 @@
 # Host setup for vector. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  # vector ships to the two agents beside it rather than straight to the
+  # backends, so both are satisfied inside its own stack.
+  - name: vlagent
+  - name: vmagent
 folders:
   - path: vector-data
     owner: 101000

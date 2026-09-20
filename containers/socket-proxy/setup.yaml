@@ -1,0 +1,7 @@
+# Host setup for socket-proxy. scripts/build.py rolls it up into each stack's
+# setup.yaml, which the ansible stacks role applies. See scripts/project-layout.md.
+provides:
+  # A separate service from the read-only proxy, on its own network, and
+  # the one logrotate has to reach.
+  - name: socket-proxy-rw
+    services: [socket-proxy-rw]

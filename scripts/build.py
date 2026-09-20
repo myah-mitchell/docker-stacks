@@ -540,6 +540,7 @@ def extract_project_name(compose_path):
     m = _PROJECT_NAME_RE.search(content)
     return m.group(1) if m else None
 
+
 # endregion
 # ============================================================================
 # region komodo.env Builder
@@ -1252,6 +1253,40 @@ SETUP_SCHEMA = {
     'firewall': ({'port', 'proto', 'allow_from', 'comment'}, {'services'}),
 }
 
+# How far a service can be reached from, widest last. It follows the networks a
+# container sits on: a postgres on ${PROJECT_NAME}_backend, which is internal,
+# is reachable only from its own stack, while a traefik on the external proxy
+# network is reachable from every stack on the host, and a vmauth published
+# through that traefik is reachable from the whole fleet.
+SETUP_REACH = ('stack', 'host', 'fleet')
+
+# What a container says it offers and what it expects to find. Entries are
+# {name, services?}, where services scopes the entry to some of the container's
+# variants and its absence means all of them.
+#
+# A container provides its own directory name, at stack reach, without saying
+# so. 'provides' is for a variant that fills a different role, such as
+# redis-public being the Redis traefik-kop writes into rather than a general
+# cache, or for one reachable beyond its own stack. Naming another container is
+# allowed and says this variant stands in for it, which is how ferretdb's
+# postgres-documentdb answers a need for postgres.
+#
+# The three needs say where the answer is allowed to come from, and a name must
+# be something some container provides at that reach or wider, which is what
+# keeps the vocabulary to names that exist. 'needs_stack' must be met inside the
+# stack, so build.py resolves it and fails here rather than leaving it to
+# ansible. 'needs_host' may be met by another stack on the same host.
+# 'needs_fleet' may be met anywhere, so a stack carrying one cannot be set up
+# until the fleet is live.
+SETUP_CAPABILITY_SCHEMA = {
+    'provides': ({'name'}, {'services', 'reach'}),
+    'needs_stack': ({'name'}, {'services'}),
+    'needs_host': ({'name'}, {'services'}),
+    'needs_fleet': ({'name'}, {'services'}),
+}
+
+SETUP_NEEDS = ('needs_stack', 'needs_host', 'needs_fleet')
+
 
 def load_setup(containers_dir, name):
     """Load and validate a container's setup.yaml.
@@ -1261,13 +1296,16 @@ def load_setup(containers_dir, name):
     this repo, and firewall ports. Owners are host IDs, so a container's own
     UID 1000 is 101000 under userns-remap.
 
+    It also carries what the container provides to the host and what it needs
+    from it, under 'provides', 'needs_local', and 'needs_fleet'.
+
     Args:
         containers_dir: Path to the containers/ directory.
         name:           Container directory name.
 
     Returns:
-        Dict with 'folders', 'files', and 'firewall' lists, or None when the
-        container has no setup.yaml.
+        Dict with a list under each SETUP_SCHEMA and SETUP_CAPABILITY_SCHEMA
+        key, or None when the container has no setup.yaml.
 
     Raises:
         SystemExit: If the file is malformed.
@@ -1288,11 +1326,12 @@ def load_setup(containers_dir, name):
     data = yaml.safe_load(path.read_text(encoding='utf-8')) or {}
     if not isinstance(data, dict):
         fail("expected a mapping at the top level")
-    unknown = set(data) - set(SETUP_SCHEMA)
+    unknown = set(data) - set(SETUP_SCHEMA) - set(SETUP_CAPABILITY_SCHEMA)
     if unknown:
         fail(f"unknown keys: {', '.join(sorted(unknown))}")
 
-    for key, (required, optional) in SETUP_SCHEMA.items():
+    for key, (required, optional) in {**SETUP_SCHEMA,
+                                      **SETUP_CAPABILITY_SCHEMA}.items():
         entries = data.get(key) or []
         if not isinstance(entries, list):
             fail(f"'{key}' must be a list")
@@ -1312,6 +1351,15 @@ def load_setup(containers_dir, name):
                 fail(f"services in a '{key}' entry must be a list of variant names")
         data[key] = entries
 
+    for key in SETUP_CAPABILITY_SCHEMA:
+        for entry in data[key]:
+            if not (isinstance(entry['name'], str) and entry['name'].strip()):
+                fail(f"a '{key}' entry needs a non-empty name")
+    for entry in data['provides']:
+        entry.setdefault('reach', 'stack')
+        if entry['reach'] not in SETUP_REACH:
+            fail(f"reach of '{entry['name']}' must be "
+                 f"{', '.join(SETUP_REACH)}")
     for folder in data['folders']:
         folder.setdefault('root', 'volumes')
         if folder['root'] not in SETUP_ROOT_DIRS:
@@ -1413,7 +1461,339 @@ def collect_stack_setup(containers_dir, container_names, service_map):
     return {key: list(merged[key].values()) for key in SETUP_SCHEMA}
 
 
-def render_stack_setup(project_name, setup):
+def known_service_names(containers_dir):
+    """Map every name a container can provide to how far it reaches.
+
+    That is each container's directory name at stack reach, plus any name a
+    container renames a variant to, at that entry's reach. The widest wins when
+    two containers provide the same name. A need outside this map is a typo or a
+    service nothing in the repo runs; a need wider than the reach recorded here
+    names something real that cannot be got at from where the need is. Either
+    way the build stops.
+
+    Args:
+        containers_dir: Path to the containers/ directory.
+
+    Returns:
+        Dict of service name to its widest reach.
+    """
+    reach = {}
+
+    def widen(name, level):
+        if SETUP_REACH.index(level) > SETUP_REACH.index(reach.get(name, 'stack')):
+            reach[name] = level
+        reach.setdefault(name, level)
+
+    for path in sorted(containers_dir.iterdir()):
+        if not path.is_dir():
+            continue
+        widen(path.name, 'stack')
+        setup = load_setup(containers_dir, path.name)
+        for entry in (setup['provides'] if setup else []):
+            widen(entry['name'], entry['reach'])
+    return reach
+
+
+def _service_wiring(service):
+    """Networks, published ports and labels of one compose service block."""
+    service = service or {}
+    networks = service.get('networks') or []
+    labels = service.get('labels') or []
+    return (set(networks if isinstance(networks, list) else networks.keys()),
+            bool(service.get('ports')),
+            list(labels if isinstance(labels, list) else labels))
+
+
+def _variant_wiring(containers_dir, container, variant, _seen=None):
+    """How a container's service variant is wired up.
+
+    A variant written with 'extends' adds to what it extends rather than
+    replacing it, which is how .authentik-server reaches postgres on backend
+    while also sitting on proxy, so the chain is walked and combined.
+
+    Args:
+        containers_dir: Path to the containers/ directory.
+        container:      Container directory name.
+        variant:        Service key in that container's compose.yaml.
+        _seen:          Variants already walked, to stop a cycle.
+
+    Returns:
+        (networks, published, labels): the network keys it attaches to, whether
+        it publishes a port to the host, and its label list.
+    """
+    import yaml
+
+    _seen = _seen or set()
+    if (container, variant) in _seen:
+        return set(), False, []
+    _seen.add((container, variant))
+
+    path = containers_dir / container / 'compose.yaml'
+    if not path.exists():
+        return set(), False, []
+    doc = yaml.safe_load(path.read_text(encoding='utf-8')) or {}
+    service = (doc.get('services') or {}).get(variant) or {}
+    networks, published, labels = _service_wiring(service)
+
+    extends = service.get('extends')
+    other, key = None, None
+    if isinstance(extends, str):
+        other, key = container, extends
+    elif isinstance(extends, dict) and extends.get('service'):
+        other = container
+        if extends.get('file'):
+            other = PurePosixPath(extends['file']).parent.name
+        key = extends['service']
+    if key:
+        up_nets, up_published, up_labels = _variant_wiring(
+            containers_dir, other, key, _seen)
+        networks |= up_nets
+        published = published or up_published
+        labels = labels + up_labels
+    return networks, published, labels
+
+
+def stack_topology(containers_dir, compose_path, _visited=None):
+    """Resolve a stack's services to their containers and networks.
+
+    Follows 'include' the way extract_container_refs does, so a stack built on
+    another one sees the services it pulls in. A service on no network at all
+    is put on 'default', which is where compose would put it.
+
+    Args:
+        containers_dir: Path to the containers/ directory.
+        compose_path:   Path to the stack's compose.yaml.
+        _visited:       Resolved paths already read, to stop a cycle.
+
+    Returns:
+        (services, external) where services maps each service name to
+        {'container', 'variant', 'networks', 'reachable'} and external is the
+        set of network keys the stack declares external. 'reachable' is true
+        when the service publishes a port or carries Traefik router labels,
+        which are the two ways into it from off the host.
+    """
+    import yaml
+
+    if _visited is None:
+        _visited = set()
+    resolved = compose_path.resolve()
+    if resolved in _visited or not compose_path.exists():
+        return {}, set()
+    _visited.add(resolved)
+
+    content = compose_path.read_text(encoding='utf-8')
+    doc = yaml.safe_load(content) or {}
+
+    services = {}
+    external = set()
+    for inc in _parse_include_paths(content, compose_path.parent):
+        inc_services, inc_external = stack_topology(
+            containers_dir, inc, _visited)
+        services.update(inc_services)
+        external |= inc_external
+
+    for key, definition in (doc.get('networks') or {}).items():
+        if (definition or {}).get('external'):
+            external.add(key)
+
+    for name, service in (doc.get('services') or {}).items():
+        service = service or {}
+        extends = service.get('extends') or {}
+        if not isinstance(extends, dict) or not extends.get('file'):
+            continue
+        container = PurePosixPath(extends['file']).parent.name
+        variant = extends['service']
+
+        own_nets, own_published, own_labels = _service_wiring(service)
+        networks, published, labels = _variant_wiring(
+            containers_dir, container, variant)
+        services[name] = {
+            'container': container,
+            'variant': variant.lstrip('.'),
+            'networks': (networks | own_nets) or {'default'},
+            'reachable': published or own_published
+                         or any(str(label).startswith('traefik.enable')
+                                for label in labels + own_labels),
+        }
+    return services, external
+
+
+def check_stack_topology(containers_dir, compose_path, label):
+    """Check the stack's compose file backs up what its containers declare.
+
+    Two things are checked. A needs_stack is only answered by a container the
+    needing one can open a socket to, so the pair has to share a network.
+    A provides that claims to reach past the stack has to be set up to: host
+    reach wants a network the stack declares external or a port published to
+    the host, and fleet reach wants a published port or a Traefik router,
+    which are the only ways in from another host.
+
+    Args:
+        containers_dir: Path to the containers/ directory.
+        compose_path:   Path to the stack's compose.yaml.
+        label:          Stack name, for the message.
+
+    Raises:
+        SystemExit: If a declaration is not backed by the compose file.
+    """
+    import yaml
+
+    services, external = stack_topology(containers_dir, compose_path)
+    if not services:
+        return
+
+    def fail(message):
+        print(f"Error: stacks/{label}/compose.yaml: {message}")
+        sys.exit(1)
+
+    def matches(entry, variant):
+        wanted = entry.get('services')
+        return not wanted or variant in wanted
+
+    def nets(name):
+        return '/'.join(sorted(services[name]['networks']))
+
+    # Which services answer to each name, including the implicit one.
+    providers = {}
+    for name, service in services.items():
+        setup = load_setup(containers_dir, service['container'])
+        offered = {service['container']}
+        for entry in (setup['provides'] if setup else []):
+            if matches(entry, service['variant']):
+                offered.add(entry['name'])
+                reach = entry['reach']
+                if reach == 'host' and not (service['networks'] & external
+                                            or service['reachable']):
+                    fail(f"{name} provides {entry['name']} at host reach, but "
+                         f"sits only on {nets(name)} and publishes nothing. "
+                         f"Another stack reaches it over a network this one "
+                         f"declares external, or through a published port.")
+                if reach == 'fleet' and not service['reachable']:
+                    fail(f"{name} provides {entry['name']} at fleet reach, but "
+                         f"publishes no port and has no Traefik router, so "
+                         f"nothing on another host can open it.")
+        for offer in offered:
+            providers.setdefault(offer, []).append(name)
+
+    for name, service in services.items():
+        setup = load_setup(containers_dir, service['container'])
+        if not setup:
+            continue
+        for entry in setup['needs_stack']:
+            if not matches(entry, service['variant']):
+                continue
+            answering = providers.get(entry['name'], [])
+            if not answering:
+                continue
+            if any(service['networks'] & services[other]['networks']
+                   for other in answering):
+                continue
+            where = ', '.join(f"{o} on {nets(o)}" for o in sorted(answering))
+            fail(f"{name} needs {entry['name']} and is on {nets(name)}, but "
+                 f"the only {entry['name']} here is {where}. They share no "
+                 f"network, so the connection cannot be made.")
+
+
+def collect_stack_capabilities(containers_dir, container_names, service_map,
+                               known=None, label=''):
+    """Roll each container's capabilities up into the stack's own.
+
+    A container contributes its directory name at stack reach unless one of its
+    own 'provides' entries covers every variant the stack uses, in which case
+    those entries replace it.
+
+    Needs are then cancelled against everything the stack provides, at any
+    reach, because anything in the stack is reachable from inside it. A stack
+    running both halves of something asks for nothing, which is what lets
+    victoriametrics-server carry the same host agents as system-agent without
+    being held back by them, and traefik-server run traefik-kop against its own
+    Redis.
+
+    What survives cancellation differs by scope. A 'needs_stack' cannot survive:
+    nothing outside the stack can answer it, so an unmet one is a stack missing a
+    container and stops the build here. A 'needs_host' goes on to the ansible
+    role, which looks at the other stacks on the host. A 'needs_fleet' means the
+    stack cannot be set up until the fleet is live.
+
+    Args:
+        containers_dir:  Path to the containers/ directory.
+        container_names: Container names in stack order.
+        service_map:     Dict of container name to active variant names.
+        known:           Map from known_service_names(), or None to skip the
+                         vocabulary check.
+        label:           Stack name, for error messages.
+
+    Returns:
+        Dict with 'provides', a sorted list of {name, reach} for what reaches
+        beyond the stack, and sorted 'needs_host' and 'needs_fleet' lists.
+
+    Raises:
+        SystemExit: If a need names a service no container provides at that
+            reach, or a 'needs_stack' is not met inside the stack.
+    """
+    def matches(entry, active):
+        services = entry.get('services')
+        return not services or not active or bool(set(services) & active)
+
+    def fail(message):
+        print(f"Error: stacks/{label}/compose.yaml: {message}")
+        sys.exit(1)
+
+    provided = {}
+    needs = {key: {} for key in SETUP_NEEDS}
+    for name in container_names:
+        setup = load_setup(containers_dir, name)
+        active = service_map.get(name, set())
+        renamed = [e for e in (setup['provides'] if setup else [])
+                   if matches(e, active)]
+        for entry in renamed:
+            if SETUP_REACH.index(entry['reach']) > SETUP_REACH.index(
+                    provided.get(entry['name'], 'stack')):
+                provided[entry['name']] = entry['reach']
+            provided.setdefault(entry['name'], entry['reach'])
+        # The default name stays unless every variant in use was renamed.
+        covered = set()
+        for entry in renamed:
+            covered.update(set(entry.get('services') or active) & active)
+        if not (renamed and (not active or not (active - covered))):
+            provided.setdefault(name, 'stack')
+        for key in SETUP_NEEDS:
+            for entry in (setup[key] if setup else []):
+                if not matches(entry, active):
+                    continue
+                if known is not None:
+                    wanted = key.split('_')[1]
+                    have = known.get(entry['name'])
+                    if have is None:
+                        print(f"Error: containers/{name}/setup.yaml: "
+                              f"'{key}: {entry['name']}' is not a service any "
+                              f"container provides")
+                        sys.exit(1)
+                    if SETUP_REACH.index(have) < SETUP_REACH.index(wanted):
+                        print(f"Error: containers/{name}/setup.yaml: "
+                              f"'{key}: {entry['name']}' wants it at {wanted} "
+                              f"reach, but nothing provides it past {have} "
+                              f"reach")
+                        sys.exit(1)
+                needs[key].setdefault(entry['name'], name)
+
+    unmet_stack = [n for n in needs['needs_stack'] if n not in provided]
+    if unmet_stack:
+        missing = ', '.join(
+            f"{n} (for {needs['needs_stack'][n]})" for n in sorted(unmet_stack))
+        fail(f"no container in this stack provides {missing}")
+
+    return {
+        'provides': [
+            {'name': n, 'reach': r} for n, r in sorted(provided.items())
+            if r != 'stack'
+        ],
+        'needs_host': sorted(set(needs['needs_host']) - set(provided)),
+        'needs_fleet': sorted(set(needs['needs_fleet']) - set(provided)),
+    }
+
+
+def render_stack_setup(project_name, containers, capabilities, setup):
     """Serialize a stack's merged setup as YAML, in a stable key order.
 
     Written by hand rather than with yaml.dump so the output is stable across
@@ -1421,6 +1801,9 @@ def render_stack_setup(project_name, setup):
 
     Args:
         project_name: The stack's project name.
+        containers:   Container names the stack uses. Sorted here, because
+                      stack order only matters where komodo.env values collide.
+        capabilities: Dict from collect_stack_capabilities().
         setup:        Dict from collect_stack_setup().
 
     Returns:
@@ -1431,7 +1814,23 @@ def render_stack_setup(project_name, setup):
         'files': ('path', 'source', 'owner', 'group', 'mode'),
         'firewall': ('port', 'proto', 'allow_from', 'comment'),
     }
-    lines = [SETUP_STACK_HEADER.rstrip('\n'), f"project: {json.dumps(project_name)}"]
+    lines = [
+        SETUP_STACK_HEADER.rstrip('\n'),
+        f"project: {json.dumps(project_name)}",
+        f"containers: {json.dumps(sorted(containers))}",
+        f"needs_host: {json.dumps(capabilities['needs_host'])}",
+        f"needs_fleet: {json.dumps(capabilities['needs_fleet'])}",
+    ]
+    # Only what reaches past the stack is published. A stack's own postgres is
+    # on an internal network, so listing it here would let another stack's
+    # needs_host match something it cannot open a socket to.
+    if not capabilities['provides']:
+        lines.append("provides: []")
+    else:
+        lines.append("provides:")
+        for entry in capabilities['provides']:
+            lines.append(f"  - name: {json.dumps(entry['name'])}")
+            lines.append(f"    reach: {json.dumps(entry['reach'])}")
     for key, fields in order.items():
         if not setup[key]:
             lines.append(f"{key}: []")
@@ -1563,7 +1962,7 @@ def merge_setup_sections(sections, generated):
 # ============================================================================
 
 def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
-                override_values, reset_env=False):
+                override_values, known_services, reset_env=False):
     """Build all generated files for a single stack.
 
     Reads the stack's compose.yaml to discover which containers it uses,
@@ -1576,6 +1975,7 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
         base_readme:     Content string of base-README.md.
         override_values: Dict of default KEY=VALUE pairs from scripts/
                          override files (base-testing.env, .env).
+        known_services:  Set from known_service_names(), for checking needs.
         reset_env:       When True, reset .env values to defaults.
     """
     stack_name = stack_dir.name
@@ -1594,8 +1994,23 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
     # --- Extract project name from compose.yaml ---
     project_name = extract_project_name(compose_path)
 
+    # --- Roll the containers' capabilities up to the stack ---
+    check_stack_topology(containers_dir, compose_path, stack_name)
+    capabilities = collect_stack_capabilities(
+        containers_dir, container_names, service_map, known_services,
+        label=stack_name,
+    )
+
     print(f"  Stack: {stack_name}")
     print(f"    Containers: {', '.join(container_names)}")
+    if capabilities['provides']:
+        shared = ', '.join(f"{e['name']} ({e['reach']})"
+                           for e in capabilities['provides'])
+        print(f"    Provides: {shared}")
+    for key in ('needs_host', 'needs_fleet'):
+        if capabilities[key]:
+            print(f"    {key.replace('_', ' ').capitalize()}: "
+                  f"{', '.join(capabilities[key])}")
 
     # --- Generate komodo.env ---
     komodo_output = build_komodo_env(
@@ -1646,7 +2061,9 @@ def build_stack(stack_dir, containers_dir, base_komodo, base_readme,
     # --- Generate setup.yaml for the ansible stacks role ---
     stack_setup = collect_stack_setup(containers_dir, container_names, service_map)
     (stack_dir / 'setup.yaml').write_text(
-        render_stack_setup(project_name or '', stack_setup), encoding='utf-8'
+        render_stack_setup(project_name or '', container_names, capabilities,
+                           stack_setup),
+        encoding='utf-8',
     )
     print("    Created: setup.yaml")
 
@@ -1704,9 +2121,9 @@ def main():
         print("No stack directories found.")
         return
 
-    # --- Validate every container's setup.yaml, used by a stack or not ---
-    for container_dir in sorted(d for d in containers_dir.iterdir() if d.is_dir()):
-        load_setup(containers_dir, container_dir.name)
+    # --- Validate every container's setup.yaml, used by a stack or not, and
+    # --- collect the service names a stack's needs are allowed to name ---
+    known_services = known_service_names(containers_dir)
 
     print(f"Found {len(stack_dirs)} stack(s)")
     if args.reset_env:
@@ -1716,7 +2133,7 @@ def main():
     for stack_dir in stack_dirs:
         build_stack(
             stack_dir, containers_dir, base_komodo, base_readme,
-            override_values, reset_env=args.reset_env,
+            override_values, known_services, reset_env=args.reset_env,
         )
         print()
 

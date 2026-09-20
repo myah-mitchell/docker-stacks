@@ -147,7 +147,7 @@ Four keys in the pasted text need a value from you:
 | `DOMAIN_NAME` | The real domain, `myah-mitchell.com` |
 | `TRAEFIK_AUTH_CHAIN` | `chain-no-auth@file`, so it routes through traefik-bootstrap |
 
-Authentik does not exist yet, so the real `chain-authentik@file` default has nothing behind it. Clear that override later, in [step 7 of system-agent](system-agent-setup.md#7-tear-down-traefik-bootstrap), once that stack has replaced traefik-bootstrap here.
+Authentik does not exist yet, so the real `chain-authentik@file` default has nothing behind it. Clear that override later, in [step 6 of traefik-agent](traefik-agent-setup.md#6-tear-down-traefik-bootstrap), once that stack has replaced traefik-bootstrap here.
 
 Three more keys are blank and stay that way: `POSTGRES_BACKUP_DB`, `POSTGRES_BACKUP_USER`, and `POSTGRES_BACKUP_PASSWORD`. This stack's `compose.yaml` points all three at the same database, user, and password its own Postgres service already resolves.
 
@@ -285,12 +285,15 @@ docker_host:
       ansible_host: <km-ip>
       serverHostname: "km01"
       docker_stacks:
+        - system-agent
+        - traefik-agent
         - komodo-server
     ci01:
       ansible_host: <ci-ip>
       serverHostname: "ci01"
       docker_stacks:
-        - traefik-bootstrap
+        - system-agent
+        - traefik-agent
         - semaphore-server
   vars:
     docker_stacks_internal_subnet: "<internal-subnet>"
@@ -316,7 +319,11 @@ Those uppercase flags are what gate each role in `provision.yml`. They are copie
 
 Do not set `ansible_user` here. Step 3's Key Store entry supplies it.
 
-`docker_stacks` lists the stacks each host runs, by their directory names under docker-stacks' `stacks/` rather than their Komodo Stack names. The `stacks` role reads it, and scopes firewall rules for fleet-only ports to `docker_stacks_internal_subnet`. Each later runbook adds its stack to a host's list before running the Template from [step 12](#create-the-provision-stacks-template).
+`docker_stacks` lists the stacks each host runs once the site is finished, by their directory names under docker-stacks' `stacks/` rather than their Komodo Stack names. The `stacks` role reads it, and scopes firewall rules for fleet-only ports to `docker_stacks_internal_subnet`.
+
+Writing the finished list this early is safe because of `docker_stacks_bootstrap`, which is answered per run rather than stored here. Each stack in docker-stacks carries the services it still needs from elsewhere in the fleet, rolled up from the containers it runs. system-agent does, since its vmagent writes through the VictoriaMetrics backends, and so does traefik-agent, whose traefik-kop writes into tf01's Redis. A run answered `true` leaves those stacks out, and prepares traefik-bootstrap in their place on a host where something still needs a Traefik and nothing left provides one. Once tf01, id01, and pk01 are live, you stop answering it and the same list gives the host its real stacks.
+
+Each later runbook adds its own stack to a host's list before running the Template from [step 12](#create-the-provision-stacks-template). Nothing here changes at the handover.
 
 Add each new VM to this group as you build it. tf01, id01, pk01, and the rest all belong here.
 
@@ -467,7 +474,18 @@ Create a second Template the same way, with the same `target` Survey Variable. O
 
 It runs the `stacks` role for every stack in the target host's `docker_stacks` list, creating the stack's folders, seeding its config files, and opening its ports. Running it again is safe. A config file already on the host is left alone, and a folder that already exists keeps its contents.
 
-Run it once now with *Target* answered `ci01`, to confirm it works. Both of ci01's stacks so far were already set up from ci01 itself, so it has nothing to add.
+Add a second Survey Variable to this one, alongside `target`:
+
+| Field | Value |
+| --- | --- |
+| *Name* | `docker_stacks_bootstrap` |
+| *Title* | **Bootstrap** |
+| *Type* | **String** |
+| *Required* | **No** |
+
+Answer it `true` while the fleet is still being built, and the role prepares traefik-bootstrap in place of the stacks that need the rest of the fleet. Leave it blank once tf01, id01, and pk01 are live, which is the same as `false` and gives each host the stacks its list actually names. Nothing in the inventory changes when you stop answering it.
+
+Run it once now with *Target* answered `ci01` and *Bootstrap* left blank, to confirm it works. Both of ci01's stacks so far were already set up from ci01 itself, so it has nothing to add.
 
 ## 13. Replace this key once step-ca is live
 

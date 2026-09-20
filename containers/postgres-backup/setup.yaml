@@ -1,5 +1,9 @@
 # Host setup for postgres-backup. scripts/build.py renders it into each stack README, and
 # the ansible stacks role applies it. See scripts/project-layout.md.
+needs_stack:
+  # Dumps the postgres beside it in its own stack, never a shared one,
+  # so this always cancels where it is used.
+  - name: postgres
 folders:
   - path: postgres-backup-data
     owner: 100000

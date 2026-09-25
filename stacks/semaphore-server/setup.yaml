@@ -19,6 +19,11 @@ folders:
     owner: 101001
     group: 101001
   - root: "volumes"
+    path: "postgres-initdb"
+    owner: 100000
+    group: 100000
+    mode: "0755"
+  - root: "volumes"
     path: "postgres-data"
     owner: 100000
     group: 100000
@@ -26,5 +31,10 @@ folders:
     path: "postgres-backup-data"
     owner: 100000
     group: 100000
-files: []
+files:
+  - path: "postgres-initdb/10-tofu-state.sh"
+    source: "containers/semaphore/config/postgres-initdb/10-tofu-state.sh"
+    owner: 100000
+    group: 100000
+    mode: "0755"
 firewall: []

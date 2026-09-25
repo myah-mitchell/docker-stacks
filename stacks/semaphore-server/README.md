@@ -23,6 +23,14 @@ mkdir -p /opt/docker/volumes/$projectName/semaphore-config
 sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-config
 mkdir -p /opt/docker/volumes/$projectName/semaphore-tmp
 sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-tmp
+mkdir -p /opt/docker/volumes/$projectName/postgres-initdb
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-initdb
+sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb
+sudo test -e /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh \
+  || sudo curl -fsSL -o /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh \
+  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/semaphore/config/postgres-initdb/10-tofu-state.sh
+sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh
+sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh
 ```
 
 Semaphore runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.

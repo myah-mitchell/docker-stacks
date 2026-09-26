@@ -24,7 +24,7 @@ This is the point of building ci01 before anything else. Until Semaphore can rea
 - [11. Create the ansible-private Variable Group](#11-create-the-ansible-private-variable-group)
 - [12. Create the Template](#12-create-the-template)
 - [13. Replace this key once step-ca is live](#13-replace-this-key-once-step-ca-is-live)
-- [Optional: the OpenTofu state database](#optional-the-opentofu-state-database)
+- [The OpenTofu state database](#the-opentofu-state-database)
 - [What's next](#whats-next)
 
 ## The problem this solves
@@ -175,7 +175,7 @@ Go to *Settings > Secrets* on km01 and create all ten by name. These are real cr
 | `SEMAPHORE_ACCESS_KEY_ENCRYPTION` | Third value from step 2 |
 | `SEMAPHORE_POSTGRES_USER` | Your choice |
 | `SEMAPHORE_POSTGRES_PASSWORD` | Your choice, alphanumeric only |
-| `SEMAPHORE_TOFU_STATE_PASSWORD` | Your choice, alphanumeric only. The `tofu` role's password for the OpenTofu state database, see the last section |
+| `SEMAPHORE_TOFU_STATE_PASSWORD` | Your choice, alphanumeric only. The `tofu` role's password for the OpenTofu state database, see [the OpenTofu state database](#the-opentofu-state-database) |
 
 The last two feed the `POSTGRES_USER` and `POSTGRES_PASSWORD` lines in the pasted text. Do not edit those two lines themselves.
 
@@ -499,13 +499,23 @@ Once step-ca's SSH CA is running on pk01, replace the static key from step 6 wit
 
 Do not skip this. A static private key stored in Semaphore that grants passwordless root on every host in the fleet is exactly what step-ca exists to remove.
 
-## Optional: the OpenTofu state database
+## The OpenTofu state database
 
-Semaphore's `tofu` runs keep their state in a second database on this same Postgres, with a role of its own that owns only that database, so Semaphore's login cannot read it. Nothing else in this guide depends on it.
+Semaphore's `tofu` runs keep their state in a second database on this same Postgres, with a role of its own that owns only that database, so Semaphore's login cannot read it. Using OpenTofu from Semaphore is optional, but the pieces that create the database are not: the `SEMAPHORE_TOFU_STATE_PASSWORD` Secret has to exist before the stack deploys, and the `postgres-initdb` folder has to hold the script.
 
-`postgres-initdb/10-tofu-state.sh` creates the `tofu` role and the `tofu_state` database, using the `SEMAPHORE_TOFU_STATE_PASSWORD` Secret. The Postgres image runs it once, on the first start of an empty data directory, and never again. A fresh deployment needs nothing beyond the Secret and the folder from step 1.
+`postgres-initdb/10-tofu-state.sh` creates the `tofu` role and the `tofu_state` database, using that Secret. The Postgres image runs it once, on the first start of an empty data directory, and never again. A fresh deployment that followed steps 1 to 3 needs nothing more.
 
-An existing deployment already has a data directory, so the script is skipped. If Semaphore holds nothing you need, reset it: stop the stack, empty `/opt/docker/volumes/semaphore/postgres-data`, and deploy again. This deletes everything in Semaphore's database, including its Projects, keys, and Templates, and Semaphore recreates its admin account from the environment on the next start. If you do need that data, create the role and database by hand instead:
+### Adding it to an existing deployment
+
+An existing deployment already has a data directory, so the script is skipped until that directory is emptied. If Semaphore holds nothing you need, do these in order:
+
+1. Create the `SEMAPHORE_TOFU_STATE_PASSWORD` Secret on km01 (see the table in step 3).
+2. Open `stacks/semaphore-server/komodo.env` in this repo, and add its `TOFU_STATE_POSTGRES_PASSWORD` line to the Stack's *Environment* field. The field is a pasted copy, so it does not pick up repo changes by itself.
+3. Run the `stacks` role against ci01, or copy the script by hand as in step 1, so `postgres-initdb/10-tofu-state.sh` exists on the host.
+4. Stop the stack, empty `/opt/docker/volumes/semaphore/postgres-data`, and deploy again. This deletes everything in Semaphore's database, including its Projects, keys, and Templates, and Semaphore recreates its admin account from the environment on the next start.
+5. Check that it ran: `docker logs semaphore-postgres 2>&1 | grep 10-tofu-state`.
+
+If you do need the existing data, skip steps 3 and 4 and create the role and database by hand instead:
 
 ```bash
 docker exec -it semaphore-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'

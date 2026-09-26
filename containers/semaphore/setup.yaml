@@ -14,3 +14,15 @@ folders:
   - path: semaphore-tmp
     owner: 101001
     group: 101001
+  # Read by the postgres image on the first start of an empty data directory,
+  # as its postgres user, so the folder and the script must be world readable.
+  - path: postgres-initdb
+    owner: 100000
+    group: 100000
+    mode: "0755"
+files:
+  - path: postgres-initdb/10-tofu-state.sh
+    source: containers/semaphore/config/postgres-initdb/10-tofu-state.sh
+    owner: 100000
+    group: 100000
+    mode: "0755"

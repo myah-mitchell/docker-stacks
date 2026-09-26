@@ -24,6 +24,7 @@ This is the point of building ci01 before anything else. Until Semaphore can rea
 - [11. Create the ansible-private Variable Group](#11-create-the-ansible-private-variable-group)
 - [12. Create the Template](#12-create-the-template)
 - [13. Replace this key once step-ca is live](#13-replace-this-key-once-step-ca-is-live)
+- [The OpenTofu state database](#the-opentofu-state-database)
 - [What's next](#whats-next)
 
 ## The problem this solves
@@ -66,7 +67,7 @@ Check the result:
 sudo ls -ln /opt/docker/volumes/semaphore
 ```
 
-The three `semaphore-` folders are owned by `101001`, and `postgres-data` and `postgres-backup-data` by `100000`.
+The three `semaphore-` folders are owned by `101001`, and `postgres-data`, `postgres-backup-data` and `postgres-initdb` by `100000`. `postgres-initdb` holds one script, `10-tofu-state.sh`.
 
 <details>
 <summary>Manual steps, instead of ansible</summary>
@@ -91,8 +92,12 @@ sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-*
 
 mkdir -p /opt/docker/volumes/$projectName/postgres-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
+mkdir -p /opt/docker/volumes/$projectName/postgres-initdb
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-*
+sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb
 ```
+
+Copy `containers/semaphore/config/postgres-initdb/10-tofu-state.sh` from this repo into `postgres-initdb`, owned by `100000:100000` with mode `755`. The generated README has the exact commands.
 
 This list mirrors the [generated README for semaphore-server](../stacks/semaphore-server/README.md), which `scripts/build.py` rebuilds. That file wins if the two disagree.
 
@@ -153,11 +158,11 @@ Three more keys are blank and stay that way: `POSTGRES_BACKUP_DB`, `POSTGRES_BAC
 
 Leave every `[[...]]` reference in the pasted text exactly as it is. Komodo resolves them at deploy time from its own Variables and Secrets, which is the next step.
 
-### Create the nine Semaphore Secrets
+### Create the ten Semaphore Secrets
 
 The `[[GLOBAL_...]]` references already resolve, from km01's step 14. The `[[SEMAPHORE_...]]` ones do not exist yet.
 
-Go to *Settings > Secrets* on km01 and create all nine by name. These are real credentials, so Secrets rather than Variables: Komodo resolves both identically, but Secrets stay masked in the UI.
+Go to *Settings > Secrets* on km01 and create all ten by name. These are real credentials, so Secrets rather than Variables: Komodo resolves both identically, but Secrets stay masked in the UI.
 
 | Secret | Value |
 | --- | --- |
@@ -170,12 +175,13 @@ Go to *Settings > Secrets* on km01 and create all nine by name. These are real c
 | `SEMAPHORE_ACCESS_KEY_ENCRYPTION` | Third value from step 2 |
 | `SEMAPHORE_POSTGRES_USER` | Your choice |
 | `SEMAPHORE_POSTGRES_PASSWORD` | Your choice, alphanumeric only |
+| `SEMAPHORE_TOFU_STATE_PASSWORD` | Your choice, alphanumeric only. The `tofu` role's password for the OpenTofu state database, see [the OpenTofu state database](#the-opentofu-state-database) |
 
 The last two feed the `POSTGRES_USER` and `POSTGRES_PASSWORD` lines in the pasted text. Do not edit those two lines themselves.
 
 The alphanumeric-only rule matters here for the same reason it does everywhere else. See [Conventions](conventions.md#alphanumeric-only).
 
-Deploying before all nine exist fails the same way a missing `GLOBAL_*` does, with Compose trying to interpolate the literal string `[[SEMAPHORE_ADMIN_PASSWORD]]` into the container's environment. Create the Secrets and click **Deploy** again.
+Deploying before all ten exist fails the same way a missing `GLOBAL_*` does, with Compose trying to interpolate the literal string `[[SEMAPHORE_ADMIN_PASSWORD]]` into the container's environment. Create the Secrets and click **Deploy** again.
 
 ### Deploy
 
@@ -492,6 +498,44 @@ Run it once now with *Target* answered `ci01` and *Bootstrap* left blank, to con
 Once step-ca's SSH CA is running on pk01, replace the static key from step 6 with a dedicated semaphore service principal using a short-lived, auto-renewed step-ca certificate.
 
 Do not skip this. A static private key stored in Semaphore that grants passwordless root on every host in the fleet is exactly what step-ca exists to remove.
+
+## The OpenTofu state database
+
+Semaphore's `tofu` runs keep their state in a second database on this same Postgres, with a role of its own that owns only that database, so Semaphore's login cannot read it. Using OpenTofu from Semaphore is optional, but the pieces that create the database are not: the `SEMAPHORE_TOFU_STATE_PASSWORD` Secret has to exist before the stack deploys, and the `postgres-initdb` folder has to hold the script.
+
+`postgres-initdb/10-tofu-state.sh` creates the `tofu` role and the `tofu_state` database, using that Secret. The Postgres image runs it once, on the first start of an empty data directory, and never again. A fresh deployment that followed steps 1 to 3 needs nothing more.
+
+### Adding it to an existing deployment
+
+An existing deployment already has a data directory, so the script is skipped until that directory is emptied. If Semaphore holds nothing you need, do these in order:
+
+1. Create the `SEMAPHORE_TOFU_STATE_PASSWORD` Secret on km01 (see the table in step 3).
+2. Open `stacks/semaphore-server/komodo.env` in this repo, and add its `TOFU_STATE_POSTGRES_PASSWORD` line to the Stack's *Environment* field. The field is a pasted copy, so it does not pick up repo changes by itself.
+3. Run the `stacks` role against ci01, or copy the script by hand as in step 1, so `postgres-initdb/10-tofu-state.sh` exists on the host.
+4. Stop the stack, empty `/opt/docker/volumes/semaphore/postgres-data`, and deploy again. This deletes everything in Semaphore's database, including its Projects, keys, and Templates, and Semaphore recreates its admin account from the environment on the next start.
+5. Check that it ran: `docker logs semaphore-postgres 2>&1 | grep 10-tofu-state`.
+
+If you do need the existing data, skip steps 3 and 4 and create the role and database by hand instead:
+
+```bash
+docker exec -it semaphore-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+```sql
+CREATE ROLE tofu LOGIN;
+\password tofu
+CREATE DATABASE tofu_state OWNER tofu;
+```
+
+Rotating the password later is `ALTER ROLE tofu PASSWORD '...'` by hand, since the script does not run again. Put the same password in the OpenTofu Template's Environment as a secret named `PG_CONN_STR`:
+
+```
+postgres://tofu:<password>@postgres:5432/tofu_state?sslmode=disable
+```
+
+The link is plaintext, but it never leaves ci01's `semaphore_backend` network, and OpenTofu encrypts the state itself before writing it.
+
+The backup sidecar dumps both databases. Restore `tofu_state` on its own. Restoring the whole server from a dump rolls the state back with everything else, and an old state can make OpenTofu try to recreate VMs that exist.
 
 ## What's next
 

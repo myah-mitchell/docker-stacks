@@ -5,7 +5,8 @@
 name: ${PROJECT_NAME}
 
 # Temporary, per-VM stack for the bootstrap window before pk01 (step-ca) and id01
-# (Authentik) exist. See docs/traefik-bootstrap.md.
+# (Authentik) exist. See
+# https://myah-mitchell.github.io/docs/fleet-bootstrap/shared-stacks/traefik-bootstrap/
 #
 # It runs the same Traefik as every other stack. The .traefik-bootstrap variant it
 # extends is that same service under a second name, which is how build.py knows to

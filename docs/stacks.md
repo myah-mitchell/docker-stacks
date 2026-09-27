@@ -1,6 +1,6 @@
 # Stacks
 
-Every stack in `stacks/`, what it deploys, and where it runs. For the order hosts come up in, see [Bootstrap runbooks](README.md). For what a stack is made of mechanically, see [Project layout](../scripts/project-layout.md).
+Every stack in `stacks/`, what it deploys, and where it runs. For the order hosts come up in, see [Fleet bootstrap](https://myah-mitchell.github.io/docs/fleet-bootstrap/). For what a stack is made of mechanically, see [Project layout](../scripts/project-layout.md).
 
 A stack is a deployable composition of containers. Only its `compose.yaml` is hand-written, and `scripts/build.py` generates the rest.
 
@@ -26,9 +26,9 @@ These are the stacks that define what a specific VM is for.
 
 traefik-dmz is the public edge. Only port 443 outbound to the internal Traefik hosts and 6379 outbound to traefik-server's Redis need to leave the DMZ.
 
-core-infra is the odd one out in this table. It is not what ci01 is for, it is where the fleet's alerts and uptime checks land and its outgoing mail is relayed, and ci01 is simply the host with the rest of the observability stack on it already. See [Core infrastructure setup](core-infra-setup.md).
+core-infra is the odd one out in this table. It is not what ci01 is for, it is where the fleet's alerts and uptime checks land and its outgoing mail is relayed, and ci01 is simply the host with the rest of the observability stack on it already. See [Core infrastructure setup](https://myah-mitchell.github.io/docs/fleet-bootstrap/hosts/ci01/core-infra/).
 
-stalwart-server is optional. It gives the domain real mailboxes with accounts from Authentik, and nothing else in the fleet depends on it. See [mx01 bootstrap](mx01-bootstrap.md).
+stalwart-server is optional. It gives the domain real mailboxes with accounts from Authentik, and nothing else in the fleet depends on it. See [mx01 bootstrap](https://myah-mitchell.github.io/docs/fleet-bootstrap/hosts/mx01/).
 
 ## One stack per VM
 
@@ -44,9 +44,9 @@ system-agent is what every VM runs: metrics, logs, container DNS, and a Dozzle a
 
 traefik-agent is the Traefik half, for the VMs that publish something. That VM's own Traefik terminates TLS and runs the `chain-authentik@file` auth chain for its services directly, without needing tf01. traefik-kop publishes a router into tf01's shared Redis only when a service also carries a `kop-public.traefik.*` label, so reaching the internet is a per-service opt-in rather than a per-VM setting. tf01 and bh01 get all of it through traefik-server and traefik-dmz instead, so they do not list traefik-agent separately.
 
-system-agent needs the monitoring backends on ci01, and traefik-agent needs the auth chain (id01), internal certs (pk01), and tf01's Redis, so there is no point deploying either before those exist. Until then, [Traefik bootstrap](traefik-bootstrap.md) covers the temporary replacement for traefik-agent. Do not run both on one VM: they fight over ports 80, 443, and 8443.
+system-agent needs the monitoring backends on ci01, and traefik-agent needs the auth chain (id01), internal certs (pk01), and tf01's Redis, so there is no point deploying either before those exist. Until then, [Traefik bootstrap](https://myah-mitchell.github.io/docs/fleet-bootstrap/shared-stacks/traefik-bootstrap/) covers the temporary replacement for traefik-agent. Do not run both on one VM: they fight over ports 80, 443, and 8443.
 
-Deploying them is the same steps on every VM, written once in [system-agent](system-agent-setup.md).
+Deploying them is the same steps on every VM, written once in [system-agent](https://myah-mitchell.github.io/docs/fleet-bootstrap/shared-stacks/system-agent/).
 
 ## Composition layers
 

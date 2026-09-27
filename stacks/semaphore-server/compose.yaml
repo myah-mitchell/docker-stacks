@@ -36,7 +36,7 @@ services:
       file: ../../containers/postgres-backup/compose.yaml
       service: .postgres-backup
     environment:
-      # tofu_state is the OpenTofu state database, created by hand (see docs/semaphore-setup.md).
+      # tofu_state is the OpenTofu state database, created by hand (see https://myah-mitchell.github.io/docs/fleet-bootstrap/hosts/ci01/semaphore/).
       POSTGRES_BACKUP_DB: ${POSTGRES_DB},tofu_state
       POSTGRES_BACKUP_USER: ${POSTGRES_USER}
       POSTGRES_BACKUP_PASSWORD: ${POSTGRES_PASSWORD}

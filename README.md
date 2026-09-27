@@ -6,13 +6,14 @@ Read [Conventions](docs/conventions.md) before adding or changing anything. Ever
 
 ## What this repo is part of
 
-The buildout spans three repos.
+The buildout spans three repos, plus a docs site for everything that crosses them.
 
 | Repo | Holds | Visibility |
 | --- | --- | --- |
 | docker-stacks (this one) | Every container and stack definition | Public |
 | [ansible](https://github.com/myah-mitchell/ansible) | OS-level provisioning for every VM, plus the pve role that builds the cloud-init template | Public |
 | [opentofu](https://github.com/myah-mitchell/opentofu) | The OpenTofu configuration that creates VMs by cloning the pve role's template, run by ansible's `site.yml` | Public |
+| [docs](https://github.com/myah-mitchell/docs) | The [docs site](https://myah-mitchell.github.io/docs/): the fleet bootstrap runbooks and the Markdown style guide | Public |
 | fleet-private | The real inventory and private values (`hosts.yml`, `group_vars/all/private.yml`), the VMs for OpenTofu (`opentofu/prod.tfvars`), and each host's generated Komodo Stacks (`komodo/stacks/`). Ansible runs against its inventory | Private |
 
 The pve role's cloud-init template turns a freshly cloned Proxmox VM into a fully provisioned Docker host on first boot, with no manual SSH step.
@@ -22,8 +23,8 @@ The pve role's cloud-init template turns a freshly cloned Proxmox VM into a full
 km01 is the one deliberate exception to "everything is GitOps": Komodo cannot GitOps-deploy itself the first time, so it gets provisioned and started by hand. Every VM after it is provisioned by cloud-init and deployed through Komodo.
 
 1. [Conventions](docs/conventions.md) for naming and secrets.
-2. [Bootstrap runbooks](docs/README.md) for the order VMs come up in and the doc for each one.
-3. [km01 bootstrap](docs/komodo-bootstrap.md) to stand up km01, the first host.
+2. [Fleet bootstrap](https://myah-mitchell.github.io/docs/fleet-bootstrap/) on the docs site, for the order VMs come up in and the runbook for each one.
+3. [km01](https://myah-mitchell.github.io/docs/fleet-bootstrap/hosts/km01/) to stand up km01, the first host.
 4. [Stacks](docs/stacks.md) for what each stack in this repo actually deploys.
 5. [Project layout](scripts/project-layout.md) if you are editing a container or adding a stack.
 

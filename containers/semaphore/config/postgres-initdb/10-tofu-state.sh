@@ -2,7 +2,8 @@
 # Creates the OpenTofu state database beside Semaphore's own, with a role that
 # owns only that database. The postgres image runs this once, on the first
 # start of an empty data directory, and never again. Changing the password
-# later means ALTER ROLE by hand. See docs/semaphore-setup.md.
+# later means ALTER ROLE by hand. See
+# https://myah-mitchell.github.io/docs/fleet-bootstrap/hosts/ci01/semaphore/
 set -e
 
 : "${TOFU_STATE_POSTGRES_PASSWORD:?TOFU_STATE_POSTGRES_PASSWORD is not set}"

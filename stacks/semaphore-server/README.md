@@ -47,7 +47,7 @@ Set these as Komodo Secrets, and keep them stable across restarts. Rotating any 
 
 ## Wiring it to the ansible repo after deploy
 
-Full walkthrough in [Semaphore setup](https://myah-mitchell.github.io/docs/fleet-bootstrap/hosts/ci01/semaphore/): the Project, the SSH credential, the repo, a real inventory, the private variables, and a Template that runs against the fleet.
+Full walkthrough in [The Semaphore project](https://myah-mitchell.github.io/docs/fleet-bootstrap/foundation/semaphore-project/): the Project, the SSH credential, the repos, the inventory, the run's secrets, and a Template that runs against the fleet.
 
 Two points worth knowing before you start.
 

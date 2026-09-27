@@ -34,7 +34,7 @@ scrape_configs:
     ## Read from a file rather than an environment variable: the password is
     ## generated per host by ansible's monitoring role and never leaves that
     ## host, so there is nothing to put in Komodo. See
-    ## https://myah-mitchell.github.io/docs/fleet-bootstrap/shared-stacks/system-agent/
+    ## https://myah-mitchell.github.io/docs/fleet-bootstrap/stacks/system-agent/
     password_file: /etc/prometheus/node_exporter_password
   static_configs:
   - targets:

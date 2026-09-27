@@ -1392,8 +1392,15 @@ def load_setup(containers_dir, name):
         parent = str(PurePosixPath(entry['path']).parent)
         if parent != '.' and parent not in folder_paths:
             fail(f"file '{entry['path']}' is not inside a volumes folder listed here")
-        if not (containers_dir.parent / entry['source']).is_file():
-            fail(f"source '{entry['source']}' does not exist")
+        # The source's text is copied into the fleet's files and a host's
+        # world-readable Nix store, so it has to be a file of this repo's
+        # containers folder.
+        source = PurePosixPath(str(entry['source']))
+        if (source.is_absolute() or '..' in source.parts
+                or source.parts[:1] != ('containers',)):
+            fail(f"source '{source}' must be relative, under containers/, with no '..'")
+        if not (containers_dir.parent / source).is_file():
+            fail(f"source '{source}' does not exist")
 
     for rule in data['firewall']:
         if not isinstance(rule['port'], int):

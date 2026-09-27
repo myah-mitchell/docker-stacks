@@ -1,4 +1,4 @@
-# mailrise.conf — copy to mailrise.conf and fill in the ntfy token.
+# mailrise.conf. Copy to mailrise.conf and fill in the ntfy token.
 #
 # Mailrise routes by recipient address. A key with no domain, like "backups",
 # matches only <key>@mailrise.xyz, mailrise's own placeholder domain, and mail

@@ -1060,22 +1060,22 @@ def generate_password(length=16):
 
 
 # Keys ending in one of these get an auto-generated 48-character alphanumeric
-# value when blank — DB users' own passwords, chosen by us, no external issuer
+# value when blank: DB users' own passwords, chosen by us, no external issuer
 # and no format/length restriction of their own.
 DB_PASSWORD_SUFFIXES = ('_PASSWORD', '_PASS')
 DB_PASSWORD_LENGTH = 48
 
 # Keys ending in one of these get an auto-generated 96-character alphanumeric
-# value when blank — other self-issued application secrets (API passkeys,
+# value when blank: other self-issued application secrets (API passkeys,
 # internal signing/session keys, inter-service shared secrets). Deliberately
 # narrow and does NOT include every *_KEY/*_SECRET/*_TOKEN-shaped name:
 #   - *_API_KEY / *_API_TOKEN / *_LICENSE_KEY are issued by an external service
-#     (Cloudflare, MaxMind, etc.) — a random value here would silently look
+#     (Cloudflare, MaxMind, etc.). A random value here would silently look
 #     "filled in" but not actually work, so these stay blank for a human to
 #     paste a real one in.
 #   - *_KEY_ENCRYPTION (SEMAPHORE_ACCESS_KEY_ENCRYPTION) must be a
-#     base64-encoded 32-byte key, not plain alphanumeric — see its own
-#     stack-README.md (`head -c32 /dev/urandom | base64`) — so it's excluded
+#     base64-encoded 32-byte key, not plain alphanumeric (see its own
+#     stack-README.md, `head -c32 /dev/urandom | base64`), so it's excluded
 #     here and stays a documented manual step.
 OTHER_SECRET_SUFFIXES = ('_PASSKEY', '_SECRET_KEY', '_LAPI_KEY')
 OTHER_SECRET_LENGTH = 96

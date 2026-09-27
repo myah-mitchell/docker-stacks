@@ -71,7 +71,7 @@ services:
   # Scheduled pg_dump + retention sidecar for any stack extending containers/postgres/
   # or containers/ferretdb/'s .postgres service. One instance per stack, pointed at
   # that stack's own postgres service via POSTGRES_HOST (defaults to "postgres", the
-  # service name every DB-bearing stack already uses) — never a shared/cross-stack
+  # service name every DB-bearing stack already uses), never a shared/cross-stack
   # backup service. Plain SQL dumps, not PBS/VM snapshots: this is the "restore just
   # this one app's data without touching anything else" layer, complementary to the
   # VM-level PBS backups that already cover disaster recovery.

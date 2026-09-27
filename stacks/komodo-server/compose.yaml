@@ -37,7 +37,7 @@ services:
       service: .postgres-backup
     environment:
       # FerretDB's postgres always uses a literal "postgres" DB name (see
-      # containers/ferretdb/compose.yaml) — not a ${POSTGRES_DB} var like the plain
+      # containers/ferretdb/compose.yaml), not a ${POSTGRES_DB} var like the plain
       # containers/postgres/ pattern used elsewhere, so this is hardcoded here instead.
       POSTGRES_BACKUP_DB: postgres
       POSTGRES_BACKUP_USER: ${POSTGRES_USER}

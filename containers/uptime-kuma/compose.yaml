@@ -87,7 +87,7 @@ services:
       - "traefik.http.routers.$PROJECT_NAME-uptime-kuma-rtr.rule=
         Host(`${UPTIME_KUMA_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${UPTIME_KUMA_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-        # Gated behind Authentik by default (decision #13/Phase 2) — swap to
+        # Gated behind Authentik by default (decision #13/Phase 2). Swap to
         # chain-no-auth@file only if you deliberately want a public status page,
         # and route that through the Cloudflare Tunnel edge, not a new WAN path.
       - "traefik.http.routers.$PROJECT_NAME-uptime-kuma-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"

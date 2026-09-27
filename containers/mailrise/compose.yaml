@@ -75,7 +75,7 @@ services:
     container_name: "${PROJECT_NAME}-${MAILRISE_HOSTNAME}"
     command:
       - "/etc/mailrise.conf"
-    # No Traefik routing — mailrise speaks SMTP, not HTTP. PBS and PVE live outside
+    # No Traefik routing: mailrise speaks SMTP, not HTTP. PBS and PVE live outside
     # Docker entirely (Proxmox host/VM-level), so they need a plain host:port to
     # point their SMTP notification settings at, not a Traefik-fronted hostname.
     ports:
@@ -103,7 +103,7 @@ services:
         condition: service_healthy
     healthcheck:
       # The image has neither nc nor wget/curl (built FROM python:3-slim), but
-      # python3 is guaranteed present — open the SMTP socket directly and check
+      # python3 is guaranteed present, so open the SMTP socket directly and check
       # for the 220 greeting banner instead of shelling out to a missing tool.
       test: ["CMD", "python3", "-c", "import socket,sys; s=socket.create_connection(('127.0.0.1',8025),2); sys.exit(0 if s.recv(64).startswith(b'220') else 1)"]
       <<: *default_healthcheck

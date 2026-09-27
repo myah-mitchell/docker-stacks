@@ -68,13 +68,13 @@ x-environment: &default_environment
 
 services:
 
-  # Outbound-only Cloudflare Tunnel connector — no inbound WAN port anywhere, ever.
+  # Outbound-only Cloudflare Tunnel connector. No inbound WAN port anywhere, ever.
   # Deliberately run in named-tunnel/local-config mode (a credentials JSON + this
   # repo's own config.yml), NOT `--token` remote-managed mode: ingress rules
   # (public hostname -> internal service) live in git as config, not clicked
   # together in the Cloudflare dashboard, matching how everything else in this repo
   # is managed. Belongs in the same stack as traefik-dmz (stacks/traefik-dmz) on
-  # bh01 — see that container's stack-README for one-time tunnel creation.
+  # bh01. See that container's stack-README for one-time tunnel creation.
   .cloudflared:
     <<: [*limits, *restart, *security, *user, *logging]
     image: cloudflare/cloudflared:2026.7.3
@@ -99,7 +99,7 @@ services:
     networks:
       - proxy
     healthcheck:
-      # The image ships neither wget nor curl, so this can't be a plain HTTP check —
+      # The image ships neither wget nor curl, so this can't be a plain HTTP check.
       # `cloudflared tunnel ready` is the native subcommand for exactly this,
       # querying the same --metrics endpoint above and exiting 0 only once the
       # tunnel has an established connection to Cloudflare's edge (see cloudflared

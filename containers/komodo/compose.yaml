@@ -88,7 +88,7 @@ services:
       # for the field reference (unmodified upstream default, safe to keep in git).
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-secrets/core.config.toml:/config/config.toml:ro
       # Core's own PKI keypair (v2 auth, replaces the old shared KOMODO_PASSKEY) is
-      # auto-generated on first boot and lives at /config/keys/core.key — this MUST
+      # auto-generated on first boot and lives at /config/keys/core.key. This MUST
       # persist across recreation, or every Periphery agent loses trust with Core.
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-keys:/config/keys
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/komodo-backups:/backups

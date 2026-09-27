@@ -81,13 +81,13 @@ services:
       SEMAPHORE_DB_USER: ${POSTGRES_USER}
       SEMAPHORE_DB_PASS: ${POSTGRES_PASSWORD}
       SEMAPHORE_DB_NAME: ${POSTGRES_DB}
-      # First-boot admin account — rotate/remove via the UI once real
+      # First-boot admin account. Rotate/remove via the UI once real
       # Authentik-federated access (Phase 6) replaces password login.
       SEMAPHORE_ADMIN: ${SEMAPHORE_ADMIN_USER}
       SEMAPHORE_ADMIN_NAME: ${SEMAPHORE_ADMIN_NAME}
       SEMAPHORE_ADMIN_EMAIL: ${SEMAPHORE_ADMIN_EMAIL}
       SEMAPHORE_ADMIN_PASSWORD: ${SEMAPHORE_ADMIN_PASSWORD}
-      # Secrets protecting stored SSH keys/vault values and session cookies —
+      # Secrets protecting stored SSH keys/vault values and session cookies:
       # generate once with `head -c32 /dev/urandom | base64` each, keep stable
       # across restarts (rotating invalidates every stored key/session).
       SEMAPHORE_COOKIE_HASH: ${SEMAPHORE_COOKIE_HASH}
@@ -107,7 +107,7 @@ services:
       - "traefik.http.routers.$PROJECT_NAME-rtr.rule=
         Host(`${SEMAPHORE_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${SEMAPHORE_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
-        # Gated behind Authentik + MFA — Semaphore holds fleet-wide SSH access,
+        # Gated behind Authentik + MFA. Semaphore holds fleet-wide SSH access,
         # one of the highest-blast-radius admin surfaces in the whole build
         # (see plan Risk #3). Being on the mesh isn't being authenticated.
       - "traefik.http.routers.$PROJECT_NAME-rtr.middlewares=${TRAEFIK_AUTH_CHAIN:-chain-authentik@file}"

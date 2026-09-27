@@ -83,7 +83,7 @@ services:
       NTFY_CACHE_FILE: "/var/lib/ntfy/cache.db"
       NTFY_CACHE_DURATION: "12h"
       NTFY_AUTH_FILE: "/var/lib/ntfy/auth.db"
-      NTFY_AUTH_DEFAULT_ACCESS: "deny-all" # publishers/subscribers need an explicit ACL entry or token — see stack-README
+      NTFY_AUTH_DEFAULT_ACCESS: "deny-all" # publishers/subscribers need an explicit ACL entry or token. See stack-README
       NTFY_ENABLE_SIGNUP: "false"
       NTFY_ENABLE_LOGIN: "true"
     volumes:
@@ -98,7 +98,7 @@ services:
         Host(`${NTFY_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`) ||
         Host(`${NTFY_HOSTNAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}`)"
         ## Middlewares
-        # ntfy does its own auth (NTFY_AUTH_*) — publishers/subscribers authenticate
+        # ntfy does its own auth (NTFY_AUTH_*): publishers/subscribers authenticate
         # to ntfy itself, not via Authentik forward-auth, so webhook-style POSTs
         # from vmalert/mailrise/PBS/PVE keep working without a browser SSO flow.
       - "traefik.http.routers.$PROJECT_NAME-ntfy-rtr.middlewares=chain-no-auth@file"
@@ -117,7 +117,7 @@ services:
       - "kop.bind.ip=${NTFY_SERVICE_NAME}.${SERVER_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
 
       ## DockNS Labels
-      ### Internal (UniFi gateway, via dockns) — internal-only, no public Cloudflare record
+      ### Internal (UniFi gateway, via dockns): internal-only, no public Cloudflare record
       - "dockns.technitium.0.record=CNAME" # NOTE: rename to dockns' UniFi record type once confirmed (see root README)
       - "dockns.technitium.0.name=${NTFY_SERVICE_NAME}.${SUB_DOMAIN_NAME}${DOMAIN_NAME}"
 

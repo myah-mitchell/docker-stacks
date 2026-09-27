@@ -35,7 +35,7 @@ tls:
       minVersion: VersionTLS13
     tls-opts-selfsigned:
       # Same as tls-opts, but sniStrict off. sniStrict rejects the handshake for any
-      # SNI that isn't covered by a real, matching certificate — fine when a
+      # SNI that isn't covered by a real, matching certificate. That is fine when a
       # resolver actually issues one, but stacks/traefik-bootstrap has no resolver
       # at all (self-signed fallback only) and its default cert never matches the
       # requested SNI, so sniStrict would reject every real hostname outright.

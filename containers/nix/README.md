@@ -1,4 +1,5 @@
 # Initial Deployment Requirements
+
 ## How to include nix in a stack
 
 nix fills a folder with a working nix and exits. The container that runs nix mounts the same folder at `/nix` and waits for it:

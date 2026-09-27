@@ -223,9 +223,9 @@ The .env file is a standard Docker Compose environment file using `KEY=VALUE` fo
 
 ## setup.yaml
 
-A container's _setup.yaml_ lists what a host needs before that container's first deploy. It is the single source for those needs: build.py renders it into every stack README that uses the container, and rolls it up into the stack's own _setup.yaml_.
+A container's _setup.yaml_ lists what a host needs before that container's first deploy. It is the single source for those needs: build.py renders it into every stack README that uses the container, and rolls it up into the stack's own `setup.yaml`.
 
-A host gets them from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes the _setup.yaml_ of each stack a host runs into that host's file under `nixos/hosts/` in fleet-private, and deploying the host creates the folders, copies the seed files, and opens the ports.
+A host gets them from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes the `setup.yaml` of each stack a host runs into that host's file under `nixos/hosts/` in fleet-private, and deploying the host creates the folders, copies the seed files, and opens the ports.
 
 ```yaml
 folders:

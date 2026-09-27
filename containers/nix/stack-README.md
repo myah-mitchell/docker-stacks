@@ -1,4 +1,5 @@
 # Initial Deployment Requirements
+
 ## Prerequisites for using nix
 
 nix runs one time for each deploy and exits. On the first deploy it copies `/nix` from its own image into `nix-data`, and hands the copy to the owner of that folder. On every later deploy it finds the folder filled and leaves it as it is.

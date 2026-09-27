@@ -6,8 +6,8 @@ needs_stack:
   - name: socket-proxy
     services: [dozzle, dozzle-agent]
 needs_host:
-  # The agent variant is reached by the server over the Docker network,
-  # so only the server needs a way in from outside.
+  # The agent variant is reached by the server on its published port, so
+  # only the server needs a Traefik in front of it.
   - name: traefik
     services: [dozzle-server]
 firewall:

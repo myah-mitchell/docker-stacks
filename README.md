@@ -20,11 +20,11 @@ The pve role's cloud-init template turns a freshly cloned Proxmox VM into a full
 
 ## Where to start
 
-km01 is the one deliberate exception to "everything is GitOps": Komodo cannot GitOps-deploy itself the first time, so it gets provisioned and started by hand. Every VM after it is provisioned by cloud-init and deployed through Komodo.
+Every VM is created by OpenTofu, provisioned by ansible, and given its stacks by Komodo, in one run. Komodo Core on km01 is the one thing started by hand, one time, because Komodo cannot deploy the stack it runs in before it has started.
 
 1. [Conventions](docs/conventions.md) for naming and secrets.
-2. [Fleet bootstrap](https://myah-mitchell.github.io/docs/fleet-bootstrap/) on the docs site, for the order VMs come up in and the runbook for each one.
-3. [km01](https://myah-mitchell.github.io/docs/fleet-bootstrap/hosts/km01/) to stand up km01, the first host.
+2. [Fleet bootstrap](https://myah-mitchell.github.io/docs/fleet-bootstrap/) on the docs site, for the order VMs come up in and the page for each one.
+3. [The foundation](https://myah-mitchell.github.io/docs/fleet-bootstrap/foundation/) to build km01 and ci01, the first two hosts.
 4. [Stacks](docs/stacks.md) for what each stack in this repo actually deploys.
 5. [Project layout](scripts/project-layout.md) if you are editing a container or adding a stack.
 

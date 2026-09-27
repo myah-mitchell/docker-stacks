@@ -278,6 +278,6 @@ services:
   # Same service, deployed by traefik-bootstrap. It differs only in the values
   # build.py puts in that stack's komodo.env: self-signed TLS options, no cert
   # resolver, and chain-no-auth@file for the dashboard. See
-  # https://myah-mitchell.github.io/docs/fleet-bootstrap/shared-stacks/traefik-bootstrap/
+  # https://myah-mitchell.github.io/docs/fleet-bootstrap/stacks/traefik-bootstrap/
   .traefik-bootstrap:
     <<: *traefik_service

@@ -14,12 +14,9 @@ networks:
 #  backend:
 #    name: ${PROJECT_NAME}_backend
 #    internal: true
-  socket_proxy:
-    name: ${PROJECT_NAME}_socket_proxy
-    internal: true
-
-include:
-  - ../dozzle-agent/compose.yaml
+#  socket_proxy:
+#    name: ${PROJECT_NAME}_socket_proxy
+#    internal: true
 
 services:
 
@@ -27,6 +24,3 @@ services:
     extends:
       file: ../../containers/dozzle/compose.yaml
       service: .dozzle-server
-    depends_on:
-      dozzle-agent:
-        condition: service_healthy

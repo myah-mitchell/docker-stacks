@@ -14,12 +14,9 @@ networks:
   backend:
     name: ${PROJECT_NAME}_backend
     internal: true
-  socket_proxy:
-    name: ${PROJECT_NAME}_socket_proxy
-    internal: true
-
-include:
-  - ../victoriametrics-agent/compose.yaml
+#  socket_proxy:
+#    name: ${PROJECT_NAME}_socket_proxy
+#    internal: true
 
 services:
 

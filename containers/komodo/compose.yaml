@@ -116,10 +116,6 @@ services:
     depends_on:
       ferretdb:
         condition: service_healthy
-    ## Allows for systemd Periphery connection at
-    ## "https://host.docker.internal:8120"
-    ##extra_hosts:
-    ##  - host.docker.internal:host-gateway
     #healthcheck:
     #  test: ["CMD", "", ""]
     #  <<: *default_healthcheck

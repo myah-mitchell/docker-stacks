@@ -47,6 +47,18 @@ The first turns on the flake commands. The second turns off the build sandbox, w
 
 The container's `PATH` names the version of Ansible in the image. Read it again after the image changes.
 
+### Add sops
+
+Ansible decrypts the fleet's secrets with `sops`, which neither image has. Add it to nix's default profile one time, after the first deploy:
+
+```bash
+docker exec semaphore-semaphore /nix/var/nix/profiles/default/bin/nix \
+  --extra-experimental-features 'nix-command flakes' \
+  profile add --profile /nix/var/nix/profiles/default nixpkgs#sops
+```
+
+The profile is in `nix-data`, so `sops` is still there after a redeploy, and it is on the `PATH` set above.
+
 ## Wiring it to the ansible repo after deploy
 
 Full walkthrough in [The Semaphore project](https://myah-mitchell.github.io/docs/fleet-bootstrap/foundation/semaphore-project/): the Project, the SSH credential, the repos, the inventory, the run's secrets, and a Template that runs against the fleet.

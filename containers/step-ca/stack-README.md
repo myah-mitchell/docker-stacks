@@ -88,4 +88,4 @@ shred -u root_ca_key intermediate.crt intermediate.key
 
 ## Root/intermediate trust distribution
 
-Add step-ca's `root_ca.crt` (the public cert, not the key) to the `ansible/roles/certificates` role's file list. It already installs an internal CA cert into every host's trust store; this just adds a second file to that same mechanism.
+Add step-ca's `root_ca.crt` (the public cert, not the key) to the fleet's CA certificates in the inventory. `nixos-sync.yml` writes the list to `caCertificates` in `nixos/fleet.json`, and a NixOS host trusts every certificate in it from its next deploy.

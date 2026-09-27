@@ -4,9 +4,9 @@ Every stack in `stacks/`, what it deploys, and where it runs. For the order host
 
 A stack is a deployable composition of containers. Only its `compose.yaml` is hand-written, and `scripts/build.py` generates the rest.
 
-The generated files are `komodo.env`, `.env`, and `README.md`.
+The generated files are `komodo.env`, `.env`, `README.md`, and `setup.yaml`.
 
-Each stack's own generated `README.md` carries the per-stack prerequisites and folder-creation commands, and is the authoritative source for those.
+Each stack's own generated `README.md` carries the per-stack prerequisites and what the stack needs from its host: folders, seed files, and open ports. It is the authoritative source for those.
 
 Every stack also has a reference page on the docs site, under [Stacks](https://myah-mitchell.github.io/docs/fleet-bootstrap/stacks/). Whether a host is built yet is tracked in one place, the [running order](https://myah-mitchell.github.io/docs/fleet-bootstrap/#running-order).
 

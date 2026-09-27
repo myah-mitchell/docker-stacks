@@ -104,9 +104,9 @@ services:
     volumes:
       - ./config/prometheus-host.yml:/etc/prometheus/prometheus.yml:ro
       - /etc/node-exporter/node_exporter.crt:/etc/prometheus/node_exporter.crt:ro
-      # The password is generated per host by ansible and read from disk, so it
-      # is never an environment variable and never reaches Komodo. Both files are
-      # written by roles/monitoring/tasks/node-exporter.yml.
+      # The password is made on each host and read from disk, so it is never
+      # an environment variable and never reaches Komodo. The host's NixOS
+      # configuration writes both files before Docker starts.
       - /etc/node-exporter/scrape-password:/etc/prometheus/node_exporter_password:ro
 
   ## Scrapes everything on one VM: this stack's own agents and Traefik, plus the

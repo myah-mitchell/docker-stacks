@@ -57,7 +57,7 @@ docker exec semaphore-semaphore /nix/var/nix/profiles/default/bin/nix \
   profile add --profile /nix/var/nix/profiles/default nixpkgs#sops
 ```
 
-The profile is in `nix-data`, so `sops` is still there after a redeploy, and it is on the `PATH` set above.
+The profile is in `nix-data`, so `sops` is still there after a redeploy, and it is on the `PATH` set above. Run the command again after `nix-data` has been emptied and filled again.
 
 ## Wiring it to the ansible repo after deploy
 

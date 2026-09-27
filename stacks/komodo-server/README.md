@@ -1,7 +1,7 @@
 # Initial Deployment Requirements
 ## Prerequisites for using komodo
 
-The generated folder commands for komodo seed `core.config.toml` from the tracked example before the first start, and only when it is not already there. Docker silently creates an empty directory in place of a missing bind-mount file, which makes Komodo fail at startup.
+`core.config.toml` is seeded from the tracked example before the first start, and only when it is not already there. Docker silently creates an empty directory in place of a missing bind-mount file, which makes Komodo fail at startup.
 
 It lives on the host rather than in the checkout so the checkout stays disposable, the same rule every other stack follows.
 
@@ -22,7 +22,26 @@ Add a `[secrets]` block in the same file for any `[[VAR]]` reference used across
 The checkout only ever holds the `.example`. The filled-in copy stays under `/opt/docker/volumes`, which nothing in this repo can commit, matching every other container here that handles a real credential. See cloudflared or mailrise.
 
 # Create and Setup Required Folders
+
+What this stack needs from its host: folders, seed files, and open ports. It is generated from the `setup.yaml` of each container in the stack.
+
+A host gets it from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes this stack's `setup.yaml` into the host's file under `nixos/hosts/` in fleet-private, and deploying the host applies it.
+
+Owners are host IDs. Docker runs with userns-remap, so a container's UID 1000 is host UID 101000. An internal port is open to `docker_stacks_internal_subnet` from the inventory.
+
+The manual steps cover folders and seed files only. The firewall of a NixOS host changes only through its configuration.
+
 ## Create Stack Folders
+
+The host's NixOS configuration creates one folder for the stack's logs and one for its volumes.
+
+| Folder | Holds |
+| --- | --- |
+| `/opt/docker/logs/komodo` | Logs the stack's containers write to files |
+| `/opt/docker/volumes/komodo` | Every other folder in this section |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
 projectName="komodo"
@@ -35,25 +54,48 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 ```
 
+</details>
+
 ## Create needed folders for ferretdb
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/komodo/ferretdb-data` | `101000:101000` | Not set |
+| `/opt/docker/volumes/komodo/postgres-data` | `100000:100000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="komodo"
 mkdir -p /opt/docker/volumes/$projectName/ferretdb-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/ferretdb-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-data
 ```
 
+</details>
+
 ## Create needed folders for postgres-backup
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/komodo/postgres-backup-data` | `100000:100000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="komodo"
 mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-data
 ```
+
+</details>
 
 ## Restore from a dump
 
@@ -72,9 +114,27 @@ gunzip -c /opt/docker/volumes/$projectName/postgres-backup-data/daily/<dump-file
 
 ## Create needed folders for komodo
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/komodo/komodo-keys` | `101000:101000` | Not set |
+| `/opt/docker/volumes/komodo/komodo-backups` | `101000:101000` | Not set |
+| `/opt/docker/volumes/komodo/komodo-sync` | `101000:101000` | Not set |
+| `/opt/docker/volumes/komodo/komodo-cache` | `101000:101000` | Not set |
+| `/opt/docker/volumes/komodo/komodo-secrets` | `101000:101000` | `0700` |
+
+| Seed file | Copied from | Owner | Mode |
+| --- | --- | --- | --- |
+| `/opt/docker/volumes/komodo/komodo-secrets/core.config.toml` | `containers/komodo/config/core.config.toml.example` | `101000:101000` | `0600` |
+
+A seed file is copied only when the target does not exist.
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="komodo"
 mkdir -p /opt/docker/volumes/$projectName/komodo-keys
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-keys
 mkdir -p /opt/docker/volumes/$projectName/komodo-backups
@@ -93,12 +153,14 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/komodo-secrets/core.co
 sudo chmod 600 /opt/docker/volumes/$projectName/komodo-secrets/core.config.toml
 ```
 
+</details>
+
 `komodo-keys` holds the Ed25519 keypair Core generates on first boot. Losing that volume breaks trust with every Periphery agent in the fleet, and each one then has to be re-onboarded by hand. Back it up like the database directories, not like the disposable `komodo-cache`.
 
 ## Open the firewall for komodo
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration opens these when the host is deployed.
 
-```bash
-sudo ufw allow 9120/tcp comment 'Komodo Core'
-```
+| Port | Protocol | Allowed from | Used for |
+| --- | --- | --- | --- |
+| `9120` | tcp | Any address | Komodo Core |

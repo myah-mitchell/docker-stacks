@@ -34,7 +34,26 @@ The role also opens port 9100 in UFW as the `Node-Exporter` application, so
 vmagent can reach it.
 
 # Create and Setup Required Folders
+
+What this stack needs from its host: folders, seed files, and open ports. It is generated from the `setup.yaml` of each container in the stack.
+
+A host gets it from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes this stack's `setup.yaml` into the host's file under `nixos/hosts/` in fleet-private, and deploying the host applies it.
+
+Owners are host IDs. Docker runs with userns-remap, so a container's UID 1000 is host UID 101000. An internal port is open to `docker_stacks_internal_subnet` from the inventory.
+
+The manual steps cover folders and seed files only. The firewall of a NixOS host changes only through its configuration.
+
 ## Create Stack Folders
+
+The host's NixOS configuration creates one folder for the stack's logs and one for its volumes.
+
+| Folder | Holds |
+| --- | --- |
+| `/opt/docker/logs/victoriametrics` | Logs the stack's containers write to files |
+| `/opt/docker/volumes/victoriametrics` | Every other folder in this section |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
 projectName="victoriametrics"
@@ -47,38 +66,70 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 ```
 
+</details>
+
 ## Create needed folders for vlagent
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/victoriametrics/vlagent-data` | `101000:101000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="victoriametrics"
 mkdir -p /opt/docker/volumes/$projectName/vlagent-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/vlagent-data
 ```
 
+</details>
+
 ## Create needed folders for vmagent
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/victoriametrics/vmagent-data` | `101000:101000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="victoriametrics"
 mkdir -p /opt/docker/volumes/$projectName/vmagent-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/vmagent-data
 ```
 
+</details>
+
 ## Create needed folders for vector
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/victoriametrics/vector-data` | `101000:101000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="victoriametrics"
 mkdir -p /opt/docker/volumes/$projectName/vector-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/vector-data
 ```
 
+</details>
+
 ## Open the firewall for vector
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration opens these when the host is deployed.
 
-```bash
-sudo ufw allow from <internal-subnet> to any port 5140 proto tcp comment 'Vector syslog'
-sudo ufw allow from <internal-subnet> to any port 5140 proto udp comment 'Vector syslog'
-```
+| Port | Protocol | Allowed from | Used for |
+| --- | --- | --- | --- |
+| `5140` | tcp | The internal subnet | Vector syslog |
+| `5140` | udp | The internal subnet | Vector syslog |

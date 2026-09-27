@@ -1,5 +1,24 @@
 # Create and Setup Required Folders
+
+What this stack needs from its host: folders, seed files, and open ports. It is generated from the `setup.yaml` of each container in the stack.
+
+A host gets it from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes this stack's `setup.yaml` into the host's file under `nixos/hosts/` in fleet-private, and deploying the host applies it.
+
+Owners are host IDs. Docker runs with userns-remap, so a container's UID 1000 is host UID 101000. An internal port is open to `docker_stacks_internal_subnet` from the inventory.
+
+The manual steps cover folders and seed files only. The firewall of a NixOS host changes only through its configuration.
+
 ## Create Stack Folders
+
+The host's NixOS configuration creates one folder for the stack's logs and one for its volumes.
+
+| Folder | Holds |
+| --- | --- |
+| `/opt/docker/logs/semaphore` | Logs the stack's containers write to files |
+| `/opt/docker/volumes/semaphore` | Every other folder in this section |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
 projectName="semaphore"
@@ -12,11 +31,30 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 ```
 
+</details>
+
 ## Create needed folders for semaphore
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/semaphore/semaphore-data` | `101001:101001` | Not set |
+| `/opt/docker/volumes/semaphore/semaphore-config` | `101001:101001` | Not set |
+| `/opt/docker/volumes/semaphore/semaphore-tmp` | `101001:101001` | Not set |
+| `/opt/docker/volumes/semaphore/postgres-initdb` | `100000:100000` | `0755` |
+
+| Seed file | Copied from | Owner | Mode |
+| --- | --- | --- | --- |
+| `/opt/docker/volumes/semaphore/postgres-initdb/10-tofu-state.sh` | `containers/semaphore/config/postgres-initdb/10-tofu-state.sh` | `100000:100000` | `0755` |
+
+A seed file is copied only when the target does not exist.
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="semaphore"
 mkdir -p /opt/docker/volumes/$projectName/semaphore-data
 sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-data
 mkdir -p /opt/docker/volumes/$projectName/semaphore-config
@@ -32,6 +70,8 @@ sudo test -e /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh \
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh
 sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh
 ```
+
+</details>
 
 Semaphore runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.
 
@@ -57,21 +97,41 @@ Semaphore reaches every host with a static SSH key trusted by the `ansible` serv
 
 ## Create needed folders for postgres
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/semaphore/postgres-data` | `100000:100000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="semaphore"
 mkdir -p /opt/docker/volumes/$projectName/postgres-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-data
 ```
 
+</details>
+
 ## Create needed folders for postgres-backup
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/semaphore/postgres-backup-data` | `100000:100000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="semaphore"
 mkdir -p /opt/docker/volumes/$projectName/postgres-backup-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-backup-data
 ```
+
+</details>
 
 ## Restore from a dump
 

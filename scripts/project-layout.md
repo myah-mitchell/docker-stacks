@@ -11,7 +11,7 @@ docker-stacks
     * komodo.env - _Only contains items specific to this container_
     * README.md - _Container-level documentation (not used by build.py)_
     * stack-README.md - _Sections to merge into stack README.md files_
-    * setup.yaml - _Optional host setup: folders, seeded config files, and firewall ports. Rendered into stack README.md files and applied by the ansible `stacks` role_
+    * setup.yaml - _Optional host setup: folders, seeded config files, and firewall ports. Rendered into stack README.md files, and carried to the host's NixOS configuration by the ansible playbook `nixos-sync.yml`_
     * testing.env - _Container-specific non-sensitive testing defaults in KEY: VALUE format_
 * **stacks** - _Folder containing all stacks_
   * **\<stackName>** - _Friendly name of stack_
@@ -20,7 +20,7 @@ docker-stacks
     * komodo.env - _This file is created by build.py_
     * .env - _This file is created by build.py (gitignored, for local testing)_
     * README.md - _This file is created by build.py_
-    * setup.yaml - _This file is created by build.py from the setup.yaml of each container the stack uses. Read by the ansible `stacks` role_
+    * setup.yaml - _This file is created by build.py from the setup.yaml of each container the stack uses. Read by the ansible `stacks` role and by `nixos-sync.yml`_
 * **scripts**
     * project-layout.md - _This file_
     * build.py - _Script that will build/update the komodo.env, README.md, setup.yaml, and testing .env files for each stack._
@@ -223,7 +223,9 @@ The .env file is a standard Docker Compose environment file using `KEY=VALUE` fo
 
 ## setup.yaml
 
-A container's _setup.yaml_ lists what a host needs before that container's first deploy. It is the single source for those steps: build.py renders it into the manual commands in every stack README that uses the container, and the ansible `stacks` role applies it to a host.
+A container's _setup.yaml_ lists what a host needs before that container's first deploy. It is the single source for those needs: build.py renders it into every stack README that uses the container, and rolls it up into the stack's own _setup.yaml_.
+
+A host gets them from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes the _setup.yaml_ of each stack a host runs into that host's file under `nixos/hosts/` in fleet-private, and deploying the host creates the folders, copies the seed files, and opens the ports.
 
 ```yaml
 folders:
@@ -255,14 +257,14 @@ firewall:
 | `files[].owner`, `group`, `mode` | As for folders, with `mode` optional |
 | `firewall[].port`, `proto` | Port number, and `tcp` or `udp` |
 | `firewall[].allow_from` | `internal`, scoped to the internal subnet, or `any` |
-| `firewall[].comment` | UFW rule comment |
+| `firewall[].comment` | What the port is for. It is shown in the stack README and carried with the rule into the host's file |
 | `services` | Optional on any entry, a list of service names. The entry applies only to stacks that run one of them, such as `redis-public` but not `redis-replica` |
 
 build.py rejects unknown keys, missing keys, paths containing `..`, and sources that do not exist. It needs PyYAML to read these files.
 
-In a stack README, the rendered commands go under `# Create and Setup Required Folders`, as `## Create needed folders for <imageName>` and `## Open the firewall for <imageName>`. A container's own _stack-README.md_ can use either heading to add prose, which follows the generated commands.
+In a stack README, the rendered sections go under `# Create and Setup Required Folders`, as `## Create needed folders for <imageName>` and `## Open the firewall for <imageName>`. Each is a table of what the host has to provide. Folders and seed files are followed by the commands that make them by hand, in a collapsed block. Ports have no such block, because the firewall of a NixOS host changes only through its configuration. A container's own _stack-README.md_ can use either heading to add prose, which follows the generated text.
 
-Each stack's own logs and volumes folders come from _base-README.md_, and the `stacks` role creates those too.
+Each stack's own logs and volumes folders come from _base-README.md_, and the host's NixOS configuration creates those too, one pair for each project.
 
 build.py also writes a stack's _setup.yaml_, next to its _README.md_. It holds the stack's project name and the entries from every container the stack uses, following `include`, with `services` already applied and dropped. Entries two containers share, such as `postgres-data`, appear once, and build.py stops if the two disagree on owner, group, mode, or source.
 
@@ -328,4 +330,4 @@ provides:
 
 The `stacks` role uses what is left. On a run with `docker_stacks_bootstrap` true it drops every stack still listing a `needs_fleet` service, then fills any `needs_host` nothing left provides from `docker_stacks_standins`, which maps `traefik` to _traefik-bootstrap_. On any run, a `needs_host` still unmet at the end stops the role, because the host's stack list cannot be right.
 
-The `stacks` role reads only this generated file, from a docker-stacks checkout on the control node. CI fails when it is out of date, so commit it together with the container change that produced it.
+The `stacks` role and `nixos-sync.yml` read this generated file, and the seed files it names, from a docker-stacks checkout on the control node. CI fails when it is out of date, so commit it together with the container change that produced it.

@@ -4,7 +4,26 @@
 A relay to send through, unless this host's public address can deliver mail itself. Most mail providers junk or refuse mail sent directly from a residential address, and Postfix here does no DKIM signing, so plan on an authenticated relay such as a mail host's SMTP submission service.
 
 # Create and Setup Required Folders
+
+What this stack needs from its host: folders, seed files, and open ports. It is generated from the `setup.yaml` of each container in the stack.
+
+A host gets it from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes this stack's `setup.yaml` into the host's file under `nixos/hosts/` in fleet-private, and deploying the host applies it.
+
+Owners are host IDs. Docker runs with userns-remap, so a container's UID 1000 is host UID 101000. An internal port is open to `docker_stacks_internal_subnet` from the inventory.
+
+The manual steps cover folders and seed files only. The firewall of a NixOS host changes only through its configuration.
+
 ## Create Stack Folders
+
+The host's NixOS configuration creates one folder for the stack's logs and one for its volumes.
+
+| Folder | Holds |
+| --- | --- |
+| `/opt/docker/logs/core` | Logs the stack's containers write to files |
+| `/opt/docker/volumes/core` | Every other folder in this section |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
 projectName="core"
@@ -17,14 +36,26 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 ```
 
+</details>
+
 ## Create needed folders for ntfy
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/core/ntfy-data` | `101000:101000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="core"
 mkdir -p /opt/docker/volumes/$projectName/ntfy-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/ntfy-data
 ```
+
+</details>
 
 ## Post-deploy: create your account and a publish-only token
 
@@ -48,9 +79,23 @@ Use the resulting token as the `Authorization: Bearer <token>` header (or `ntfy:
 
 ## Create needed folders for mailrise
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/core/mailrise-secrets` | `101000:101000` | `0700` |
+
+| Seed file | Copied from | Owner | Mode |
+| --- | --- | --- | --- |
+| `/opt/docker/volumes/core/mailrise-secrets/mailrise.conf` | `containers/mailrise/config/mailrise.conf.example` | `101000:101000` | `0600` |
+
+A seed file is copied only when the target does not exist.
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="core"
 mkdir -p /opt/docker/volumes/$projectName/mailrise-secrets
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
 sudo chmod 700 /opt/docker/volumes/$projectName/mailrise-secrets
@@ -61,6 +106,8 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets/mailr
 sudo chmod 600 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
 ```
 
+</details>
+
 The config is copied from the tracked example only when it is not already there, so a filled-in token is never overwritten.
 
 Fill in the `token` value with the ntfy publish-only token created in ntfy's own post-deploy step.
@@ -69,11 +116,11 @@ Do all of this before the first deploy. Docker creates an empty directory in pla
 
 ## Open the firewall for mailrise
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration opens these when the host is deployed.
 
-```bash
-sudo ufw allow from <internal-subnet> to any port 8025 proto tcp comment 'Mailrise SMTP'
-```
+| Port | Protocol | Allowed from | Used for |
+| --- | --- | --- | --- |
+| `8025` | tcp | The internal subnet | Mailrise SMTP |
 
 ## Point PBS and PVE at it
 
@@ -83,24 +130,34 @@ Burn in rather than cutting over instantly. Leave PBS/PVE's previous (broken, sp
 
 ## Create needed folders for postfix
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/core/postfix-data` | `100000:100000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="core"
 mkdir -p /opt/docker/volumes/$projectName/postfix-data
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postfix-data
 ```
+
+</details>
 
 Postfix runs as the image's own root, so its queue directory belongs to host UID `100000` rather than `101000`. Postfix creates the queue's subdirectories itself on first start.
 
 ## Open the firewall for postfix
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration opens these when the host is deployed.
 
-```bash
-sudo ufw allow from <internal-subnet> to any port 25 proto tcp comment 'Postfix SMTP'
-```
+| Port | Protocol | Allowed from | Used for |
+| --- | --- | --- | --- |
+| `25` | tcp | The internal subnet | Postfix SMTP |
 
-Scope it to the internal subnet. Postfix relays for any private address with no login, which is fine for a LAN-only relay and not fine for anything wider.
+Keep it scoped to the internal subnet. Postfix relays for any private address with no login, which is fine for a LAN-only relay and not fine for anything wider.
 
 ## Point services at it
 
@@ -118,12 +175,22 @@ Postfix also refuses a recipient whose domain has no DNS record, so a typo in a 
 
 ## Create needed folders for mailpit
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/core/mailpit-data` | `101000:101000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="core"
 mkdir -p /opt/docker/volumes/$projectName/mailpit-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailpit-data
 ```
+
+</details>
 
 ## Reading the copies
 
@@ -139,9 +206,23 @@ docker logs ${projectName}-postfix 2>&1 | grep 'status='
 
 ## Create needed folders for blackbox-exporter
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/core/blackbox-exporter-config` | `101000:101000` | Not set |
+
+| Seed file | Copied from | Owner | Mode |
+| --- | --- | --- | --- |
+| `/opt/docker/volumes/core/blackbox-exporter-config/blackbox.yml` | `containers/blackbox-exporter/config/blackbox.yml.example` | `101000:101000` | Not set |
+
+A seed file is copied only when the target does not exist.
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="core"
 mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
 sudo test -e /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
@@ -149,6 +230,8 @@ sudo test -e /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.
   https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/blackbox-exporter/config/blackbox.yml.example
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml
 ```
+
+</details>
 
 The config is copied from the tracked example only when it is not already there, so local edits are never overwritten.
 
@@ -182,12 +265,22 @@ Pair with a `vmalert` rule (`probe_success == 0`) notifying through `ntfy` (Phas
 
 ## Create needed folders for uptime-kuma
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/core/uptime-kuma-data` | `101000:101000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="core"
 mkdir -p /opt/docker/volumes/$projectName/uptime-kuma-data
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/uptime-kuma-data
 ```
+
+</details>
 
 ## Post-deploy
 

@@ -10,7 +10,7 @@ Postfix runs as the image's own root, so its queue directory belongs to host UID
 
 ## Open the firewall for postfix
 
-Scope it to the internal subnet. Postfix relays for any private address with no login, which is fine for a LAN-only relay and not fine for anything wider.
+Keep it scoped to the internal subnet. Postfix relays for any private address with no login, which is fine for a LAN-only relay and not fine for anything wider.
 
 ## Point services at it
 

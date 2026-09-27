@@ -1,7 +1,7 @@
 # Initial Deployment Requirements
 ## Prerequisites for using komodo
 
-The generated folder commands for komodo seed `core.config.toml` from the tracked example before the first start, and only when it is not already there. Docker silently creates an empty directory in place of a missing bind-mount file, which makes Komodo fail at startup.
+`core.config.toml` is seeded from the tracked example before the first start, and only when it is not already there. Docker silently creates an empty directory in place of a missing bind-mount file, which makes Komodo fail at startup.
 
 It lives on the host rather than in the checkout so the checkout stays disposable, the same rule every other stack follows.
 

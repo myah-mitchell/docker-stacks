@@ -1,5 +1,24 @@
 # Create and Setup Required Folders
+
+What this stack needs from its host: folders, seed files, and open ports. It is generated from the `setup.yaml` of each container in the stack.
+
+A host gets it from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes this stack's `setup.yaml` into the host's file under `nixos/hosts/` in fleet-private, and deploying the host applies it.
+
+Owners are host IDs. Docker runs with userns-remap, so a container's UID 1000 is host UID 101000. An internal port is open to `docker_stacks_internal_subnet` from the inventory.
+
+The manual steps cover folders and seed files only. The firewall of a NixOS host changes only through its configuration.
+
 ## Create Stack Folders
+
+The host's NixOS configuration creates one folder for the stack's logs and one for its volumes.
+
+| Folder | Holds |
+| --- | --- |
+| `/opt/docker/logs/traefik` | Logs the stack's containers write to files |
+| `/opt/docker/volumes/traefik` | Every other folder in this section |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
 projectName="traefik"
@@ -12,11 +31,23 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 ```
 
+</details>
+
 ## Create needed folders for traefik
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/logs/traefik/traefik` | `101000:101000` | `0755` |
+| `/opt/docker/volumes/traefik/traefik-certs` | `101000:101000` | Not set |
+| `/opt/docker/volumes/traefik/traefik-plugins` | `101000:101000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="traefik"
 mkdir -p /opt/docker/logs/$projectName/traefik
 sudo chown 101000:101000 /opt/docker/logs/$projectName/traefik
 sudo chmod 755 /opt/docker/logs/$projectName/traefik
@@ -26,23 +57,40 @@ mkdir -p /opt/docker/volumes/$projectName/traefik-plugins
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/traefik-plugins
 ```
 
+</details>
+
 The log folder is mode 755 rather than group-writable. logrotate runs as root and refuses to rotate a file whose parent directory is writable by a group other than root, so it would exit 1 every five minutes and access.log would grow forever.
 
 ## Open the firewall for traefik
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration opens these when the host is deployed.
 
-```bash
-sudo ufw allow 80/tcp comment 'Traefik HTTP'
-sudo ufw allow 443/tcp comment 'Traefik HTTPS'
-sudo ufw allow 8443/tcp comment 'Traefik HTTPS (alt)'
-```
+| Port | Protocol | Allowed from | Used for |
+| --- | --- | --- | --- |
+| `80` | tcp | Any address | Traefik HTTP |
+| `443` | tcp | Any address | Traefik HTTPS |
+| `8443` | tcp | Any address | Traefik HTTPS (alt) |
 
 ## Create needed folders for cloudflared
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/traefik/cloudflared-config` | `101000:101000` | Not set |
+| `/opt/docker/volumes/traefik/cloudflared-secrets` | `101000:101000` | `0700` |
+
+| Seed file | Copied from | Owner | Mode |
+| --- | --- | --- | --- |
+| `/opt/docker/volumes/traefik/cloudflared-config/config.yml` | `containers/cloudflared/config/config.yml.example` | `101000:101000` | Not set |
+
+A seed file is copied only when the target does not exist.
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="traefik"
 mkdir -p /opt/docker/volumes/$projectName/cloudflared-config
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config
 mkdir -p /opt/docker/volumes/$projectName/cloudflared-secrets
@@ -53,6 +101,8 @@ sudo test -e /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
   https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/cloudflared/config/config.yml.example
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config/config.yml
 ```
+
+</details>
 
 The ingress config is copied from the tracked example only when it is not already there, so a filled-in `config.yml` is never overwritten.
 

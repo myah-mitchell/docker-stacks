@@ -8,7 +8,26 @@ A Stalwart Enterprise license for the domain, stored in a Komodo Secret named `S
 An Authentik OAuth2 application for Bulwark to sign in through. Its client ID and secret go in the Komodo Secrets `MAIL_OIDC_CLIENT_ID` and `MAIL_OIDC_CLIENT_SECRET`, and a 96-character random `BULWARK_SESSION_SECRET_KEY` goes beside them.
 
 # Create and Setup Required Folders
+
+What this stack needs from its host: folders, seed files, and open ports. It is generated from the `setup.yaml` of each container in the stack.
+
+A host gets it from its NixOS configuration. The ansible playbook `nixos-sync.yml` writes this stack's `setup.yaml` into the host's file under `nixos/hosts/` in fleet-private, and deploying the host applies it.
+
+Owners are host IDs. Docker runs with userns-remap, so a container's UID 1000 is host UID 101000. An internal port is open to `docker_stacks_internal_subnet` from the inventory.
+
+The manual steps cover folders and seed files only. The firewall of a NixOS host changes only through its configuration.
+
 ## Create Stack Folders
+
+The host's NixOS configuration creates one folder for the stack's logs and one for its volumes.
+
+| Folder | Holds |
+| --- | --- |
+| `/opt/docker/logs/mail` | Logs the stack's containers write to files |
+| `/opt/docker/volumes/mail` | Every other folder in this section |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
 projectName="mail"
@@ -21,29 +40,42 @@ sudo chmod 750 /opt/docker/volumes/$projectName/
 sudo chown $USER:101000 /opt/docker/volumes/$projectName
 ```
 
+</details>
+
 ## Create needed folders for stalwart
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/mail/stalwart-config` | `102000:102000` | Not set |
+| `/opt/docker/volumes/mail/stalwart-data` | `102000:102000` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="mail"
 mkdir -p /opt/docker/volumes/$projectName/stalwart-config
 sudo chown 102000:102000 /opt/docker/volumes/$projectName/stalwart-config
 mkdir -p /opt/docker/volumes/$projectName/stalwart-data
 sudo chown 102000:102000 /opt/docker/volumes/$projectName/stalwart-data
 ```
 
+</details>
+
 Stalwart runs as the image's own UID 2000, so its directories belong to host UID `102000` rather than `101000`.
 
 ## Open the firewall for stalwart
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration opens these when the host is deployed.
 
-```bash
-sudo ufw allow 25/tcp comment 'Stalwart SMTP'
-sudo ufw allow 465/tcp comment 'Stalwart submissions'
-sudo ufw allow 587/tcp comment 'Stalwart submission'
-sudo ufw allow 993/tcp comment 'Stalwart IMAPS'
-```
+| Port | Protocol | Allowed from | Used for |
+| --- | --- | --- | --- |
+| `25` | tcp | Any address | Stalwart SMTP |
+| `465` | tcp | Any address | Stalwart submissions |
+| `587` | tcp | Any address | Stalwart submission |
+| `993` | tcp | Any address | Stalwart IMAPS |
 
 ## First start
 
@@ -72,9 +104,21 @@ Never add either variable to the stack itself.
 
 ## Create needed folders for bulwark
 
-Generated from `setup.yaml`, which the ansible `stacks` role also applies.
+The host's NixOS configuration sets these up when the host is deployed.
+
+| Folder | Owner | Mode |
+| --- | --- | --- |
+| `/opt/docker/volumes/mail/bulwark-data` | `101001:101001` | Not set |
+| `/opt/docker/volumes/mail/bulwark-data/settings` | `101001:101001` | Not set |
+| `/opt/docker/volumes/mail/bulwark-data/admin` | `101001:101001` | Not set |
+| `/opt/docker/volumes/mail/bulwark-data/admin-state` | `101001:101001` | Not set |
+| `/opt/docker/volumes/mail/bulwark-data/telemetry` | `101001:101001` | Not set |
+
+<details>
+<summary>Manual steps, instead of nixos-sync.yml</summary>
 
 ```bash
+projectName="mail"
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data
 sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data/settings
@@ -86,5 +130,7 @@ sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data/admin-sta
 mkdir -p /opt/docker/volumes/$projectName/bulwark-data/telemetry
 sudo chown 101001:101001 /opt/docker/volumes/$projectName/bulwark-data/telemetry
 ```
+
+</details>
 
 Bulwark runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.

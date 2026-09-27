@@ -25,9 +25,9 @@ Read [Conventions](conventions.md) first. This doc assumes its naming and secret
 ## Prerequisites
 
 - km01 is finished, through step 14 of [km01 bootstrap](komodo-bootstrap.md). Its four containers are healthy, its admin account exists, its firewall allows inbound 9120, and its global `[[GLOBAL_...]]` Variables are created.
-- The real Komodo Core address and public key are committed and pushed in ansible-private's `group_vars/all/private.yml`. That is step 13 of the km01 runbook, and the new host reads both at first boot.
+- The real Komodo Core address and public key are committed and pushed in fleet-private's `group_vars/all/private.yml`. That is step 13 of the km01 runbook, and the new host reads both at first boot.
 - The cloud-init template exists on the target PVE host, the same one km01 was cloned from. Its name follows the Ubuntu version, so `ubuntu-server-2604` at 26.04.
-- You can open Komodo's UI when you reach step 5. The onboarding key is single-use and short-lived, so there is nothing to prepare ahead of time.
+- You can open Komodo's UI when you reach step 5. The onboarding key is created there, so there is nothing to prepare ahead of time.
 
 ## Placeholders
 
@@ -46,7 +46,7 @@ The first seven are in the Placeholders table of the host runbook that sent you 
 | `<vm-storage>` | The Proxmox storage that holds VM disks, `local-zfs` on a host built with the pve role's defaults |
 | `<km-ip>` | km01's address, from its own runbook |
 | `<same>` | The value cloud-init already used, recovered in step 5 rather than guessed |
-| `<ansible-private-url>` | Clone URL for ansible-private, from the ansible repo's README |
+| `<fleet-private-url>` | Clone URL for fleet-private, from the ansible repo's README |
 
 There is no single fleet gateway. Every host in the running order sits on the internal VLAN except bh01, which is the DMZ edge and takes the DMZ VLAN's gateway instead. Take `<gateway-ip>` and `<ip>` from the same VLAN the host runbook names.
 
@@ -123,9 +123,11 @@ Docker will not start if any of these mounts is missing. The docker role install
 
 ## 5. Give the host an onboarding key
 
-This is the one manual step, and it is permanent. Every new host needs its own fresh onboarding key at provision time, the same way every new host needs its own SSH host key accepted. A host that is being rebuilt does not. It keeps Periphery's private key on its persistent disk and reconnects as it was, see [Rebuilding a VM](rebuild-a-vm.md#7-check-it-reconnected).
+This is the one manual step when a host is built by hand. Every new host needs an onboarding key for its first connection to Core, the same way every new host needs its SSH host key accepted once. A host that is being rebuilt does not. It keeps Periphery's private key on its persistent disk and reconnects as it was, see [Rebuilding a VM](rebuild-a-vm.md#7-check-it-reconnected).
 
-The ansible repo ships `komodo_onboarding_key` blank in the docker role's defaults, because a real value is single-use and must never be committed. Periphery needs one to make its first outbound connection to Core. After that, Core and the new host trust each other by their own Ed25519 keypairs and the onboarding key is discarded. Periphery's private key is written to `/srv/persist/host/komodo/periphery.key`, on the persistent disk rather than the OS disk, so it survives a rebuild.
+The ansible repo ships `komodo_onboarding_key` blank in the docker role's defaults, because a real key must never be committed. Periphery needs one to make its first outbound connection to Core, which creates the host's Server. After that, Core and the new host trust each other by their own Ed25519 keypairs, and the host no longer needs the key.
+
+Onboarding keys are not single-use. Komodo keeps a key until it expires or you delete or disable it, and one key onboards any number of hosts. It can only create Servers under names that do not exist yet, unless it was created as privileged. Anyone holding it can add a Server under a new name, so give each key an expiry, or delete it once its hosts are in. [One-run provisioning](one-run-provisioning.md) holds a single key as a Semaphore secret for this reason, with an expiry. Periphery's private key is written to `/srv/persist/host/komodo/periphery.key`, on the persistent disk rather than the OS disk, so it survives a rebuild.
 
 In Komodo's UI on km01, at `http://<km-ip>:9120`, go to *Settings > Onboarding* and click **New Onboarding Key**.
 
@@ -146,7 +148,7 @@ If that file is gone, the same values are in the vendor snippet on the PVE host,
 
 ```bash
 cd /tmp/ansible
-ansible-playbook -i hosts.yml -c local provision.yml \
+ansible-playbook -i /tmp/fleet-private/hosts.yml -c local provision.yml \
   -e '{"target":"ubuntu_docker","server_password":"","short_name":"<same>","abbr_name":"<same>","location_abbr":"<same>","domain_name":"<same>"}' \
   -e '{"komodo_onboarding_key":"<the key you just generated>"}' \
   --tags docker
@@ -154,19 +156,18 @@ ansible-playbook -i hosts.yml -c local provision.yml \
 
 The `--tags docker` scoping keeps this from repeating the whole provisioning run.
 
-`/tmp/ansible` is still the checkout cloud-init made in step 3, with the private overlay's real `hosts.yml` and `group_vars/all/private.yml` already copied in. Re-run in place.
+`/tmp/ansible` and `/tmp/fleet-private` are still the checkouts cloud-init made in step 3: the public repo, and the private repo whose inventory and `group_vars/` the run reads. Both are plain clones, so `git pull` in either is safe.
 
-> [!WARNING]
-> Do not `git pull` that checkout first. Those two files are locally modified relative to git, because the overlay copies over them rather than committing. Pulling either refuses outright or silently reverts them to the public repo's sanitised placeholders.
+A host built before the snippet cloned fleet-private separately has the private `hosts.yml` and `group_vars/all/private.yml` copied into `/tmp/ansible` instead. Use `-i hosts.yml` there, and do not `git pull` that checkout, which would revert those two files.
 
-If `/tmp/ansible` really is gone, re-clone the public repo and re-apply the overlay before provisioning:
+If either checkout is gone, clone it again before provisioning:
 
 ```bash
 git clone https://github.com/myah-mitchell/ansible /tmp/ansible
-cd /tmp/ansible && ./scripts/bootstrap-private.sh <ansible-private-url>
+git clone <fleet-private-url> /tmp/fleet-private
 ```
 
-Get that URL from the [ansible repo's README](https://github.com/myah-mitchell/ansible). Never paste a credentialed clone URL into docker-stacks, which is public.
+For `<fleet-private-url>`, use `https://x-access-token:<pat>@github.com/<you>/fleet-private` with the read-only PAT from `ansible_private_repo_token`. Never paste a credentialed clone URL into docker-stacks, which is public.
 
 ### Confirm it connected
 
@@ -186,20 +187,20 @@ In Komodo's UI on km01, check *Resources > Servers* and confirm the host shows c
 
 The ansible `stacks` role sets a host up for a docker-stacks stack: it creates the stack's folders, seeds its config files, and opens its ports. It reads all three from the stack's generated `setup.yaml`, the same file every runbook's manual commands come from. Once Semaphore is up, hosts get this from the **provision-stacks** Template in [step 12 of Semaphore setup](semaphore-setup.md#create-the-provision-stacks-template).
 
-km01, and the first two stacks on ci01, come before Semaphore exists. Those run the role on the host itself, from the `/tmp/ansible` checkout cloud-init left there. If that checkout is gone, re-create it as in [step 5](#re-run-provisioning-with-the-key) first.
+km01, and the first two stacks on ci01, come before Semaphore exists. Those run the role on the host itself, from the checkouts cloud-init left in `/tmp`. If that checkout is gone, re-create it as in [step 5](#re-run-provisioning-with-the-key) first.
 
-The checkout can predate the role. Update everything in it except the two overlay files, which a pull would revert:
+The checkouts can predate the role. Update both:
 
 ```bash
-cd /tmp/ansible
-git fetch origin
-git checkout origin/main -- . ':(exclude)hosts.yml' ':(exclude)group_vars/all/private.yml'
+git -C /tmp/ansible pull
+git -C /tmp/fleet-private pull
 ```
 
 Then run the role. Use the four identity values [recovered in step 5](#recover-the-original-provisioning-arguments), and set `<stack>` to the stack's directory name under `stacks/`, such as `komodo-server`:
 
 ```bash
-ansible-playbook -i hosts.yml -c local provision.yml \
+cd /tmp/ansible
+ansible-playbook -i /tmp/fleet-private/hosts.yml -c local provision.yml \
   -e '{"target":"ubuntu_docker","server_password":"","short_name":"<same>","abbr_name":"<same>","location_abbr":"<same>","domain_name":"<same>"}' \
   -e '{"docker_stacks":"<stack>"}' \
   --tags stacks

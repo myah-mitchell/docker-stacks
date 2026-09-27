@@ -79,7 +79,7 @@ The VM still provisions the same way, still runs Periphery, and still dials out 
 
 The ansible `stacks` role creates these from `stacks/traefik-dmz/setup.yaml`, seeds cloudflared's ingress config, and opens step 4's ports in the same run. The tunnel credentials stay a manual step, because they come from your admin machine rather than from this repo.
 
-In ansible-private's `hosts.yml`, add bh01 to the `docker_host` group if it is not there yet, and add the `system-agent` and `traefik-dmz` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). bh01's own stack is a Traefik, so it never gets the traefik-bootstrap stand-in, whatever *Bootstrap* is answered. Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In fleet-private's `hosts.yml`, add bh01 to the `docker_host` group if it is not there yet, and add the `system-agent` and `traefik-dmz` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private). bh01's own stack is a Traefik, so it never gets the traefik-bootstrap stand-in, whatever its `docker_stacks_bootstrap` says. Commit and push it.
 
 Run **provision-stacks** with *Target* answered `bh01`, then check the result on bh01:
 

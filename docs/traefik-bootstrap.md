@@ -45,7 +45,7 @@ The ansible `stacks` role creates these from `stacks/traefik-bootstrap/setup.yam
 
 On ci01, which deploys this stack before Semaphore exists, follow [Run the stacks role without Semaphore](provision-a-vm.md#run-the-stacks-role-without-semaphore) with `<stack>` set to `traefik-bootstrap`.
 
-On any later host, you do not list this stack at all. Run the **provision-stacks** Template from [step 12](semaphore-setup.md#create-the-provision-stacks-template) with *Target* answered with that host and *Bootstrap* answered `true`. The role then prepares this stack in place of the ones it leaves out, on any host where something still needs a Traefik and nothing left provides one.
+On any later host, you do not list this stack at all. Set `docker_stacks_bootstrap: true` on the host in fleet-private's `hosts.yml`, push, and run the **provision-stacks** Template from [step 12](semaphore-setup.md#create-the-provision-stacks-template) with *Target* answered with that host. The role then prepares this stack in place of the ones it leaves out, on any host where something still needs a Traefik and nothing left provides one.
 
 Check the result on the target VM:
 

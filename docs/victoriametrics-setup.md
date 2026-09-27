@@ -56,7 +56,7 @@ There is no password to collect. Each host's is generated on that host and never
 
 vector's host variant publishes 5140 on TCP and UDP so it can take syslog from the network. The ansible `stacks` role opens both, scoped to the internal subnet, in the same run that creates step 3's folders.
 
-In ansible-private's `hosts.yml`, add the `victoriametrics-server` stack to ci01's `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In fleet-private's `hosts.yml`, add the `victoriametrics-server` stack to ci01's `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private). Commit and push it.
 
 Run **provision-stacks** with *Target* answered `ci01`, then confirm the rules on ci01:
 

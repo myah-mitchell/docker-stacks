@@ -91,7 +91,7 @@ In the PVE web UI, expand *Datacenter* to km01 and open its *Console*. Watch clo
 
 Skip this unless something goes wrong.
 
-The snippet clones the public ansible repo to `/tmp/ansible`. If the template was built with a real private-repo token, it also clones the ansible-private overlay and copies its `hosts.yml` and `group_vars/all/private.yml` over the public repo's placeholders. It then runs `provision.yml` locally against `target: ubuntu_docker`.
+The snippet clones the public ansible repo to `/tmp/ansible`. If the template was built with a real private-repo token, it also clones fleet-private to `/tmp/fleet-private` and uses its inventory. It then runs `provision.yml` locally against `target: ubuntu_docker`.
 
 Without that token the host still comes up provisioned, but with placeholder identity and secret values rather than the real ones.
 
@@ -330,11 +330,11 @@ km01 is not behind Traefik yet, so this direct port is its real access path rath
 
 ## 13. Give ansible Core's address and public key
 
-Every other host's Periphery agent needs to know where Core is and which Core to trust. Both values live in ansible-private's `group_vars/all/private.yml`, not in the public ansible repo, whose `roles/docker/defaults/main.yml` only holds blank defaults.
+Every other host's Periphery agent needs to know where Core is and which Core to trust. Both values live in fleet-private's `group_vars/all/private.yml`, not in the public ansible repo, whose `roles/docker/defaults/main.yml` only holds blank defaults.
 
 In Komodo's UI, go to *Settings*. Core's public key is at the top of the page.
 
-Set both keys in ansible-private, then commit and push:
+Set both keys in fleet-private, then commit and push:
 
 ```yaml
 komodo_core_address: "http://<km-ip>:9120"

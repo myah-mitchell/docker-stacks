@@ -42,3 +42,9 @@ A container's `config/` is always safe to commit and never holds a real credenti
 Run `scripts/build.py` after adding a container to a stack, or after editing one of a container's own fragments. Those are its `komodo.env`, `stack-README.md`, and `testing.env`.
 
 Never hand-edit a stack's generated `komodo.env`, `.env`, or `README.md`. The next run overwrites them.
+
+## License
+
+Copyright (C) 2026 Myah Mitchell. Licensed under the [GNU Affero General Public License v3.0 or later](LICENSE). You can use, modify, and share this code, but any modified version you distribute or offer over a network must be released under the same license with this notice kept.
+
+The VictoriaMetrics, VictoriaLogs, and VictoriaTraces Grafana dashboards in `containers/grafana/config/dashboards/` come from [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) and keep their original Apache-2.0 license.

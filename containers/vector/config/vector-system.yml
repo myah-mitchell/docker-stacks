@@ -21,19 +21,21 @@ sources:
     # before Vector tries to parse them, preventing "invalid JSON" errors.
     auto_partial_merge: true
 
+  # The host's own logs. A NixOS host logs to the journal, the kernel and
+  # logins included, so this is the main source.
   host_journald:
     type: "journald"
     journal_directory: "/var/log/journal"
 
+  # Whatever a service on the host writes as a text file instead. It names no
+  # file, so it is empty on a host where nothing does.
   host_files:
     type: "file"
     include:
       - "/var/log/**/*.log"
     exclude:
       - "/var/log/journal/**/*" # Binary; covered by host_journald
-      - "/var/log/traefik/**/*" # Covered via Docker source
-      - "/var/log/auth.log"     # Covered by host_journald
-      - "/var/log/kern.log"     # Covered by host_journald
+      - "/var/log/traefik/**/*" # Covered by traefik_logs
 
   # Source: Syslog
   syslog:
@@ -377,7 +379,7 @@ transforms:
     type: "remap"
     inputs: ["host_files"]
     source: |
-      # Derive a stream name from the file path (e.g., /var/log/syslog → host-syslog)
+      # Derive a stream name from the file path (e.g., /var/log/<name>.log → host-<name>.log)
       path_parts = parse_regex(.file, r'^/var/log/(?P<name>.*)$') ?? {"name": "unknown"}
       .stream_name = "host-" + replace(path_parts.name, "/", "-")
       ._time = format_timestamp!(now(), format: "%+")

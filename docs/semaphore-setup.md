@@ -21,7 +21,7 @@ This is the point of building ci01 before anything else. Until Semaphore can rea
 - [8. Add the SSH key to the Key Store](#8-add-the-ssh-key-to-the-key-store)
 - [9. Add the ansible repository](#9-add-the-ansible-repository)
 - [10. Create the inventory](#10-create-the-inventory)
-- [11. Create the ansible-private Variable Group](#11-create-the-ansible-private-variable-group)
+- [11. Create the fleet-private Variable Group](#11-create-the-fleet-private-variable-group)
 - [12. Create the Template](#12-create-the-template)
 - [13. Replace this key once step-ca is live](#13-replace-this-key-once-step-ca-is-live)
 - [The OpenTofu state database](#the-opentofu-state-database)
@@ -33,7 +33,7 @@ Cloud-init runs ansible once, on a host's first boot, from whatever the repo hel
 
 After that the host is on its own. A role that gains a task, a shared credential that changes, a setting corrected across the fleet: none of it reaches a host that is already built. Fixing one host means an SSH session, and fixing all of them means a dozen.
 
-Semaphore is what re-runs ansible against hosts that already exist. It holds the identity values from ansible-private, the fleet's SSH key, and an inventory, so a change lands everywhere by running one Template rather than by hand.
+Semaphore is what re-runs ansible against hosts that already exist. It holds the fleet's SSH key and an inventory carrying the identity values from fleet-private, so a change lands everywhere by running one Template rather than by hand.
 
 Every host after ci01 is built with it in place, so it never has to be retrofitted onto them.
 
@@ -41,7 +41,7 @@ Every host after ci01 is built with it in place, so it never has to be retrofitt
 
 - ci01 is provisioned and shows connected and healthy in Komodo, through step 2 of [ci01 bootstrap](ci01-bootstrap.md). Step 2 in particular: without traefik-bootstrap there is no way to reach Semaphore's UI once it deploys.
 - km01's `[[GLOBAL_...]]` Variables exist, from step 14 of [km01 bootstrap](komodo-bootstrap.md). Step 3 below fails without them.
-- You have ansible-private checked out somewhere you can commit and push from.
+- You have fleet-private checked out somewhere you can commit and push from.
 - You know the four identity values the fleet was provisioned with, listed under [Placeholders](#placeholders).
 
 ## Placeholders
@@ -219,7 +219,7 @@ Generate the keypair:
 ssh-keygen -t ed25519 -C "semaphore-bootstrap" -f ./semaphore-bootstrap -N ""
 ```
 
-Add the public half, `semaphore-bootstrap.pub`, to ansible-private's `group_vars/all/private.yml` under `ansible_ssh_public_keys`. That is a list, so append rather than replace. Commit and push.
+Add the public half, `semaphore-bootstrap.pub`, to fleet-private's `group_vars/all/private.yml` under `ansible_ssh_public_keys`. That is a list, so append rather than replace. Commit and push.
 
 Hosts provisioned after this point pick the key up automatically on first boot. Hosts that already exist do not, and Semaphore cannot fix that yet because it has no way in. Break the loop by hand, once per existing host, over SSH:
 
@@ -232,7 +232,7 @@ ansible-playbook -i hosts.yml -c local provision.yml \
 
 Use the same argument-recovery trick from [Provisioning a VM](provision-a-vm.md#recover-the-original-provisioning-arguments) if you do not know the four values for that host.
 
-If `/tmp/ansible` is gone on a host, re-clone it and re-apply the private overlay first, the same way [step 5 of Provisioning a VM](provision-a-vm.md#5-give-the-host-an-onboarding-key) does.
+If `/tmp/ansible` or `/tmp/fleet-private` is gone on a host, clone it again first, the same way [step 5 of Provisioning a VM](provision-a-vm.md#5-give-the-host-an-onboarding-key) does.
 
 Do this on km01 and ci01 at minimum. This static key is the same kind of bootstrap exception as Komodo's own manual first start, and [step 13](#13-replace-this-key-once-step-ca-is-live) replaces it later.
 
@@ -257,6 +257,17 @@ Go to *Key Store* and click **New Key**.
 
 The *Username* field here is what becomes `ansible_user` on every connection, so the inventory in step 10 does not need to set it.
 
+Add a second entry for the private repo, which Semaphore clones to read the inventory in step 10:
+
+| Field | Value |
+| --- | --- |
+| *Name* | `fleet-private-read` |
+| *Type* | **Login with password** |
+| *Login* | Your GitHub username |
+| *Password* | A fine-grained PAT with read-only *Contents* access to fleet-private alone |
+
+The same PAT can be the `ansible_private_repo_token` in step 11, since both only read that one repo.
+
 ## 9. Add the ansible repository
 
 Go to *Repository* and click **New Repository**.
@@ -270,19 +281,28 @@ Go to *Repository* and click **New Repository**.
 
 The ansible repo is public, so no deploy key is needed, the same as the docker-stacks Stack resource in Komodo.
 
+Create a second Repository for the private repo:
+
+| Field | Value |
+| --- | --- |
+| *Name* | `fleet-private` |
+| *URL* | `https://github.com/myah-mitchell/fleet-private` |
+| *Branch* | `main` |
+| *Access Key* | **fleet-private-read** from step 8 |
+
 The dotfiles repo needs no Repository entry at all. Its own Ansible role clones it directly over plain HTTPS.
 
 ## 10. Create the inventory
 
-This is the step with real work in it. The `hosts.yml` in both ansible and ansible-private is built for local runs. Its localhosts group holds three entries, ubuntu, ubuntu_docker, and wsl, and points all of them at 127.0.0.1, because every Docker VM so far was provisioned by cloud-init with `-c local`.
+This is the step with real work in it. The `hosts.yml` in both ansible and fleet-private is built for local runs. Its localhosts group holds three entries, ubuntu, ubuntu_docker, and wsl, and points all of them at 127.0.0.1, because every Docker VM so far was provisioned by cloud-init with `-c local`.
 
 Semaphore connects over SSH from ci01. Pointed at `ubuntu_docker`, it would run against `127.0.0.1`, which is ci01 itself, every time. There is no group in the shipped inventory that names a real remote Docker host.
 
 So the fleet's real Docker hosts have to be added as new entries. They do not exist yet in any file.
 
-### Add a real host group to ansible-private
+### Add a real host group to fleet-private
 
-Open ansible-private's `hosts.yml` and edit the `docker_host` group alongside the existing `pve_host` and `pbs_host` ones.
+Open fleet-private's `hosts.yml` and edit the `docker_host` group alongside the existing `pve_host` and `pbs_host` ones.
 
 ```yaml
 docker_host:
@@ -327,13 +347,24 @@ Do not set `ansible_user` here. Step 3's Key Store entry supplies it.
 
 `docker_stacks` lists the stacks each host runs once the site is finished, by their directory names under docker-stacks' `stacks/` rather than their Komodo Stack names. The `stacks` role reads it, and scopes firewall rules for fleet-only ports to `docker_stacks_internal_subnet`.
 
-Writing the finished list this early is safe because of `docker_stacks_bootstrap`, which is answered per run rather than stored here. Each stack in docker-stacks carries the services it still needs from elsewhere in the fleet, rolled up from the containers it runs. system-agent does, since its vmagent writes through the VictoriaMetrics backends, and so does traefik-agent, whose traefik-kop writes into tf01's Redis. A run answered `true` leaves those stacks out, and prepares traefik-bootstrap in their place on a host where something still needs a Traefik and nothing left provides one. Once tf01, id01, and pk01 are live, you stop answering it and the same list gives the host its real stacks.
+Writing the finished list this early is safe because of `docker_stacks_bootstrap`, set on the host here while the fleet is being built:
 
-Each later runbook adds its own stack to a host's list before running the Template from [step 12](#create-the-provision-stacks-template). Nothing here changes at the handover.
+```yaml
+    ci01:
+      ansible_host: <ci-ip>
+      serverHostname: "ci01"
+      docker_stacks_bootstrap: true
+      docker_stacks:
+        ...
+```
+
+ Each stack in docker-stacks carries the services it still needs from elsewhere in the fleet, rolled up from the containers it runs. system-agent does, since its vmagent writes through the VictoriaMetrics backends, and so does traefik-agent, whose traefik-kop writes into tf01's Redis. A host with it set leaves those stacks out, and gets traefik-bootstrap in their place when something still needs a Traefik and nothing left provides one. Once tf01, id01, and pk01 are live, remove the line and the same list gives the host its real stacks. It stays in the inventory rather than being answered per run, because [one-run provisioning](one-run-provisioning.md) writes each host's Komodo Stacks from the inventory and commits them, and both need to agree.
+
+Each later runbook adds its own stack to a host's list before running the Template from [step 12](#create-the-provision-stacks-template).
 
 Add each new VM to this group as you build it. tf01, id01, pk01, and the rest all belong here.
 
-Commit and push ansible-private.
+Commit and push fleet-private.
 
 ### Load it into Semaphore
 
@@ -342,17 +373,16 @@ Go to *Inventory* and click **New Inventory**.
 | Field | Value |
 | --- | --- |
 | *Name* | `ansible-fleet` |
-| *Type* | **Static YAML** |
+| *Type* | **File** |
+| *Repository* | **fleet-private** from step 9 |
+| *Path* | `hosts.yml` |
 | *User Credentials* | **ansible-bootstrap-key** from step 8 |
 
-Paste the full contents of ansible-private's `hosts.yml`, including the group you just added. Semaphore stores inventory inline rather than cloning it from a repo, so this is a copy, not a reference.
+Semaphore clones fleet-private for each run and reads `hosts.yml` from it, so a pushed change applies to the next run with nothing to paste. Ansible also loads the `group_vars/` folder next to that file, so `group_vars/all/private.yml` applies to every host without being copied anywhere. The roles that `site.yml` adds find their files there too: `opentofu/prod.tfvars` and `komodo/stacks/`.
 
-> [!IMPORTANT]
-> That copy does not update itself. Every time you add a host to ansible-private's `hosts.yml`, paste the new content into this Inventory too, or Semaphore keeps running against the old list.
+## 11. Create the fleet-private Variable Group
 
-## 11. Create the ansible-private Variable Group
-
-Go to *Variable Groups*, click **New Group**, and name it `ansible-private`.
+Go to *Variable Groups*, click **New Group**, and name it `fleet-private`.
 
 ### Which of the four fields to use
 
@@ -367,7 +397,9 @@ The Variable Group has two tabs, *Variables* and *Secrets*, and each tab is spli
 
 Ansible never sees an OS environment variable as a Jinja variable unless a role explicitly calls `lookup('env', ...)`, and none of `provision.yml`'s roles do. Anything put in an *Environment Variables* section is silently ignored: the run does not error, it just keeps using each role's own defaults as though you set nothing.
 
-Leave both *Environment Variables* sections empty.
+Leave both *Environment Variables* sections empty for `provision.yml`. [One-run provisioning](one-run-provisioning.md#4-add-the-secrets-to-semaphore) adds some there later, for the roles of its own that do read them.
+
+The *Variables* tab's *Extra Variables* stays empty too. `group_vars/all/private.yml` already loads from the inventory's repo (step 10), and anything put here as `--extra-vars` beats every inventory value, so a host could never override it.
 
 ### Secrets tab, Extra Variables
 
@@ -380,54 +412,24 @@ Add these as name and value pairs:
 
 There is no node_exporter password here. The monitoring role generates one per host, on that host, so there is no shared value to distribute. See [Setting up Node Exporter](../containers/vmagent/stack-README.md) for how a host's own password is made and rotated.
 
-### Variables tab, Extra Variables
+`ansible_private_repo_token` is set here as well as in `private.yml` so the real PAT can stay out of the repo. If `private.yml` holds the real value, leave this one out.
 
-Everything else from `private.yml` that is not a credential goes here: the two SSH public-key lists, the Komodo Core address and public key, the CA certificates, the SSH banner text, and the client account name. You do not have to transcribe them, since the command below builds the whole object for you.
+### Where the identity values go
 
-Use the *JSON* toggle at the top of the field rather than entering every field as a table row. Generate the object from the file itself, dropping the keys that belong on the *Secrets* tab:
+`provision.yml` needs four identity values: `short_name`, `abbr_name`, `location_abbr` and `domain_name`. Put them in fleet-private's `hosts.yml`, fleet-wide under `all: vars:`, and push:
 
-```bash
-cd /path/to/ansible-private
-yq -o=json 'del(.ansible_private_repo_token, .server_password)' \
-  group_vars/all/private.yml
+```yaml
+all:
+  vars:
+    short_name: "<short_name>"
+    abbr_name: "<abbr_name>"
+    location_abbr: "<location_abbr>"
+    domain_name: "<domain_name>"
 ```
 
-Without `yq`, use Python:
+A group or a host can set its own value over the fleet-wide one. Keep the four out of the Variable Group. Semaphore passes its *Extra Variables* as `--extra-vars`, which beats every inventory value, so a host's own value would never apply.
 
-```bash
-python3 -c "
-import yaml, json
-data = yaml.safe_load(open('group_vars/all/private.yml'))
-for k in ('ansible_private_repo_token', 'server_password'):
-    data.pop(k, None)
-print(json.dumps(data, indent=2))
-"
-```
-
-Check the output before pasting. It should be one JSON object, and it must not contain `ansible_private_repo_token`. `server_password` is never in that file, so deleting it is only a guard in case someone adds it later.
-
-Then add the four identity values, which are not in `private.yml` at all:
-
-```json
-{
-  "short_name": "<short_name>",
-  "abbr_name": "<abbr_name>",
-  "location_abbr": "<location_abbr>",
-  "domain_name": "<domain_name>"
-}
-```
-
-Paste the merged object into the *JSON* editor, replacing the empty `{}`, then click **Save**.
-
-### Why the identity values go here and not in the inventory
-
-`provision.yml` declares six values as `vars_prompt`: target, server_password, and the four identity values. Semaphore runs non-interactively, so an unanswered prompt hangs the job.
-
-An inventory or `group_vars` value does not suppress a `vars_prompt`. Ansible evaluates prompts at play parse time, before host selection and before inventory variables are in scope, so the prompt still fires and the answer still wins. Only `--extra-vars` suppresses one.
-
-That is why these live in the Variable Group's *Extra Variables*, which Semaphore passes as `--extra-vars`. Putting them in `hosts.yml` looks like it should work and does not.
-
-Five of the six are fleet-wide constants, so setting them once here means you never type them again. The sixth, `target`, is per-run, and step 12 handles it.
+`provision.yml` only asks for a value that neither the inventory nor `--extra-vars` sets. Semaphore has no terminal to ask on, so a missing identity value stops the run with its name in the error, and a missing `server_password` counts as empty, which leaves every password as it is. `target` is still asked for on every run, and step 12 handles it.
 
 ## 12. Create the Template
 
@@ -439,12 +441,12 @@ Go to *Task Templates*, click **New Template**, and choose the **Ansible Playboo
 | *Playbook Filename* | `provision.yml` |
 | *Repository* | **ansible** from step 9 |
 | *Inventory* | **ansible-fleet** from step 10 |
-| *Variable Groups* | **ansible-private** from step 11 |
+| *Variable Groups* | **fleet-private** from step 11 |
 | *Tags* | `monitoring` |
 
 The tag is `monitoring`, not `docker`. It runs the role that installs and configures Node Exporter, which `provision.yml` tags `monitoring`.
 
-This Template needs no `komodo_onboarding_key`. Each host's key is single-use and generated fresh right before that host's own provisioning run.
+This Template needs no `komodo_onboarding_key`. It only runs the monitoring role, on hosts that are already onboarded.
 
 ### Add target as a Survey Variable
 
@@ -457,7 +459,7 @@ Open the Template's *Survey Variables* tab and add one entry:
 | *Type* | **String** |
 | *Required* | **Yes** |
 
-Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the `target` prompt the same way step 11 suppresses the other five. It is a separate field because `target` changes per run and the other five never do.
+Semaphore passes Survey Variables as `--extra-vars` too, so this suppresses the `target` prompt the same way step 11 suppresses the `server_password` one. It is a separate field because `target` changes per run.
 
 Answer it with a host or group name from the inventory: ci01 for one host, `docker_host` for every Docker VM at once.
 
@@ -480,18 +482,9 @@ Create a second Template the same way, with the same `target` Survey Variable. O
 
 It runs the `stacks` role for every stack in the target host's `docker_stacks` list, creating the stack's folders, seeding its config files, and opening its ports. Running it again is safe. A config file already on the host is left alone, and a folder that already exists keeps its contents.
 
-Add a second Survey Variable to this one, alongside `target`:
+Bootstrap mode is not a Survey Variable. Semaphore passes Survey Variables as `--extra-vars`, which would override each host's own `docker_stacks_bootstrap` from step 10, so it stays in the inventory.
 
-| Field | Value |
-| --- | --- |
-| *Name* | `docker_stacks_bootstrap` |
-| *Title* | **Bootstrap** |
-| *Type* | **String** |
-| *Required* | **No** |
-
-Answer it `true` while the fleet is still being built, and the role prepares traefik-bootstrap in place of the stacks that need the rest of the fleet. Leave it blank once tf01, id01, and pk01 are live, which is the same as `false` and gives each host the stacks its list actually names. Nothing in the inventory changes when you stop answering it.
-
-Run it once now with *Target* answered `ci01` and *Bootstrap* left blank, to confirm it works. Both of ci01's stacks so far were already set up from ci01 itself, so it has nothing to add.
+Run it once now with *Target* answered `ci01`, to confirm it works. Both of ci01's stacks so far were already set up from ci01 itself, so it has nothing to add.
 
 ## 13. Replace this key once step-ca is live
 

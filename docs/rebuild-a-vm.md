@@ -26,7 +26,7 @@ Read [Provisioning a VM](provision-a-vm.md) first. This page reuses its steps ra
 
 ## Prerequisites
 
-- The new template exists on the PVE host. Set `pve_template_ubuntu_version` and `pve_template_ubuntu_release` in ansible-private's `group_vars/all/private.yml`, run the pve role's `pve-cloudinit` tag against the PVE host, then run `/usr/local/bin/create-cloud-init-template.sh` on it, or wait for its weekly cron job. The template's VMID and name follow the version, so 28.04 gives VMID `2804001` and name `ubuntu-server-2804`. The old template stays where it is.
+- The new template exists on the PVE host. Set `pve_template_ubuntu_version` and `pve_template_ubuntu_release` in fleet-private's `group_vars/all/private.yml`, run the pve role's `pve-cloudinit` tag against the PVE host, then run `/usr/local/bin/create-cloud-init-template.sh` on it, or wait for its weekly cron job. The template's VMID and name follow the version, so 28.04 gives VMID `2804001` and name `ubuntu-server-2804`. The old template stays where it is.
 - The new release has been proved on a throwaway VM first. Clone the new template, add a data disk with the `--scsi2` line from Provisioning a VM step 2, start it, run [step 4's checks](provision-a-vm.md#4-verify-base-provisioning), then destroy it. This finds a missing package or a Docker apt repo that has not caught up with the release before it costs you a real host.
 - The old host is healthy, and PBS has a recent backup of it.
 - Both VMs live on the same PVE node. The data disk moves by renaming a volume on that node's storage, so it cannot cross nodes.

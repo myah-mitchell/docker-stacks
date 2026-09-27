@@ -41,7 +41,7 @@ Once ci01 is live. This stack writes metrics and logs to ci01 and needs nothing 
 
 Nothing here publishes `:80`, `:443`, or `:8443`, so this stack and traefik-bootstrap can sit on the same VM. The handover that has to be sequenced is traefik-bootstrap to traefik-agent, and it lives on [that page](traefik-agent-setup.md#6-tear-down-traefik-bootstrap).
 
-The ansible `stacks` role leaves this stack out of any run answered *Bootstrap* `true`, because `stacks/system-agent/setup.yaml` marks it as needing the rest of the fleet.
+The ansible `stacks` role leaves this stack out on a host with `docker_stacks_bootstrap: true` in the inventory, because `stacks/system-agent/setup.yaml` marks it as needing the rest of the fleet.
 
 ## Prerequisites
 
@@ -82,9 +82,9 @@ Neither Periphery nor Compose creates host bind-mount directories, so these have
 
 The ansible `stacks` role creates them from `stacks/system-agent/setup.yaml`, and opens step 3's ports in the same run.
 
-`<host>`'s `docker_stacks` already lists `system-agent`, from [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private), and nothing in the inventory has to change here. What changes is the *Bootstrap* answer that has been keeping this stack out of the run: leave it blank from now on.
+`<host>`'s `docker_stacks` already lists `system-agent`, from [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private), What changes is the host's `docker_stacks_bootstrap: true`, which has been keeping this stack out of the run. Remove it from the host in fleet-private's `hosts.yml`, and commit and push.
 
-Run **provision-stacks** with *Target* answered `<host>` and *Bootstrap* blank, then check the result on the VM:
+Run **provision-stacks** with *Target* answered `<host>`, then check the result on the VM:
 
 ```bash
 sudo ls -ln /opt/docker/volumes/system

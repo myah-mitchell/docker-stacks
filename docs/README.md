@@ -12,9 +12,9 @@ From that shared starting point, a VM's stack gets deployed one of two ways.
 
 km01 is the one deliberate exception, provisioned and started entirely by hand, because Komodo cannot GitOps-deploy itself the first time. See [km01 bootstrap](komodo-bootstrap.md).
 
-Every other VM is registered as a Komodo Server resource and deployed through Komodo's GitOps flow. Provision the base OS, generate that VM's own Komodo onboarding key, then let Komodo do the rest. That half is the same for every host and is written once, in [Provisioning a VM](provision-a-vm.md). Each host runbook's first step is a pointer to it.
+Every other VM is registered as a Komodo Server resource and deployed through Komodo's GitOps flow. Provision the base OS, generate that VM's own Komodo onboarding key, then let Komodo do the rest. That half is the same for every host and is written once, in [Provisioning a VM](provision-a-vm.md). Each host runbook's first step is a pointer to it. [One-run provisioning](one-run-provisioning.md) does the same work from a single ansible run, from creating the VM to deploying its Stacks, for a host described in the inventory.
 
-The onboarding key is a permanent step for every new host. Under Komodo's PKI auth, each host proves itself to Core once with a single-use key, the same way a new SSH host key gets accepted once, and Core and that host trust each other by their own keypairs from then on. A rebuilt host keeps its Periphery key on its persistent disk, so it reconnects without a new key.
+The onboarding key is a permanent step for every new host. Under Komodo's PKI auth, each host proves itself to Core once with an onboarding key, the same way a new SSH host key gets accepted once, and Core and that host trust each other by their own keypairs from then on. A rebuilt host keeps its Periphery key on its persistent disk, so it reconnects without a new key.
 
 ## Running order
 

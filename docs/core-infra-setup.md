@@ -56,7 +56,7 @@ ntfy, uptime-kuma, and Mailpit keep state. Postfix keeps its mail queue there, s
 
 ### Tell ansible which stacks ci01 runs
 
-Add `core-infra` to ci01's `docker_stacks` list in ansible-private's `hosts.yml`, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+Add `core-infra` to ci01's `docker_stacks` list in fleet-private's `hosts.yml`, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private). Commit and push it.
 
 ### Run it
 

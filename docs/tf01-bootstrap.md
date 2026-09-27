@@ -100,7 +100,7 @@ tf01 is on the internal VLAN, not the DMZ, so it takes the same gateway ci01 did
 
 The ansible `stacks` role creates these from `stacks/traefik-server/setup.yaml`, and opens step 3's ports in the same run.
 
-In ansible-private's `hosts.yml`, add tf01 to the `docker_host` group if it is not there yet, and add the `system-agent` and `traefik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). tf01's own stack is a Traefik, so it never gets the traefik-bootstrap stand-in, whatever *Bootstrap* is answered. Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In fleet-private's `hosts.yml`, add tf01 to the `docker_host` group if it is not there yet, and add the `system-agent` and `traefik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private). tf01's own stack is a Traefik, so it never gets the traefik-bootstrap stand-in, whatever its `docker_stacks_bootstrap` says. Commit and push it.
 
 Run **provision-stacks** with *Target* answered `tf01`, then check the result on tf01:
 

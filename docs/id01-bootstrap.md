@@ -55,9 +55,9 @@ id01 is on the internal VLAN. Authentik is reached from the internet through bh0
 
 The ansible `stacks` role creates these from `stacks/authentik-server/setup.yaml`.
 
-In ansible-private's `hosts.yml`, add id01 to the `docker_host` group if it is not there yet, and add the `system-agent`, `traefik-agent`, and `authentik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+In fleet-private's `hosts.yml`, add id01 to the `docker_host` group if it is not there yet, and add the `system-agent`, `traefik-agent`, and `authentik-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private). Set `docker_stacks_bootstrap: true` on id01 too. Commit and push it.
 
-Run **provision-stacks** with *Target* answered `id01` and *Bootstrap* answered `true`. The role then leaves out the two stacks that need the rest of the fleet and prepares traefik-bootstrap in their place, so this one run also covers the folders and ports for step 3.
+Run **provision-stacks** with *Target* answered `id01`. The role then leaves out the two stacks that need the rest of the fleet and prepares traefik-bootstrap in their place, so this one run also covers the folders and ports for step 3.
 
 Check the result on id01:
 

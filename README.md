@@ -12,7 +12,8 @@ The buildout spans three repos.
 | --- | --- | --- |
 | docker-stacks (this one) | Every container and stack definition | Public |
 | [ansible](https://github.com/myah-mitchell/ansible) | OS-level provisioning for every VM, plus the pve role that builds the cloud-init template | Public |
-| ansible-private | The real inventory and secrets: `hosts.yml` and `group_vars/all/private.yml`, layered over ansible's sanitised placeholders | Private |
+| [opentofu](https://github.com/myah-mitchell/opentofu) | The OpenTofu configuration that creates VMs by cloning the pve role's template, run by ansible's `site.yml` | Public |
+| fleet-private | The real inventory and private values (`hosts.yml`, `group_vars/all/private.yml`), the VMs for OpenTofu (`opentofu/prod.tfvars`), and each host's generated Komodo Stacks (`komodo/stacks/`). Ansible runs against its inventory | Private |
 
 The pve role's cloud-init template turns a freshly cloned Proxmox VM into a fully provisioned Docker host on first boot, with no manual SSH step.
 

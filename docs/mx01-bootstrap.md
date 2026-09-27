@@ -115,7 +115,7 @@ On the router, forward these WAN ports to `<ip>`, TCP only:
 
 Do not forward 80, 443, or 8080. The web side reaches the internet through bh01's tunnel, never through a port forward.
 
-Then let the ansible `stacks` role open them on mx01. In ansible-private's `hosts.yml`, add mx01 to the `docker_host` group if it is not there yet, and add the `system-agent`, `traefik-agent`, and `stalwart-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private). mx01 is built after the rest of the fleet, so leave *Bootstrap* blank even if you were still answering it elsewhere. Step 4 deploys the real stacks here rather than traefik-bootstrap. Commit and push it, and paste the new contents into Semaphore's **ansible-fleet** Inventory, as in [Load it into Semaphore](semaphore-setup.md#load-it-into-semaphore).
+Then let the ansible `stacks` role open them on mx01. In fleet-private's `hosts.yml`, add mx01 to the `docker_host` group if it is not there yet, and add the `system-agent`, `traefik-agent`, and `stalwart-server` stacks to its `docker_stacks` list, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private). mx01 is built after the rest of the fleet, so do not set `docker_stacks_bootstrap` on it. Step 4 deploys the real stacks here rather than traefik-bootstrap. Commit and push it.
 
 Run **provision-stacks** with *Target* answered `mx01`. The same run creates step 5's folders. Confirm the ports:
 

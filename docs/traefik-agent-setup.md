@@ -38,7 +38,7 @@ Once id01, pk01, and tf01 are live. Traefik takes its certificate from pk01, its
 
 Deploy [traefik-bootstrap](traefik-bootstrap.md) in the meantime, and come back here per VM once those three are up.
 
-The ansible `stacks` role leaves this stack out of any run answered *Bootstrap* `true`, because `stacks/traefik-agent/setup.yaml` marks it as needing the rest of the fleet. That is also what makes the role prepare traefik-bootstrap on that host instead.
+The ansible `stacks` role leaves this stack out on a host with `docker_stacks_bootstrap: true` in the inventory, because `stacks/traefik-agent/setup.yaml` marks it as needing the rest of the fleet. That is also what makes the role prepare traefik-bootstrap on that host instead.
 
 > [!WARNING]
 > Do not run traefik-bootstrap and traefik-agent on the same VM at once. Both publish `:80`, `:443`, and `:8443` on the host and will fight over them. Step 6 is the handover.
@@ -65,9 +65,9 @@ Neither Periphery nor Compose creates host bind-mount directories, so these have
 
 The ansible `stacks` role creates them from `stacks/traefik-agent/setup.yaml`, and opens step 2's ports in the same run.
 
-Add `traefik-agent` to `<host>`'s `docker_stacks` list in ansible-private's `hosts.yml`, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-ansible-private), if it is not there already. The list is what the host runs once the site is finished, so it can carry this stack from the day the host is created.
+Add `traefik-agent` to `<host>`'s `docker_stacks` list in fleet-private's `hosts.yml`, as in [step 10 of Semaphore setup](semaphore-setup.md#add-a-real-host-group-to-fleet-private), if it is not there already. The list is what the host runs once the site is finished, so it can carry this stack from the day the host is created. Remove the host's `docker_stacks_bootstrap: true`, if it has one, and commit and push.
 
-Run **provision-stacks** with *Target* answered `<host>` and *Bootstrap* blank, then check the result on the VM:
+Run **provision-stacks** with *Target* answered `<host>`, then check the result on the VM:
 
 ```bash
 sudo ls -ln /opt/docker/logs/traefik /opt/docker/volumes/traefik

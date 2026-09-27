@@ -3,7 +3,7 @@
 # nixos-sync.yml carries the folders, files and firewall ports to the host's
 # NixOS configuration. See scripts/project-layout.md.
 project: "semaphore"
-containers: ["postgres", "postgres-backup", "semaphore"]
+containers: ["nix", "postgres", "postgres-backup", "semaphore"]
 needs_host: ["traefik"]
 needs_fleet: []
 provides: []
@@ -18,6 +18,10 @@ folders:
     group: 101001
   - root: "volumes"
     path: "semaphore-tmp"
+    owner: 101001
+    group: 101001
+  - root: "volumes"
+    path: "nix-data"
     owner: 101001
     group: 101001
   - root: "volumes"

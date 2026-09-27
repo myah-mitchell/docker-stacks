@@ -17,7 +17,7 @@ These are the stacks that define what a specific VM is for.
 | Stack | Deploys | Host |
 | --- | --- | --- |
 | komodo-server | komodo, ferretdb, postgres (DocumentDB), postgres-backup | km01 |
-| semaphore-server | semaphore, postgres, postgres-backup | ci01 |
+| semaphore-server | semaphore, postgres, postgres-backup, nix | ci01 |
 | traefik-server | traefik-agent plus a password-protected redis every traefik-kop writes to | tf01 |
 | authentik-server | authentik-server, authentik-worker, postgres, postgres-backup, redis, geoipupdate, socket-proxy | id01 |
 | step-ca-server | step-ca | pk01 |

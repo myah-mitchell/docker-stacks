@@ -1,3 +1,12 @@
+# Initial Deployment Requirements
+## Prerequisites for using nix
+
+nix runs one time for each deploy and exits. On the first deploy it copies `/nix` from its own image into `nix-data`, and hands the copy to the owner of that folder. On every later deploy it finds the folder filled and leaves it as it is.
+
+The Komodo Stack has to list `nix` under `ignore_services`. Komodo otherwise reports the stack as unhealthy, because one of its services has exited.
+
+The image tag sets the nix version of a new fill only. To move a filled folder to the image's version, stop the stack, empty `nix-data`, and deploy again.
+
 # Create and Setup Required Folders
 
 What this stack needs from its host: folders, seed files, and open ports. It is generated from the `setup.yaml` of each container in the stack.
@@ -42,6 +51,7 @@ The host's NixOS configuration sets these up when the host is deployed.
 | `/opt/docker/volumes/semaphore/semaphore-data` | `101001:101001` | Not set |
 | `/opt/docker/volumes/semaphore/semaphore-config` | `101001:101001` | Not set |
 | `/opt/docker/volumes/semaphore/semaphore-tmp` | `101001:101001` | Not set |
+| `/opt/docker/volumes/semaphore/nix-data` | `101001:101001` | Not set |
 | `/opt/docker/volumes/semaphore/postgres-initdb` | `100000:100000` | `0755` |
 
 | Seed file | Copied from | Owner | Mode |
@@ -61,6 +71,8 @@ mkdir -p /opt/docker/volumes/$projectName/semaphore-config
 sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-config
 mkdir -p /opt/docker/volumes/$projectName/semaphore-tmp
 sudo chown 101001:101001 /opt/docker/volumes/$projectName/semaphore-tmp
+mkdir -p /opt/docker/volumes/$projectName/nix-data
+sudo chown 101001:101001 /opt/docker/volumes/$projectName/nix-data
 mkdir -p /opt/docker/volumes/$projectName/postgres-initdb
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-initdb
 sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb
@@ -75,6 +87,8 @@ sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh
 
 Semaphore runs as the image's own UID 1001, so its directories belong to host UID `101001` rather than `101000`.
 
+`nix-data` is mounted at `/nix`. The `nix` service fills it on the first deploy and hands every file in it to the folder's owner, which lets Semaphore run nix as its own user with no daemon.
+
 ## Generate the cookie/encryption secrets once
 
 ```bash
@@ -84,6 +98,35 @@ head -c32 /dev/urandom | base64  # SEMAPHORE_ACCESS_KEY_ENCRYPTION
 ```
 
 Set these as Komodo Secrets, and keep them stable across restarts. Rotating any of them invalidates every stored SSH key, every stored vault secret, and every active session.
+
+## Give the runs nix
+
+The playbooks that install and deploy a NixOS host call `nix`. A run sees only the variables Semaphore hands it, so set these three in the Variable Group of every Template that runs those playbooks.
+
+| Variable | Tab | Value |
+| --- | --- | --- |
+| `PATH` | *Variables* | The container's own `PATH`, then `:/nix/var/nix/profiles/default/bin` |
+| `NIX_CONFIG` | *Variables* | The two lines below |
+| `SOPS_AGE_KEY` | *Secrets* | The age private key that decrypts the fleet's secrets |
+
+All three go in the *Environment Variables* section of their tab.
+
+A `PATH` set here replaces the one a run would otherwise get, so it has to repeat the container's. Read that one from the running container:
+
+```bash
+docker exec semaphore-semaphore printenv PATH
+```
+
+`NIX_CONFIG` holds two settings, one on each line:
+
+```ini
+experimental-features = nix-command flakes
+sandbox = false
+```
+
+The first turns on the flake commands. The second turns off the build sandbox, which a container without privileges cannot set up.
+
+The container's `PATH` names the version of Ansible in the image. Read it again after the image changes.
 
 ## Wiring it to the ansible repo after deploy
 

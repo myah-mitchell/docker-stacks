@@ -3,6 +3,7 @@
 # scripts/project-layout.md.
 needs_stack:
   - name: postgres
+  - name: nix
 needs_host:
   - name: traefik
 folders:
@@ -13,6 +14,11 @@ folders:
     owner: 101001
     group: 101001
   - path: semaphore-tmp
+    owner: 101001
+    group: 101001
+  # Mounted at /nix. The nix service fills it and hands it to this owner, and
+  # nix refuses a store its own user cannot write to.
+  - path: nix-data
     owner: 101001
     group: 101001
   # Read by the postgres image on the first start of an empty data directory,

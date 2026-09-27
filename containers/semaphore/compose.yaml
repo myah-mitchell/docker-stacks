@@ -97,6 +97,10 @@ services:
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/semaphore-data:/var/lib/semaphore
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/semaphore-config:/etc/semaphore
       - ${DOCKER_VOLUMES}/${PROJECT_NAME}/semaphore-tmp:/tmp/semaphore
+      # The nix the playbooks call to install and deploy a NixOS host. The nix
+      # service fills the folder, and Semaphore runs nix from it as its own
+      # user, in single-user mode with no daemon.
+      - ${DOCKER_VOLUMES}/${PROJECT_NAME}/nix-data:/nix
     labels: ## Traefik Labels
       - "traefik.enable=true"
       - "traefik.docker.network=${PROXY_NETWORK}"
@@ -117,6 +121,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      nix:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/ping"]
       <<: *default_healthcheck

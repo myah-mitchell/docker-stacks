@@ -8,6 +8,10 @@ Semaphore runs as the image's own UID 1001, so its directories belong to host UI
 
 `nix-data` is mounted at `/nix`. The `nix` service fills it on the first deploy and hands every file in it to the folder's owner, which lets Semaphore run nix as its own user with no daemon.
 
+## Memory
+
+The Semaphore container gets 4G of memory (`SEMAPHORE_MEM_LIMIT`) and 4.5G with swap (`SEMAPHORE_MEM_SWAP_LIMIT`), in place of the stack's `MEM_LIMIT` and `MEM_SWAP_LIMIT`. A run that installs or deploys a NixOS host evaluates the host's system in the container, which takes about 1 GB, and the playbooks run one evaluation at a time. Raise both if a run is killed for running out of memory. The stack's other containers keep the default.
+
 ## Generate the cookie/encryption secrets once
 
 ```bash

@@ -22,7 +22,7 @@ These are the stacks that define what a specific VM is for.
 | authentik-server | authentik-server, authentik-worker, postgres, postgres-backup, redis, geoipupdate, socket-proxy | id01 |
 | step-ca-server | step-ca | pk01 |
 | traefik-dmz | traefik-agent plus redis (replicating from traefik-server) and cloudflared | bh01 |
-| victoriametrics-server | victoriametrics-agent plus victoriametrics, victorialogs, victoriatraces, vmauth, vmalert, grafana, alertmanager | ci01 |
+| victoriametrics-server | victoriametrics, victorialogs, victoriatraces, vmauth, vmalert, grafana, alertmanager | ci01 |
 | core-infra | ntfy, mailrise, postfix, mailpit, blackbox-exporter, uptime-kuma | ci01 |
 | stalwart-server | stalwart, bulwark | mx01, optional |
 
@@ -58,18 +58,16 @@ These exist so the stacks above can build on each other through Compose `include
 | --- | --- | --- |
 | traefik-basic | traefik, error-pages, socket-proxy, socket-proxy-rw, logrotate | traefik-agent |
 | traefik-agent | traefik-basic plus traefik-kop | traefik-server, traefik-dmz |
-| victoriametrics-agent | vlagent, vmagent, vector, cadvisor, socket-proxy | victoriametrics-server |
-| dozzle-agent | dozzle-agent, socket-proxy | dozzle-server |
 
 The chain runs traefik-basic to traefik-agent to traefik-server or traefik-dmz, each adding one layer. traefik-agent is the only one of the three that is also deployed on its own. traefik-bootstrap is deliberately outside that chain. It runs the same Traefik service as the rest, under a second name that changes only the TLS options, the cert resolver, and the auth chain, so there is no second copy of the argument list to keep in step.
 
-system-agent supersedes victoriametrics-agent and dozzle-agent for the per-VM role. It bundles the same agents plus dockns.
+victoriametrics-agent and dozzle-agent are stacks of their own that nothing includes and no host lists. system-agent supersedes both for the per-VM role. It bundles the same agents plus dockns, and publishes the same host ports, so a host runs system-agent or one of those two, never both.
 
 ## No host assigned yet
 
 | Stack | Deploys | Note |
 | --- | --- | --- |
-| dozzle-server | dozzle-agent plus dozzle-server | Connects to every VM's dozzle-agent on port 7007. Likely lands on ci01, not decided |
+| dozzle-server | dozzle-server | Connects to every VM's dozzle-agent on port 7007, its own host's included. Likely lands on ci01, not decided |
 
 ## Cut from the plan
 

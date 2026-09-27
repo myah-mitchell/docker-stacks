@@ -67,7 +67,7 @@ After a suspected compromise, do all of the following before the next run:
 2. Make a new deploy age key. Put its public key in `.sops.yaml` in place of the old one, run `sops updatekeys` and then `sops rotate -i` on every sops file in fleet-private, and commit.
 3. Make a new SSH key for the deploy account, put its public key in the fleet's values, and deploy to every host from the control shell.
 4. Delete the Proxmox API token and make a new one.
-5. Make new SSH host keys, since the old ones could be read. For each host, remove `secrets/host-keys/<host>.yaml` from fleet-private, run `new-host-key` for the host, commit, and install the host again. Do the same for the installer with `new-installer-key`, and build the ISO again.
+5. Make new SSH host keys, since the old ones could be read. For each host, remove `secrets/host-keys/<host>.yaml` from fleet-private, run `new-host-key` for the host, commit, and install the host again. Do the same for the installer: remove `secrets/installer.yaml`, run `new-installer-key`, commit, and build the ISO again.
 
 ### Add sops
 
@@ -90,3 +90,5 @@ Two points worth knowing before you start.
 The ansible repo is public, so its Repository entry needs no credential. Set *Access Key* to **None** rather than creating a deploy key. The dotfiles repo needs no Repository entry at all, because its own Ansible role clones it directly over plain HTTPS.
 
 Semaphore reaches every host with a static SSH key trusted by the `ansible` service account. That is the same kind of bootstrap exception as Komodo's own manual first start. Once step-ca's SSH CA is live on pk01, replace it with a dedicated service principal on a short-lived, auto-renewed certificate.
+
+The nixos-fleet commands a run starts (`host-state`, `install-host`, `deploy-host`) open their own SSH connections and name no key file, so they reach the key only through the SSH agent Semaphore starts for the run, by the `SSH_AUTH_SOCK` they inherit from `ansible-playbook`. That has not been tried. If the first run fails at the `nixos` stage with a publickey error, this is the place to look.

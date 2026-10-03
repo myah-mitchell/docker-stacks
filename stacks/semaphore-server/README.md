@@ -139,7 +139,7 @@ The container's `PATH` names the version of Ansible in the image. Read it again 
 
 Treat the Semaphore container as holding the keys to the whole fleet, because it does.
 
-- `SOPS_AGE_KEY` is the deploy key. It decrypts every sops file in fleet-private: Ansible's secrets, the fleet's secrets, the installer's host key, and every host's SSH private keys.
+- `SOPS_AGE_KEY` is the deploy key. It decrypts every sops file in fleet-private: Ansible's secrets, the fleet's secrets, and every host's SSH private keys.
 - The SSH key in the Key Store logs in to the deploy account, which is root on every host through sudo.
 - The Proxmox API token can change or delete every VM of the fleet.
 - The Nix store at `/nix` is the `nix-data` folder, and the Semaphore user can write to all of it. Code that runs as that user can replace `nix`, `sops`, `ssh` or any other program in the store, and the change outlives a redeploy of the stack and a reinstall of the host.
@@ -151,7 +151,7 @@ After a suspected compromise, do all of the following before the next run:
 2. Make a new deploy age key. Put its public key in `.sops.yaml` in place of the old one, run `sops updatekeys` and then `sops rotate -i` on every sops file in fleet-private, and commit.
 3. Make a new SSH key for the deploy account, put its public key in the fleet's values, and deploy to every host from the control shell.
 4. Delete the Proxmox API token and make a new one.
-5. Make new SSH host keys, since the old ones could be read. For each host, remove `secrets/host-keys/<host>.yaml` from fleet-private, run `new-host-key` for the host, commit, and install the host again. Do the same for the installer: remove `secrets/installer.yaml`, run `new-installer-key`, commit, and build the ISO again.
+5. Make new SSH host keys, since the old ones could be read. For each host, remove `secrets/host-keys/<host>.yaml` from fleet-private, run `new-host-key` for the host, commit, and install the host again. The installer ISO holds no key, and needs no change.
 
 ### Add sops
 

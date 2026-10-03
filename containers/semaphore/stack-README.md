@@ -71,15 +71,23 @@ After a suspected compromise, do all of the following before the next run:
 
 ### Add sops
 
-Ansible decrypts the fleet's secrets with `sops`, which neither image has. Add it to nix's default profile one time, after the first deploy:
+Ansible decrypts the fleet's secrets with `sops`, which neither image has. Add nixos-fleet's own `sops` to nix's default profile one time, after the first deploy. It comes from that flake's lock, so it is the version the fleet's commands use:
 
 ```bash
 docker exec semaphore-semaphore /nix/var/nix/profiles/default/bin/nix \
   --extra-experimental-features 'nix-command flakes' \
-  profile add --profile /nix/var/nix/profiles/default nixpkgs#sops
+  profile add --profile /nix/var/nix/profiles/default github:myah-mitchell/nixos-fleet#sops
 ```
 
 The profile is in `nix-data`, so `sops` is still there after a redeploy, and it is on the `PATH` set above. Run the command again after `nix-data` has been emptied and filled again.
+
+After nixos-fleet's lock moves to a newer nixpkgs, follow it:
+
+```bash
+docker exec semaphore-semaphore /nix/var/nix/profiles/default/bin/nix \
+  --extra-experimental-features 'nix-command flakes' \
+  profile upgrade --profile /nix/var/nix/profiles/default sops
+```
 
 ## Wiring it to the ansible repo after deploy
 

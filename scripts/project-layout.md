@@ -3,7 +3,7 @@
 ## Folder layout
 The folder layout looks like the following with each sequential indent being another folder deep. `<>` are used to indicate values that would be replaced depending on the container or stack and that multiple entries could exist. Any items that are folders will be in **bold**.
 
-docker-stacks
+fleet-stacks
 * **containers** _Folder containing all container sources_
   * **\<imageName>** - _Folder name should be the image name_
     * **config** - _Optional folder for any config needed to run container (e.g. traefik/rules, vector/config)_
@@ -330,4 +330,4 @@ provides:
 
 The `stacks` role uses what is left. On a run with `docker_stacks_bootstrap` true it drops every stack still listing a `needs_fleet` service, then fills any `needs_host` nothing left provides from `docker_stacks_standins`, which maps `traefik` to _traefik-bootstrap_. On any run, a `needs_host` still unmet at the end stops the role, because the host's stack list cannot be right.
 
-The `stacks` role and `nixos-sync.yml` read this generated file, and the seed files it names, from a docker-stacks checkout on the control node. CI fails when it is out of date, so commit it together with the container change that produced it.
+The `stacks` role and `nixos-sync.yml` read this generated file, and the seed files it names, from a fleet-stacks checkout on the control node. CI fails when it is out of date, so commit it together with the container change that produced it.

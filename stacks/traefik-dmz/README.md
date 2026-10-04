@@ -98,7 +98,7 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-secrets
 sudo chmod 700 /opt/docker/volumes/$projectName/cloudflared-secrets
 sudo test -e /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
   || sudo curl -fsSL -o /opt/docker/volumes/$projectName/cloudflared-config/config.yml \
-  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/cloudflared/config/config.yml.example
+  https://raw.githubusercontent.com/myah-mitchell/fleet-stacks/main/containers/cloudflared/config/config.yml.example
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/cloudflared-config/config.yml
 ```
 

@@ -101,7 +101,7 @@ sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets
 sudo chmod 700 /opt/docker/volumes/$projectName/mailrise-secrets
 sudo test -e /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
   || sudo curl -fsSL -o /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf \
-  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/mailrise/config/mailrise.conf.example
+  https://raw.githubusercontent.com/myah-mitchell/fleet-stacks/main/containers/mailrise/config/mailrise.conf.example
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
 sudo chmod 600 /opt/docker/volumes/$projectName/mailrise-secrets/mailrise.conf
 ```
@@ -227,7 +227,7 @@ mkdir -p /opt/docker/volumes/$projectName/blackbox-exporter-config
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config
 sudo test -e /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
   || sudo curl -fsSL -o /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml \
-  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/blackbox-exporter/config/blackbox.yml.example
+  https://raw.githubusercontent.com/myah-mitchell/fleet-stacks/main/containers/blackbox-exporter/config/blackbox.yml.example
 sudo chown 101000:101000 /opt/docker/volumes/$projectName/blackbox-exporter-config/blackbox.yml
 ```
 

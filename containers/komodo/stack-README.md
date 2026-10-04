@@ -5,7 +5,7 @@
 
 It lives on the host rather than in the checkout so the checkout stays disposable, the same rule every other stack follows.
 
-Leave the copy as it is for this repo. docker-stacks is public, so Komodo needs no `[[git_provider]]` credential to clone it.
+Leave the copy as it is for this repo. fleet-stacks is public, so Komodo needs no `[[git_provider]]` credential to clone it.
 
 Add one, using the commented-out example already in the file, only when you point Komodo at a private repo. Scope the token to that repo, read-only, so a leak grants nothing more than repo access already does:
 

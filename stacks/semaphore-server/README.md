@@ -81,7 +81,7 @@ sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-initdb
 sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb
 sudo test -e /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh \
   || sudo curl -fsSL -o /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh \
-  https://raw.githubusercontent.com/myah-mitchell/docker-stacks/main/containers/semaphore/config/postgres-initdb/10-tofu-state.sh
+  https://raw.githubusercontent.com/myah-mitchell/fleet-stacks/main/containers/semaphore/config/postgres-initdb/10-tofu-state.sh
 sudo chown 100000:100000 /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh
 sudo chmod 755 /opt/docker/volumes/$projectName/postgres-initdb/10-tofu-state.sh
 ```
@@ -155,17 +155,17 @@ After a suspected compromise, do all of the following before the next run:
 
 ### Add sops
 
-Ansible decrypts the fleet's secrets with `sops`, which neither image has. Add nixos-fleet's own `sops` to nix's default profile one time, after the first deploy. It comes from that flake's lock, so it is the version the fleet's commands use:
+Ansible decrypts the fleet's secrets with `sops`, which neither image has. Add fleet-nixos's own `sops` to nix's default profile one time, after the first deploy. It comes from that flake's lock, so it is the version the fleet's commands use:
 
 ```bash
 docker exec semaphore-semaphore /nix/var/nix/profiles/default/bin/nix \
   --extra-experimental-features 'nix-command flakes' \
-  profile add --profile /nix/var/nix/profiles/default github:myah-mitchell/nixos-fleet#sops
+  profile add --profile /nix/var/nix/profiles/default github:myah-mitchell/fleet-nixos#sops
 ```
 
 The profile is in `nix-data`, so `sops` is still there after a redeploy, and it is on the `PATH` set above. Run the command again after `nix-data` has been emptied and filled again.
 
-After nixos-fleet's lock moves to a newer nixpkgs, follow it:
+After fleet-nixos's lock moves to a newer nixpkgs, follow it:
 
 ```bash
 docker exec semaphore-semaphore /nix/var/nix/profiles/default/bin/nix \
@@ -173,17 +173,17 @@ docker exec semaphore-semaphore /nix/var/nix/profiles/default/bin/nix \
   profile upgrade --profile /nix/var/nix/profiles/default sops
 ```
 
-## Wiring it to the ansible repo after deploy
+## Wiring it to the fleet-ansible repo after deploy
 
 Full walkthrough in [The Semaphore project](https://myah-mitchell.github.io/docs/fleet-bootstrap/foundation/semaphore-project/): the Project, the SSH credential, the repos, the inventory, the run's secrets, and a Template that runs against the fleet.
 
 Two points worth knowing before you start.
 
-The ansible repo is public, so its Repository entry needs no credential. Set *Access Key* to **None** rather than creating a deploy key. The dotfiles repo needs no Repository entry at all, because its own Ansible role clones it directly over plain HTTPS.
+The fleet-ansible repo is public, so its Repository entry needs no credential. Set *Access Key* to **None** rather than creating a deploy key. The dotfiles repo needs no Repository entry at all, because its own Ansible role clones it directly over plain HTTPS.
 
 Semaphore reaches every host with a static SSH key trusted by the `ansible` service account. That is the same kind of bootstrap exception as Komodo's own manual first start. Once step-ca's SSH CA is live on pk01, replace it with a dedicated service principal on a short-lived, auto-renewed certificate.
 
-The nixos-fleet commands a run starts (`host-state`, `install-host`, `deploy-host`) open their own SSH connections and name no key file, so they reach the key only through the SSH agent Semaphore starts for the run, by the `SSH_AUTH_SOCK` they inherit from `ansible-playbook`. That has not been tried. If the first run fails at the `nixos` stage with a publickey error, this is the place to look.
+The fleet-nixos commands a run starts (`host-state`, `install-host`, `deploy-host`) open their own SSH connections and name no key file, so they reach the key only through the SSH agent Semaphore starts for the run, by the `SSH_AUTH_SOCK` they inherit from `ansible-playbook`. That has not been tried. If the first run fails at the `nixos` stage with a publickey error, this is the place to look.
 
 ## Create needed folders for postgres
 

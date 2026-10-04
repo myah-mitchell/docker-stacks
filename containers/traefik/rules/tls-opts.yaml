@@ -1,5 +1,5 @@
 ################################################################
-# TLS Options (https://jellyfin.org/docs/general/networking/traefik2.html#traefik-providertoml)
+# TLS Options (https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/traefik/)
 # toml -> yml
 # 2024 updates to cipherSuites from (https://www.smarthomebeginner.com/traefik-v3-docker-compose-guide-2024/)
 #

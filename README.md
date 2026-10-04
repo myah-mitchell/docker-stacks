@@ -13,7 +13,7 @@ The buildout spans four repos, plus a docs site for everything that crosses them
 | fleet-stacks (this one) | Every container and stack definition | Public |
 | [fleet-nixos](https://github.com/myah-mitchell/fleet-nixos) | The flake every VM's NixOS configuration is built from: the modules, the installer ISO, and the install and deploy commands | Public |
 | [fleet-ansible](https://github.com/myah-mitchell/fleet-ansible) | The roles for the Proxmox hosts, and `site.yml`, the one run that builds the fleet | Public |
-| [fleet-opentofu](https://github.com/myah-mitchell/opentofu) | The OpenTofu configuration that creates each VM blank, set to boot the installer ISO. Run by fleet-ansible's `site.yml` | Public |
+| [fleet-opentofu](https://github.com/myah-mitchell/fleet-opentofu) | The OpenTofu configuration that creates each VM blank, set to boot the installer ISO. Run by fleet-ansible's `site.yml` | Public |
 | [docs](https://github.com/myah-mitchell/docs) | The [docs site](https://myah-mitchell.github.io/docs/): the fleet bootstrap runbooks and the Markdown style guide | Public |
 | fleet-private | The real inventory and private values (`hosts.yml`, `group_vars/all/private.yml`), the VMs for OpenTofu (`opentofu/prod.tfvars`), each host's generated Komodo Stacks (`komodo/stacks/`) and NixOS values (`nixos/hosts/`), and the sops secrets. Ansible runs against its inventory | Private |
 
